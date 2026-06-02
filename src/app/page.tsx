@@ -34,13 +34,12 @@ export default async function Home() {
     clientId: session.user.clientId,
     role: "employee",
   });
-  const [lessons, completions] = await Promise.all([
+  const [lessons, completedIds] = await Promise.all([
     sdb.lessons.list(),
-    sdb.completions.forUser(),
+    sdb.events.completedLessonIds(),
   ]);
   if (lessons.length === 0) redirect("/browse");
 
-  const completedIds = new Set(completions.map((c) => c.lessonId));
   const firstIncomplete = lessons.find((l) => !completedIds.has(l.id));
   const target = firstIncomplete ?? lessons[0];
   redirect(`/watch/${target.id}`);

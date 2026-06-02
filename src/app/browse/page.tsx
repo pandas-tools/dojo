@@ -20,13 +20,11 @@ export default async function BrowsePage() {
     role: "employee",
   });
 
-  const [lessons, completions, client] = await Promise.all([
+  const [lessons, completedIds, client] = await Promise.all([
     sdb.lessons.list(),
-    sdb.completions.forUser(),
+    sdb.events.completedLessonIds(),
     sdb.client.get(),
   ]);
-
-  const completedIds = new Set(completions.map((c) => c.lessonId));
 
   // Hydrate each lesson with a translation in the user's preferred language.
   // Single batched fetch — `forLessons` resolves the preferred-or-English
@@ -38,19 +36,38 @@ export default async function BrowsePage() {
   );
   const cards = lessons.map((lesson) => {
     const translation = translationsByLesson.get(lesson.id) ?? null;
+    // Thumbnail source depends on the lesson's content type:
+    //   video    → Mux-generated thumbnail (null until processing finishes)
+    //   image    → the image itself
+    //   carousel → the first slide
+    let thumbnail: string | null = null;
+    let ready = false;
+    if (lesson.contentType === "video") {
+      thumbnail = translation?.thumbnailUrl ?? null;
+      ready = !!translation?.muxPlaybackId;
+    } else if (lesson.contentType === "image") {
+      thumbnail = translation?.imageUrl ?? null;
+      ready = !!translation?.imageUrl;
+    } else if (lesson.contentType === "carousel") {
+      const slides = translation?.carouselSlides ?? null;
+      thumbnail = slides && slides.length > 0 ? slides[0].url : null;
+      ready = !!(slides && slides.length >= 2);
+    }
     return {
       id: lesson.id,
       title: translation?.title ?? lesson.internalName,
       description: translation?.description ?? null,
-      thumbnail: translation?.thumbnailUrl ?? null,
+      contentType: lesson.contentType,
+      thumbnail,
+      ready,
       durationSeconds: translation?.durationSeconds ?? null,
       completed: completedIds.has(lesson.id),
       language: translation?.language ?? null,
     };
   });
 
-  const ready = cards.filter((c) => c.thumbnail !== null);
-  const processing = cards.filter((c) => c.thumbnail === null);
+  const ready = cards.filter((c) => c.ready);
+  const processing = cards.filter((c) => !c.ready);
 
   return (
     <main className="min-h-screen bg-zinc-50">

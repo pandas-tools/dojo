@@ -12,7 +12,7 @@ import {
   users,
   lessons,
   lessonTranslations,
-  lessonCompletions,
+  lessonEvents,
 } from "@/lib/db/schema";
 import {
   Card,
@@ -90,42 +90,45 @@ export default async function ClientDetailPage({
     title: titleByLesson.get(l.id) ?? null,
   }));
 
-  // Per-employee completions, restricted to lessons currently assigned to
-  // this client. Mirrors the analytics pattern so stale completions from
-  // a previous tenant assignment can't inflate the counts here.
-  const completionRows =
+  // Per-employee completions, derived from lesson_events. Restricted to
+  // lessons currently assigned to this client so stale events from a
+  // previous tenant assignment can't inflate counts. Counts are de-duped
+  // per (user, lesson) — a user with multiple lesson_completed events
+  // for the same lesson counts once.
+  const completionEventRows =
     clientUsers.length > 0 && lessonIds.length > 0
       ? await db
           .select({
-            userId: lessonCompletions.userId,
-            lessonId: lessonCompletions.lessonId,
-            completedAt: lessonCompletions.completedAt,
+            userId: lessonEvents.userId,
+            lessonId: lessonEvents.lessonId,
+            createdAt: lessonEvents.createdAt,
           })
-          .from(lessonCompletions)
+          .from(lessonEvents)
           .where(
             and(
+              eq(lessonEvents.eventType, "lesson_completed"),
               inArray(
-                lessonCompletions.userId,
+                lessonEvents.userId,
                 clientUsers.map((u) => u.id),
               ),
-              inArray(lessonCompletions.lessonId, lessonIds),
+              inArray(lessonEvents.lessonId, lessonIds),
             ),
           )
       : [];
 
   const completionsByUser = new Map<
     string,
-    { count: number; lastAt: Date | null }
+    { completed: Set<string>; lastAt: Date | null }
   >();
-  for (const c of completionRows) {
-    const prior = completionsByUser.get(c.userId) ?? {
-      count: 0,
+  for (const e of completionEventRows) {
+    const prior = completionsByUser.get(e.userId) ?? {
+      completed: new Set<string>(),
       lastAt: null as Date | null,
     };
-    prior.count += 1;
-    if (!prior.lastAt || c.completedAt > prior.lastAt)
-      prior.lastAt = c.completedAt;
-    completionsByUser.set(c.userId, prior);
+    prior.completed.add(e.lessonId);
+    if (!prior.lastAt || e.createdAt > prior.lastAt)
+      prior.lastAt = e.createdAt;
+    completionsByUser.set(e.userId, prior);
   }
 
   const storeNameById = new Map(clientStores.map((s) => [s.id, s.name]));
@@ -146,7 +149,7 @@ export default async function ClientDetailPage({
         storeName: u.storeId
           ? (storeNameById.get(u.storeId) ?? "—")
           : "HQ / other",
-        completed: stat?.count ?? 0,
+        completed: stat?.completed.size ?? 0,
         lastActive: stat?.lastAt ?? null,
       };
     });

@@ -12,6 +12,7 @@ import {
   lessons,
   lessonTranslations,
   lessonCompletions,
+  lessonEvents,
 } from "./db/schema";
 
 export type FunnelStage = {
@@ -98,36 +99,60 @@ export async function getClientDetailAnalytics(
   ]);
 
   const assignedLessonIds = clientLessonRows.map((cl) => cl.lessonId);
-  const [lessonRows, translationRows, completionRows] = await Promise.all([
-    assignedLessonIds.length > 0
-      ? db.query.lessons.findMany({
-          where: (l, { inArray: inArr }) => inArr(l.id, assignedLessonIds),
-          orderBy: (l, { asc }) => [asc(l.sortOrder)],
-        })
-      : Promise.resolve([] as (typeof lessons.$inferSelect)[]),
-    assignedLessonIds.length > 0
-      ? db
-          .select()
-          .from(lessonTranslations)
-          .where(inArray(lessonTranslations.lessonId, assignedLessonIds))
-      : Promise.resolve([] as (typeof lessonTranslations.$inferSelect)[]),
-    employeeRows.length > 0 && assignedLessonIds.length > 0
-      ? db
-          .select()
-          .from(lessonCompletions)
-          .where(
-            and(
-              inArray(
-                lessonCompletions.userId,
-                employeeRows.map((u) => u.id),
+  const [lessonRows, translationRows, ratingRows, completionEventRows] =
+    await Promise.all([
+      assignedLessonIds.length > 0
+        ? db.query.lessons.findMany({
+            where: (l, { inArray: inArr }) => inArr(l.id, assignedLessonIds),
+            orderBy: (l, { asc }) => [asc(l.sortOrder)],
+          })
+        : Promise.resolve([] as (typeof lessons.$inferSelect)[]),
+      assignedLessonIds.length > 0
+        ? db
+            .select()
+            .from(lessonTranslations)
+            .where(inArray(lessonTranslations.lessonId, assignedLessonIds))
+        : Promise.resolve([] as (typeof lessonTranslations.$inferSelect)[]),
+      // Ratings (lesson_completions table) — for avg-rating + response count.
+      employeeRows.length > 0 && assignedLessonIds.length > 0
+        ? db
+            .select()
+            .from(lessonCompletions)
+            .where(
+              and(
+                inArray(
+                  lessonCompletions.userId,
+                  employeeRows.map((u) => u.id),
+                ),
+                inArray(lessonCompletions.lessonId, assignedLessonIds),
               ),
-              // Restrict to currently-assigned lessons so stale completions
-              // from a previously-assigned lesson can't inflate counts.
-              inArray(lessonCompletions.lessonId, assignedLessonIds),
-            ),
-          )
-      : Promise.resolve([] as (typeof lessonCompletions.$inferSelect)[]),
-  ]);
+            )
+        : Promise.resolve([] as (typeof lessonCompletions.$inferSelect)[]),
+      // Completion events (lesson_events table) — drives "did they finish."
+      // Historical ratings backfilled here at migration time so pre-cutover
+      // completion counts are preserved.
+      employeeRows.length > 0 && assignedLessonIds.length > 0
+        ? db
+            .select({
+              userId: lessonEvents.userId,
+              lessonId: lessonEvents.lessonId,
+              createdAt: lessonEvents.createdAt,
+            })
+            .from(lessonEvents)
+            .where(
+              and(
+                eq(lessonEvents.eventType, "lesson_completed"),
+                inArray(
+                  lessonEvents.userId,
+                  employeeRows.map((u) => u.id),
+                ),
+                inArray(lessonEvents.lessonId, assignedLessonIds),
+              ),
+            )
+        : Promise.resolve(
+            [] as { userId: string; lessonId: string; createdAt: Date }[],
+          ),
+    ]);
 
   const assignedCount = assignedLessonIds.length;
   const enTitleByLessonId = new Map<string, string>();
@@ -135,29 +160,50 @@ export async function getClientDetailAnalytics(
     if (t.language === "en") enTitleByLessonId.set(t.lessonId, t.title);
   }
 
-  // Indexed completions
-  const completionsByUser = new Map<string, typeof completionRows>();
-  for (const c of completionRows) {
-    const arr = completionsByUser.get(c.userId) ?? [];
-    arr.push(c);
-    completionsByUser.set(c.userId, arr);
-  }
-  const completionsByLesson = new Map<string, typeof completionRows>();
-  for (const c of completionRows) {
-    const arr = completionsByLesson.get(c.lessonId) ?? [];
-    arr.push(c);
-    completionsByLesson.set(c.lessonId, arr);
+  // Completion events — de-duped per (user, lesson). A user who somehow
+  // produced multiple lesson_completed events for the same lesson counts
+  // as one completion. scopedDb.events.write de-dupes on insert too;
+  // belt-and-braces here in case backfill or admin scripts ever produce
+  // dupes.
+  const completedLessonsByUser = new Map<string, Set<string>>();
+  const completedUsersByLesson = new Map<string, Set<string>>();
+  for (const e of completionEventRows) {
+    const userSet = completedLessonsByUser.get(e.userId) ?? new Set<string>();
+    userSet.add(e.lessonId);
+    completedLessonsByUser.set(e.userId, userSet);
+    const lessonSet =
+      completedUsersByLesson.get(e.lessonId) ?? new Set<string>();
+    lessonSet.add(e.userId);
+    completedUsersByLesson.set(e.lessonId, lessonSet);
   }
 
-  // FUNNEL
+  // Ratings — indexed for avg-rating and response-count metrics. Kept
+  // distinct from completion data so a user who completed without rating,
+  // or rated without completing (legacy data), is counted correctly in
+  // each.
+  const ratingsByUser = new Map<string, typeof ratingRows>();
+  for (const r of ratingRows) {
+    const arr = ratingsByUser.get(r.userId) ?? [];
+    arr.push(r);
+    ratingsByUser.set(r.userId, arr);
+  }
+  const ratingsByLesson = new Map<string, typeof ratingRows>();
+  for (const r of ratingRows) {
+    const arr = ratingsByLesson.get(r.lessonId) ?? [];
+    arr.push(r);
+    ratingsByLesson.set(r.lessonId, arr);
+  }
+
+  // FUNNEL — based on completion events, not ratings.
   const loggedIn = employeeRows.length;
   const completed1Plus = employeeRows.filter(
-    (u) => (completionsByUser.get(u.id)?.length ?? 0) > 0,
+    (u) => (completedLessonsByUser.get(u.id)?.size ?? 0) > 0,
   ).length;
   const completedAll =
     assignedCount > 0
       ? employeeRows.filter(
-          (u) => (completionsByUser.get(u.id)?.length ?? 0) >= assignedCount,
+          (u) =>
+            (completedLessonsByUser.get(u.id)?.size ?? 0) >= assignedCount,
         ).length
       : 0;
 
@@ -192,15 +238,15 @@ export async function getClientDetailAnalytics(
       const completedAtStore = usersAtStore.filter(
         (u) =>
           assignedCount > 0 &&
-          (completionsByUser.get(u.id)?.length ?? 0) >= assignedCount,
+          (completedLessonsByUser.get(u.id)?.size ?? 0) >= assignedCount,
       ).length;
       const completionPct =
         loggedAtStore > 0 && assignedCount > 0
           ? completedAtStore / loggedAtStore
           : 0;
       const ratings = usersAtStore
-        .flatMap((u) => completionsByUser.get(u.id) ?? [])
-        .map((c) => c.rating);
+        .flatMap((u) => ratingsByUser.get(u.id) ?? [])
+        .map((r) => r.rating);
       const avgRating =
         ratings.length > 0
           ? Number(
@@ -237,36 +283,43 @@ export async function getClientDetailAnalytics(
 
   // LESSONS
   const lessonRowsOut: LessonRow[] = lessonRows.map((l): LessonRow => {
-    const lessonComps = completionsByLesson.get(l.id) ?? [];
-    const completionPct =
-      loggedIn > 0 ? lessonComps.length / loggedIn : 0;
-    const ratings = lessonComps.map((c) => c.rating);
+    const completedUsers = completedUsersByLesson.get(l.id);
+    const completionCount = completedUsers?.size ?? 0;
+    const completionPct = loggedIn > 0 ? completionCount / loggedIn : 0;
+    const lessonRatings = ratingsByLesson.get(l.id) ?? [];
+    const ratingValues = lessonRatings.map((r) => r.rating);
     const avgRating =
-      ratings.length > 0
+      ratingValues.length > 0
         ? Number(
-            (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(2),
+            (
+              ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length
+            ).toFixed(2),
           )
         : null;
     return {
       lessonId: l.id,
       internalName: l.internalName,
       title: enTitleByLessonId.get(l.id) ?? l.internalName,
-      completionCount: lessonComps.length,
+      completionCount,
       completionPct,
       avgRating,
-      ratingCount: ratings.length,
+      ratingCount: ratingValues.length,
     };
   });
 
   // EMPLOYEES
   const employeeRowsOut: EmployeeRow[] = employeeRows
     .map((u): EmployeeRow => {
-      const comps = completionsByUser.get(u.id) ?? [];
-      const completedCount = comps.length;
+      const completedSet = completedLessonsByUser.get(u.id);
+      const completedCount = completedSet?.size ?? 0;
+      // Most recent activity = most recent completion event for this user
+      // across their completed lessons. Falls back to null if they never
+      // completed anything.
+      const userEvents = completionEventRows.filter((e) => e.userId === u.id);
       const lastActiveAt =
-        comps.length > 0
-          ? comps
-              .map((c) => c.completedAt.toISOString())
+        userEvents.length > 0
+          ? userEvents
+              .map((e) => e.createdAt.toISOString())
               .sort()
               .reverse()[0]
           : null;
@@ -297,9 +350,9 @@ export async function getClientDetailAnalytics(
       return a.email.localeCompare(b.email);
     });
 
-  // TIMELINE — completions per day for the last 30 days, oldest first.
-  // Buckets are computed in UTC for stability across regions; the page
-  // formats them in the viewer's locale at render time.
+  // TIMELINE — completion events per day for the last 30 days, oldest
+  // first. Buckets are computed in UTC for stability across regions; the
+  // page formats them in the viewer's locale at render time.
   const DAYS = 30;
   const now = new Date();
   const startUtc = Date.UTC(
@@ -308,8 +361,8 @@ export async function getClientDetailAnalytics(
     now.getUTCDate() - (DAYS - 1),
   );
   const bucketCounts = new Map<string, number>();
-  for (const c of completionRows) {
-    const d = c.completedAt;
+  for (const c of completionEventRows) {
+    const d = c.createdAt;
     const ts = Date.UTC(
       d.getUTCFullYear(),
       d.getUTCMonth(),

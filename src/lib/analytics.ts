@@ -10,6 +10,7 @@ import {
   users,
   clientLessons,
   lessonCompletions,
+  lessonEvents,
 } from "./db/schema";
 
 export type ClientAnalytics = {
@@ -34,14 +35,32 @@ export type ClientAnalytics = {
 };
 
 export async function getClientAnalytics(): Promise<ClientAnalytics[]> {
-  const [clientRows, storeRows, employeeRows, clientLessonRows, completionRows] =
-    await Promise.all([
-      db.select().from(clients),
-      db.select().from(stores),
-      db.select().from(users).where(eq(users.role, "employee")),
-      db.select().from(clientLessons),
-      db.select().from(lessonCompletions),
-    ]);
+  // Completion is now derived from lesson_events (event_type =
+  // 'lesson_completed'). Rating data still lives in lesson_completions;
+  // the two are decoupled. Historical rating-rows were backfilled into
+  // lesson_events at migration time so pre-cutover completion counts
+  // remain visible.
+  const [
+    clientRows,
+    storeRows,
+    employeeRows,
+    clientLessonRows,
+    ratingRows,
+    completedEventRows,
+  ] = await Promise.all([
+    db.select().from(clients),
+    db.select().from(stores),
+    db.select().from(users).where(eq(users.role, "employee")),
+    db.select().from(clientLessons),
+    db.select().from(lessonCompletions),
+    db
+      .select({
+        userId: lessonEvents.userId,
+        lessonId: lessonEvents.lessonId,
+      })
+      .from(lessonEvents)
+      .where(eq(lessonEvents.eventType, "lesson_completed")),
+  ]);
 
   // Index rows by clientId for O(1) lookups
   const storesByClient = group(storeRows, (s) => s.clientId);
@@ -65,31 +84,43 @@ export async function getClientAnalytics(): Promise<ClientAnalytics[]> {
     if (u.clientId) userToClient.set(u.id, u.clientId);
   }
 
-  // Map: userId → count of completions that are FOR LESSONS ASSIGNED TO
-  // THE USER'S CURRENT CLIENT. Completions for lessons no longer assigned
-  // (or never assigned) to the user's client don't count toward "trained".
-  const inScopeCompletionsByUser = new Map<string, number>();
-  const ratingsByClient = new Map<string, number[]>();
+  // Map: userId → count of COMPLETION EVENTS that are FOR LESSONS
+  // ASSIGNED TO THE USER'S CURRENT CLIENT. Completions for lessons no
+  // longer assigned (or never assigned) to the user's client don't count
+  // toward "trained". De-duped per (user, lesson) — multiple completion
+  // events for the same lesson count once.
+  const inScopeCompletionsByUser = new Map<string, Set<string>>();
   const completedUserIdsByClient = new Map<string, Set<string>>();
 
-  for (const c of completionRows) {
-    const cid = userToClient.get(c.userId);
-    if (!cid) continue; // orphaned completion (user has no client) — skip
+  for (const ev of completedEventRows) {
+    const cid = userToClient.get(ev.userId);
+    if (!cid) continue;
     const assignedToClient = assignedLessonsByClient.get(cid);
-    if (!assignedToClient?.has(c.lessonId)) continue; // completion is for
-    // a lesson not currently assigned to this user's client — don't count
+    if (!assignedToClient?.has(ev.lessonId)) continue;
 
-    inScopeCompletionsByUser.set(
-      c.userId,
-      (inScopeCompletionsByUser.get(c.userId) ?? 0) + 1,
-    );
-    const ratings = ratingsByClient.get(cid) ?? [];
-    ratings.push(c.rating);
-    ratingsByClient.set(cid, ratings);
+    const userCompleted =
+      inScopeCompletionsByUser.get(ev.userId) ?? new Set<string>();
+    userCompleted.add(ev.lessonId);
+    inScopeCompletionsByUser.set(ev.userId, userCompleted);
+
     const completedSet =
       completedUserIdsByClient.get(cid) ?? new Set<string>();
-    completedSet.add(c.userId);
+    completedSet.add(ev.userId);
     completedUserIdsByClient.set(cid, completedSet);
+  }
+
+  // Ratings are still tracked separately — average / response count come
+  // from the rating table, scoped the same way (only ratings for lessons
+  // currently assigned to the user's client count).
+  const ratingsByClient = new Map<string, number[]>();
+  for (const r of ratingRows) {
+    const cid = userToClient.get(r.userId);
+    if (!cid) continue;
+    const assignedToClient = assignedLessonsByClient.get(cid);
+    if (!assignedToClient?.has(r.lessonId)) continue;
+    const ratings = ratingsByClient.get(cid) ?? [];
+    ratings.push(r.rating);
+    ratingsByClient.set(cid, ratings);
   }
 
   return clientRows.map((c): ClientAnalytics => {
@@ -108,11 +139,17 @@ export async function getClientAnalytics(): Promise<ClientAnalytics[]> {
     }
 
     // Trained employees: completed ALL assigned lessons (only in-scope
-    // completions count — see inScopeCompletionsByUser construction above)
+    // completion EVENTS count — see inScopeCompletionsByUser construction
+    // above). Counted as the size of the per-user set since events are
+    // de-duped per (user, lesson).
     let trainedEmployeeCount = 0;
+    let completionCountForClient = 0;
     if (clientAssigned > 0) {
       for (const u of clientEmployees) {
-        if ((inScopeCompletionsByUser.get(u.id) ?? 0) >= clientAssigned) {
+        const userCompleted = inScopeCompletionsByUser.get(u.id);
+        if (!userCompleted) continue;
+        completionCountForClient += userCompleted.size;
+        if (userCompleted.size >= clientAssigned) {
           trainedEmployeeCount++;
         }
       }
@@ -135,7 +172,7 @@ export async function getClientAnalytics(): Promise<ClientAnalytics[]> {
           ? Number((trainedEmployeeCount / activeStores.size).toFixed(2))
           : null,
       assignedLessonCount: clientAssigned,
-      completionCount: ratings.length, // ratings array length == completions count
+      completionCount: completionCountForClient,
       avgRating: avgRating !== null ? Number(avgRating.toFixed(2)) : null,
       responseCount: ratings.length,
     };

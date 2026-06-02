@@ -29,6 +29,13 @@ export async function POST(
       role: "employee",
     });
     const [row] = await sdb.completions.upsert(id, parsed.data.rating);
+    // Also log a rating_submitted event so the events table carries the
+    // rating signal alongside the lesson_completions row. Best-effort —
+    // if the event write fails we still return ok=true since the rating
+    // was persisted successfully.
+    sdb.events
+      .write(id, "rating_submitted", { rating: parsed.data.rating })
+      .catch(() => {});
     return NextResponse.json({ ok: true, completion: row });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
