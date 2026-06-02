@@ -35,6 +35,12 @@ import { cn } from "@/lib/cn";
 import { prepareLessonUpload, createLessonFromUpload } from "./actions";
 
 type Step = "intro" | "uploading" | "configure";
+
+// Lessons must carry media. The text-only escape hatch was removed
+// 2026-06-02 when Dimi locked the three content-type model
+// (video | image | carousel). Until Dex's image/carousel schema lands,
+// the dialog is video-only and the configure step is only reachable
+// after a successful Mux upload.
 type LessonType = "training" | "announcement" | "update";
 
 const ALL_LANGS = [
@@ -274,14 +280,6 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
               </p>
             </div>
 
-            <button
-              type="button"
-              className="text-xs text-zinc-500 hover:text-zinc-900 self-center"
-              onClick={() => setStep("configure")}
-            >
-              Skip — create a text-only lesson
-            </button>
-
             {uploadError && (
               <div className="flex items-start gap-2 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -349,13 +347,10 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
         {step === "configure" && (
           <>
             <DialogHeader>
-              <DialogTitle>
-                {uploadId ? "Configure lesson" : "New text-only lesson"}
-              </DialogTitle>
+              <DialogTitle>Configure lesson</DialogTitle>
               <DialogDescription>
-                {uploadId
-                  ? "Video is uploading in the background. Fill in the details and save."
-                  : "No video attached — you can add one from the lesson detail page later."}
+                Video is uploading in the background. Fill in the details and
+                save.
               </DialogDescription>
             </DialogHeader>
 
@@ -498,15 +493,13 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
               </div>
             </div>
 
-            {uploadId && (
-              <div className="flex items-start gap-2 rounded-md bg-zinc-50 border border-zinc-200 px-3 py-2 text-xs text-zinc-600">
-                <Film className="h-3.5 w-3.5 shrink-0 mt-0.5 text-zinc-500" />
-                <span>
-                  Video attached. Mux is processing — the lesson detail page
-                  will show &ldquo;Ready&rdquo; once it&apos;s playable.
-                </span>
-              </div>
-            )}
+            <div className="flex items-start gap-2 rounded-md bg-zinc-50 border border-zinc-200 px-3 py-2 text-xs text-zinc-600">
+              <Film className="h-3.5 w-3.5 shrink-0 mt-0.5 text-zinc-500" />
+              <span>
+                Video attached. Mux is processing — the lesson detail page will
+                show &ldquo;Ready&rdquo; once it&apos;s playable.
+              </span>
+            </div>
 
             <DialogFooter>
               <Button
