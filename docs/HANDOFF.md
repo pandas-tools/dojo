@@ -124,6 +124,8 @@ Workflow design (Iris drives): what steps the user takes, in what order, what ea
 
 | Commit | What |
 |---|---|
+| `50c9506` | `feat`: analytics + browse read completion from lesson_events, not ratings (Dex) |
+| `d30005b` | `docs(handoff)`: first pass of this handoff document (Iris) |
 | `f1ea6b9` | `feat(watch)`: three-way content-type renderer + lesson tracking wired (Iris) |
 | `f639acb` | `feat(admin)`: NewLessonDialog content-type picker + image/carousel uploaders (Iris) |
 | `fb181b1` | `feat`: ImageKit upload + lesson_events endpoint + tracker hook + image/carousel actions (Dex) |
@@ -145,7 +147,9 @@ Workflow design (Iris drives): what steps the user takes, in what order, what ea
 - **ImageKit credentials on Railway env.** `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT`. Until these are set, the upload endpoint returns 503 and image/carousel uploads can't go end-to-end. Video lessons unaffected. Dex offered two paths: A) Dimi creates a shared Pandas ImageKit account + pastes the keys; B) Dex provisions on Dimi's behalf. Decision pending.
 
 ### In-flight on Dex's side
-- Final commit of the content-types bundle: **analytics rewrite — read completion status from `lesson_events` instead of from `lesson_completions`**. Backfill of existing rating rows into events at migration time. Was "in flight, 30 min" as of 16:18 EEST 2026-06-02.
+- ✅ **Shipped** as `50c9506`: analytics + browse + admin clients detail now read completion from `lesson_events` instead of `lesson_completions`. Rating data still sourced from `lesson_completions` (decoupled the two signals — see commit body for the full split). Backfill ran in migration `0001_media_types_and_events.sql` so historical counts are preserved.
+- ✅ **Shipped** as part of the same commit: `/api/lessons/[id]/complete` (the RatingWidget endpoint) now ALSO fires a `rating_submitted` lesson_event best-effort alongside the existing `lesson_completions` row write. The events table carries the rating signal for analytics; the legacy `lesson_completions` row stays for back-compat.
+- ✅ **Shipped** in the same commit: `/browse` is now content-type-aware — image lessons show `imageUrl` as thumbnail, carousel lessons show the first slide. Old "thumbnail !== null" filter would have hidden every non-video lesson.
 
 ### Deferred (acknowledged, not done)
 - **TranslationsManager and StoresManager internal polish** — they live inside the new Cards but their innards still use older styling. Functional but visually inherit from the previous era. Low priority.
@@ -163,7 +167,39 @@ Workflow design (Iris drives): what steps the user takes, in what order, what ea
 
 ## Conventions Dex uses
 
-(Dex to fill in)
+### Backend ship pattern
+- Direct commits to `main`, no PRs while pre-prod (`/apps/dojo/CLAUDE.md`).
+- Always `tsc --noEmit` clean before commit. Don't trust the build catching things later — the Railway build is reactive, not diagnostic.
+- Don't `git add -A` — git tracks filemode on this repo and the persona's filesystem flips exec bits constantly. Stage explicit paths, or pass `-c core.fileMode=false` to `git add` / `git commit` / `git diff` when you must operate at scale. Never modify the persistent gitconfig.
+- Migrations: `DATABASE_URL=<DATABASE_PUBLIC_URL from Railway> npx drizzle-kit generate --name <slug>`. Migrations land in `drizzle/`, auto-run on deploy via the `release` startCommand in `railway.json` (`npm run db:migrate && npm run db:seed && npm run start`).
+- Drizzle migrations should be additive when possible. If you absolutely need a data backfill, append it as an idempotent INSERT inside the same .sql so re-runs are safe (see `drizzle/0001_media_types_and_events.sql` for the pattern).
+
+### Railway operations
+- Don't use the railway CLI — my account token is rejected. Always go via the GraphQL API at `https://backboard.railway.com/graphql/v2` with `Authorization: Bearer $RAILWAY_TOKEN` from `/personas/dex/.env`.
+- Dojo project + service IDs are stable: project `e0bf2e2d-cd72-47ab-85a8-7286d8972198`, env `f6e41437-0cd1-442e-8dd5-3d4b540930f0`, web `f6de1fcf-07ee-4144-9f78-4d45ce293f0d`, Postgres `5fc74ee4-8f0c-486c-824e-8742815fa168`.
+- Set env vars via the `variableUpsert` mutation. Trigger a redeploy with `deploymentRedeploy(id: <previous deployment id>)`. Status polls via `deployments(first: 1, …)` then `deployment(id: …) { status }` — terminal states are `SUCCESS` / `FAILED` / `CRASHED` / `REMOVED`.
+- `deploymentLogs` shows runtime stdout (typically a propagation lag of 15–30s after a request fires). `buildLogs` shows the Nixpacks build. `environmentLogs` is more reliable for fresh runtime stdout — Iris's `/tmp/dojo-login.sh` uses it for the magic-link gate.
+- The Postgres `DATABASE_PUBLIC_URL` is the TCP-proxy host (`yamanote.proxy.rlwy.net:<port>`); the internal URL `postgres.railway.internal:5432` only resolves from inside the same Railway project. Use the public URL for local migrations + DB inspection from the VPS.
+
+### Auth.js v5 specifics
+- Two configs by design: `src/lib/auth.config.ts` is the Edge-safe slim slice used by middleware; `src/lib/auth.ts` is the full Node config with the Drizzle adapter + Resend provider.
+- Middleware reads claims off the JWT only. It can't touch the DB. JWT self-heal lives in the full config's `jwt` callback — only re-derives role/clientId when the row looks genuinely stale (admin with non-null clientId, or non-admin with null clientId) to keep the request path off Postgres.
+- After mutating a user record server-side, call `unstable_update({ user: { … } })` to force Auth.js to re-issue the JWT — middleware sees the fresh claims on the very next request without a sign-out/sign-in round trip.
+
+### Tracking pattern (`useLessonTracking`)
+- Hook is the single source of truth for client-side event emission. Components consume it; nobody calls `/api/lessons/[id]/event` directly.
+- Engagement heuristic mirrors the `pandas-dynamic-lander` landing-page tracker — visible AND (active in last 30s OR a video is currently playing). Final heartbeat fires via `navigator.sendBeacon` on `pagehide`/`visibilitychange-hidden` so a tab close doesn't lose the count.
+- All event POSTs are fire-and-forget — the tracker must never block or break the UI. If a write fails, the events table is missing that one row; the lesson keeps playing.
+- Server-side `scopedDb.events.write` de-dupes `lesson_opened` and `lesson_completed` per `(user_id, lesson_id)` so retries are safe. `lesson_engagement` and `rating_submitted` always insert.
+
+### Tenant-scoping discipline
+- `scopedDb(user)` is the only path for employee-facing reads/writes against tenant tables. The integration test (`src/tests/tenant-isolation.test.ts`) fails the build if anyone reaches `db` directly for tenant data.
+- Admin routes use the raw `db` client but self-authorize at the top of each handler with `if (session.user.role !== 'admin') return 403`. Never rely on middleware redirects for authorization — middleware redirects; it does not authorize.
+- The denormalised `client_id` on `lesson_events` is set server-side at write time from the user's clientId — never accepted from the client payload. Analytics queries scope by it.
+
+### Migration-state cleanup
+- The `MuxPlayerClient.tsx` legacy component was removed in `f1ea6b9` as part of the three-content-type viewer split. If anyone needs a Mux player going forward, it lives in `VideoLessonViewer`.
+- `createLesson` (the legacy action that creates a video-less lesson with just title+description) is still exported but unused — the New Lesson dialog routes through `createLessonFromUpload` / `createImageLesson` / `createCarouselLesson` exclusively. Safe to delete in a future cleanup pass.
 
 ## Reading order for a fresh session
 
