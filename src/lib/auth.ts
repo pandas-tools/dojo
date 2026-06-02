@@ -27,6 +27,45 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
     Resend({
       apiKey: process.env.AUTH_RESEND_KEY,
       from: process.env.AUTH_EMAIL_FROM,
+      // Custom sendVerificationRequest so we can ALSO log the magic-link
+      // URL when DEV_LOG_MAGIC_LINKS=1 is set on the host. Pre-production
+      // only — flip the env var off (or unset it) when dojo cuts over to
+      // a real production audience. The email still goes out via Resend
+      // exactly as before in both modes.
+      async sendVerificationRequest({ identifier, url, provider }) {
+        if (process.env.DEV_LOG_MAGIC_LINKS === "1") {
+          // Single-line, grep-friendly. Iris pulls this via the Railway
+          // deploymentLogs GraphQL query.
+          console.log(`DEV_MAGIC_LINK email=${identifier} url=${url}`);
+        }
+        const apiKey = provider.apiKey as string | undefined;
+        const from = provider.from as string | undefined;
+        if (!apiKey || !from) {
+          throw new Error(
+            "AUTH_RESEND_KEY or AUTH_EMAIL_FROM is missing — cannot send magic link",
+          );
+        }
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from,
+            to: identifier,
+            subject: "Sign in to Dojo",
+            text: `Sign in to Dojo:\n\n${url}\n\nThis link expires in 24 hours. If you didn't request this, you can ignore this email.`,
+            html: `<p>Sign in to Dojo by clicking the link below:</p><p><a href="${url}">${url}</a></p><p>This link expires in 24 hours. If you didn't request this, you can ignore this email.</p>`,
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          throw new Error(
+            `Resend send failed: ${res.status} ${res.statusText} ${body}`,
+          );
+        }
+      },
     }),
   ],
   adapter: DrizzleAdapter(db, {
