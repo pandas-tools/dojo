@@ -52,7 +52,7 @@ Helper script Iris left at `/tmp/dojo-login.sh` automates this. Flip the env var
 | ORM | Drizzle | Schema at `src/lib/db/schema.ts` |
 | Auth | Auth.js v5 + Resend | Magic-link, JWT sessions, sender `noreply@mkt.pandas.io` |
 | Video | Mux | Direct-upload from browser; webhook signature-verified at `/api/webhooks/mux` |
-| Images | ImageKit | Server-proxied upload at `/api/admin/lessons/upload-image`. **Creds not yet on Railway env — operator action pending.** |
+| Images | Railway Bucket (Tigris, S3-compatible) | `dojo-media` bucket. Server-proxied upload at `/api/admin/lessons/upload-image`; public read via `/api/media/[...path]` proxy stream. Bucket has no public URL. |
 | Tests | Vitest | Integration tests for auth, tenant isolation, Mux webhook |
 | Deploy | Railway | Web + Postgres in one project. Project id `e0bf2e2d-cd72-47ab-85a8-7286d8972198`, environment `f6e41437-0cd1-442e-8dd5-3d4b540930f0`, web service `f6de1fcf-07ee-4144-9f78-4d45ce293f0d` |
 
@@ -84,8 +84,8 @@ Every lesson is one of:
 | Content type | Authoring | Employee viewer | Completion criteria |
 |---|---|---|---|
 | **Video** | Drag-drop file → Mux direct-upload → webhook fills `mux_playback_id` | `VideoLessonViewer` (Mux player) | 90% of duration watched |
-| **Image** | Drag-drop one image → ImageKit via `/api/admin/lessons/upload-image` → ImageKit URL stored | `ImageLessonViewer` | 5 seconds of visible dwell |
-| **Carousel** | Drag-drop multiple images → sequential ImageKit uploads → ordered slide list with alt-per-slide | `CarouselLessonViewer` | All slides viewed |
+| **Image** | Drag-drop one image → server proxy → `dojo-media` bucket → `/api/media/lessons/<uuid>.<ext>` URL stored | `ImageLessonViewer` | 5 seconds of visible dwell |
+| **Carousel** | Drag-drop multiple images → sequential bucket uploads → ordered slide list with alt-per-slide | `CarouselLessonViewer` | All slides viewed |
 
 Text-only lessons are explicitly out of scope (removed from the New Lesson dialog 2026-06-02). Carousels of text-slides are the way to do text content — the designer makes them as images.
 
@@ -126,7 +126,7 @@ Mobile: parent layout is `flex-col sm:flex-row`. Mobile top bar with hamburger �
 
 ## Lane split
 
-Backend (always Dex): DB schema, server actions, API routes, integrations (Mux, Resend, ImageKit, Auth.js), validation, business logic, auth, deploys, env, performance.
+Backend (always Dex): DB schema, server actions, API routes, integrations (Mux, Resend, Railway Bucket, Auth.js), validation, business logic, auth, deploys, env, performance.
 
 Frontend (always Iris): every visible surface — components, layout, motion, styling, user-facing experience.
 
@@ -157,11 +157,11 @@ Workflow design (Iris drives): what steps the user takes, in what order, what ea
 ## What's pending / blocked
 
 ### Operator action (Dimi)
-- **ImageKit credentials on Railway env.** `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT`. Until these are set, the upload endpoint returns 503 and image/carousel uploads can't go end-to-end. Video lessons unaffected. Dex offered two paths: A) Dimi creates a shared Pandas ImageKit account + pastes the keys; B) Dex provisions on Dimi's behalf. Decision pending.
+- _(empty — ImageKit migration to Railway Bucket completed 2026-06-02. Image + carousel uploads work end-to-end on the live deploy.)_
 
 ### Things that ONLY the operator (Dimi) can do
 Useful for future sessions to know upfront — these can't be bypassed by either persona:
-- Set / rotate / delete Railway env vars on the dojo Railway project (Dex has read access via GraphQL but write permissions for sensitive vars sit with Dimi). Today's stuck-on-operator item is ImageKit (above).
+- Set / rotate / delete Railway env vars on the dojo Railway project (Dex has read access via GraphQL and can `variableUpsert` with a project-scoped token; account-scoped Railway operations — e.g. CLI-only steps like `bucketCreate` instance deploy — sit with Dimi or require account-scoped tokens issued to a persona).
 - Approve any external-facing change (PR push to a customer-facing repo, prod deploy of pandas-website, etc.). Dojo is pre-prod so direct-to-main is fine here.
 - Domain DNS for `learn.pandas.io` cutover when Dojo goes live (Cloudflare side, not Railway).
 - Add a new admin email to `ADMIN_ALLOWLIST` if that's how you want to bootstrap a teammate — though you can also add admins from the live Members surface once you're signed in.
