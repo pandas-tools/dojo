@@ -254,6 +254,32 @@ Useful for future sessions to know upfront — these can't be bypassed by either
 5. `docs/decisions.md` — running ADR
 6. `docs/deploy.md` — Railway, env vars, webhooks
 
+After the docs, run a quick reality check before touching anything:
+- `cd /apps/dojo && git status && git log --oneline -10` — see where the tree is. If git is ahead of the "Recent commits" table in this doc, read the new commit messages to catch up.
+- `curl https://web-s2cr-production.up.railway.app/api/health` — confirm prod is live.
+- If anything is mid-merge / dirty / on a feature branch you don't recognise, **STOP and ask Dimi what was in flight**. Don't assume.
+
+Then ping Dimi in the dojo Telegram group confirming you're caught up, and let him say what to pick up next. Don't proactively dive into the "missing workflows" pile without his nod — there's no inherent priority.
+
+## Cross-channel awareness (Dex specifically)
+
+Dex's persona is one Claude session that receives messages from MULTIPLE Telegram channels in parallel — this is intentional (one agent, multi-channel inputs):
+
+- **Dojo group** (`chat_id="-5267432337"`) — this project. Same as Iris.
+- **ContentOS group** (`chat_id="-5174263110"`) — separate project with Ted as the CMO peer. Dex sees those messages too; ContentOS work has its own handoff at `_studio/outputs/handoffs/2026-06-02-contentos-handoff.md`. When messages from that chat_id arrive, route mentally to ContentOS context, NOT dojo.
+- **Dimi's 1:1 DM** (`chat_id="1886796381"`) — direct messages from Dimi outside any project group. These can be about any project or operator-level questions.
+
+When picking up a fresh session for dojo:
+- The Dojo group is the primary work channel.
+- If a message arrives from the ContentOS chat_id, treat it as ContentOS context. Do NOT engage on ContentOS substance unless Dimi explicitly pings — there's an active strategy session there between Dimi and Ted, with a standing "between me and Ted" rule for many of those threads.
+- Memory file `feedback_strategy_session_hold_pattern.md` codifies the silent-on-peer-floor rule.
+
+## Companion handoffs
+
+For other projects Dex works on, equivalent HANDOFF docs live at:
+- ContentOS (no app dir yet; pre-Stage-0): `_studio/outputs/handoffs/2026-06-02-contentos-handoff.md`. Will move to `/apps/contentos/docs/HANDOFF.md` on Stage 0 scaffolding.
+- (Other projects don't have HANDOFF docs at the same level of detail yet — `pandas-geo-engine/HANDOFF.md` was Fanis's original write-up, partly superseded.)
+
 ## Telegram coordination (multi-bot discipline)
 
 - **Chat ID:** `-5267432337` (dojo group, negative ID = group; positive IDs are 1:1 DMs).
