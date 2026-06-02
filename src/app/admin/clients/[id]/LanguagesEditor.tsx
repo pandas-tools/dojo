@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
+import { toast } from "sonner";
 import { addLanguage, removeLanguage } from "../actions";
+import { cn } from "@/lib/cn";
 
 const LANGS = [
   { code: "en", label: "English" },
@@ -25,49 +28,51 @@ export default function LanguagesEditor({
   const [pending, startTransition] = useTransition();
   const enabled = new Set(languages);
 
-  function toggle(code: string) {
+  function toggle(code: string, label: string) {
+    const wasOn = enabled.has(code);
     startTransition(async () => {
-      if (enabled.has(code)) {
+      if (wasOn) {
         await removeLanguage({ clientId, language: code });
+        toast.success(`Disabled ${label}`);
       } else {
         await addLanguage({ clientId, language: code });
+        toast.success(`Enabled ${label}`);
       }
       router.refresh();
     });
   }
 
   return (
-    <div className="rounded-md border border-zinc-200 bg-white p-4">
-      <ul className="grid gap-2 sm:grid-cols-2">
-        {LANGS.map((l) => {
-          const isOn = enabled.has(l.code);
-          return (
-            <li
-              key={l.code}
-              className="flex items-center justify-between rounded px-3 py-2 text-sm hover:bg-zinc-50"
+    <div className="flex flex-wrap gap-1.5">
+      {LANGS.map((l) => {
+        const isOn = enabled.has(l.code);
+        return (
+          <button
+            key={l.code}
+            type="button"
+            onClick={() => toggle(l.code, l.label)}
+            disabled={pending}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              "disabled:opacity-50",
+              isOn
+                ? "bg-zinc-900 text-white border-zinc-900 hover:bg-zinc-800"
+                : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400",
+            )}
+          >
+            {isOn && <Check className="h-3 w-3" />}
+            {l.label}
+            <span
+              className={cn(
+                "font-mono text-[10px]",
+                isOn ? "text-zinc-300" : "text-zinc-400",
+              )}
             >
-              <span>
-                <span className="font-mono text-xs text-zinc-500 mr-2">
-                  {l.code}
-                </span>
-                {l.label}
-              </span>
-              <button
-                type="button"
-                onClick={() => toggle(l.code)}
-                disabled={pending}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                  isOn
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                    : "border border-zinc-300 text-zinc-700 hover:border-zinc-500"
-                } disabled:opacity-50`}
-              >
-                {isOn ? "Enabled ✓" : "Enable"}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+              {l.code}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

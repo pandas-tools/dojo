@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
+import { Building2 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import {
@@ -10,7 +11,10 @@ import {
   stores,
   users,
 } from "@/lib/db/schema";
-import NewClientForm from "./NewClientForm";
+import { PageHeader } from "@/components/ui/page-header";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import NewClientDialog from "./NewClientDialog";
 
 export const metadata = { title: "Clients · Admin · Dojo" };
 export const dynamic = "force-dynamic";
@@ -34,72 +38,64 @@ export default async function AdminClientsPage() {
   const usersByClient = group(allUsers, (u) => u.clientId ?? "");
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Clients</h1>
-        <p className="text-sm text-zinc-600 mt-1">
-          Add and manage Pandas clients. Each client gets its own allowed
-          email domains, language picker, and assigned lessons.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Clients"
+        description="Pandas clients on Dojo. Each has its own allowed sign-in domains, language picker, stores, and assigned lessons."
+        action={<NewClientDialog />}
+      />
 
-      <section>
-        <h2 className="text-sm font-medium text-zinc-700 mb-2">New client</h2>
-        <div className="rounded-md border border-zinc-200 bg-white p-4">
-          <NewClientForm />
+      {clientList.length === 0 ? (
+        <div className="rounded-lg border border-zinc-200 bg-white">
+          <EmptyState
+            icon={<Building2 className="h-5 w-5" />}
+            title="No clients yet"
+            description="Add your first client to start configuring domains, stores, and lesson assignments."
+            action={<NewClientDialog />}
+          />
         </div>
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="text-sm font-medium text-zinc-700">All clients</h2>
-        {clientList.map((c) => {
-          const domains = domainsByClient.get(c.id) ?? [];
-          const assigned = lessonsByClient.get(c.id) ?? [];
-          const storeCount = (storesByClient.get(c.id) ?? []).length;
-          const userCount = (usersByClient.get(c.id) ?? []).length;
-          return (
-            <div
-              key={c.id}
-              className="rounded-md border border-zinc-200 bg-white p-5"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <h3 className="text-lg font-medium">{c.name}</h3>
-                  <p className="text-xs text-zinc-500">slug: {c.slug}</p>
+      ) : (
+        <div className="space-y-3">
+          {clientList.map((c) => {
+            const domains = domainsByClient.get(c.id) ?? [];
+            const assigned = lessonsByClient.get(c.id) ?? [];
+            const storeCount = (storesByClient.get(c.id) ?? []).length;
+            const userCount = (usersByClient.get(c.id) ?? []).length;
+            return (
+              <Link
+                key={c.id}
+                href={`/admin/clients/${c.id}`}
+                className="block rounded-lg border border-zinc-200 bg-white p-5 hover:border-zinc-400 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-semibold text-zinc-900">
+                        {c.name}
+                      </h3>
+                      {c.isActive ? (
+                        <Badge variant="success">Active</Badge>
+                      ) : (
+                        <Badge variant="neutral">Inactive</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-0.5 font-mono">
+                      {c.slug}
+                    </p>
+                  </div>
+                  <span className="text-xs text-zinc-400">Manage →</span>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      c.isActive
-                        ? "bg-emerald-100 text-emerald-800"
-                        : "bg-zinc-200 text-zinc-700"
-                    }`}
-                  >
-                    {c.isActive ? "Active" : "Inactive"}
-                  </span>
-                  <Link
-                    href={`/admin/clients/${c.id}`}
-                    className="text-sm text-zinc-700 hover:underline"
-                  >
-                    Manage →
-                  </Link>
-                </div>
-              </div>
-              <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-                <Stat label="Stores" value={storeCount} />
-                <Stat label="Employees" value={userCount} />
-                <Stat label="Lessons assigned" value={assigned.length} />
-                <Stat label="Allowed domains" value={domains.length} />
-              </dl>
-            </div>
-          );
-        })}
-        {clientList.length === 0 && (
-          <p className="text-sm text-zinc-500">
-            No clients yet. Add one above.
-          </p>
-        )}
-      </section>
+                <dl className="mt-4 grid grid-cols-4 gap-x-6 text-sm">
+                  <Stat label="Stores" value={storeCount} />
+                  <Stat label="Employees" value={userCount} />
+                  <Stat label="Lessons" value={assigned.length} />
+                  <Stat label="Domains" value={domains.length} />
+                </dl>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -107,8 +103,10 @@ export default async function AdminClientsPage() {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-zinc-500">{label}</dt>
-      <dd className="text-zinc-900 font-medium">{value}</dd>
+      <dt className="text-[11px] uppercase tracking-wide text-zinc-500">
+        {label}
+      </dt>
+      <dd className="text-zinc-900 font-semibold text-lg mt-0.5">{value}</dd>
     </div>
   );
 }

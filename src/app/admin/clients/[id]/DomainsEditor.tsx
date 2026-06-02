@@ -2,7 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
+import { toast } from "sonner";
 import { addAllowedDomain, removeAllowedDomain } from "../actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function DomainsEditor({
   clientId,
@@ -13,67 +17,53 @@ export default function DomainsEditor({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
   function onAdd(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     startTransition(async () => {
       const res = await addAllowedDomain({ clientId, domain: draft });
       if (res?.error) {
-        setError(res.error);
+        toast.error(res.error);
         return;
       }
+      toast.success(`Added ${draft}`);
       setDraft("");
       router.refresh();
     });
   }
 
   function onRemove(domain: string) {
-    setError(null);
     startTransition(async () => {
       await removeAllowedDomain({ clientId, domain });
+      toast.success(`Removed ${domain}`);
       router.refresh();
     });
   }
 
   return (
-    <div className="rounded-md border border-zinc-200 bg-white p-4 space-y-3">
+    <div className="space-y-3">
       <form onSubmit={onAdd} className="flex gap-2">
-        <input
+        <Input
           type="text"
           value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            if (error) setError(null);
-          }}
+          onChange={(e) => setDraft(e.target.value)}
           placeholder="orange.be"
-          className="flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-mono focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          className="font-mono flex-1"
         />
-        <button
-          type="submit"
-          disabled={pending || !draft}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:bg-zinc-300 transition-colors"
-        >
-          {pending ? "…" : "Add"}
-        </button>
+        <Button type="submit" disabled={pending || !draft.trim()}>
+          Add
+        </Button>
       </form>
 
-      {error && (
-        <p className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
-
       {domains.length === 0 ? (
-        <p className="text-sm text-zinc-500">No domains yet.</p>
+        <p className="text-sm text-zinc-500">No allowed domains yet.</p>
       ) : (
-        <ul className="flex flex-wrap gap-2">
+        <ul className="flex flex-wrap gap-1.5">
           {domains.map((d) => (
             <li
               key={d}
-              className="flex items-center gap-2 rounded bg-zinc-100 pl-2 pr-1 py-1 text-sm font-mono text-zinc-700"
+              className="inline-flex items-center gap-1 rounded-full bg-zinc-100 pl-2.5 pr-1 py-0.5 text-xs font-mono text-zinc-700 border border-zinc-200"
             >
               {d}
               <button
@@ -81,9 +71,9 @@ export default function DomainsEditor({
                 onClick={() => onRemove(d)}
                 disabled={pending}
                 aria-label={`Remove ${d}`}
-                className="rounded text-zinc-500 hover:bg-zinc-200 hover:text-red-700 px-1 disabled:opacity-50"
+                className="rounded-full p-0.5 text-zinc-400 hover:bg-zinc-200 hover:text-red-700 disabled:opacity-50 transition-colors"
               >
-                ×
+                <X className="h-3 w-3" />
               </button>
             </li>
           ))}

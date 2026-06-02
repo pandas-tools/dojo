@@ -2,7 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { updateClient } from "../actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 type Client = {
   id: string;
@@ -14,16 +20,16 @@ type Client = {
 export default function ClientDetailEditor({ client }: { client: Client }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState(client.name);
   const [slug, setSlug] = useState(client.slug);
   const [isActive, setIsActive] = useState(client.isActive);
   const dirty =
-    name !== client.name || slug !== client.slug || isActive !== client.isActive;
+    name !== client.name ||
+    slug !== client.slug ||
+    isActive !== client.isActive;
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     startTransition(async () => {
       const res = await updateClient({
         id: client.id,
@@ -32,66 +38,59 @@ export default function ClientDetailEditor({ client }: { client: Client }) {
         isActive: isActive !== client.isActive ? isActive : undefined,
       });
       if (res?.error) {
-        setError(res.error);
+        toast.error(res.error);
         return;
       }
+      toast.success("Client updated");
       router.refresh();
     });
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="rounded-md border border-zinc-200 bg-white p-4 space-y-3"
-    >
+    <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-zinc-600 mb-1">
-            Name
-          </label>
-          <input
+          <Label htmlFor="client-name">Name</Label>
+          <Input
+            id="client-name"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-zinc-600 mb-1">
-            Slug
-          </label>
-          <input
+          <Label htmlFor="client-slug">Slug</Label>
+          <Input
+            id="client-slug"
             required
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-mono focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            className="font-mono"
           />
         </div>
       </div>
-      <label className="flex items-center gap-2 text-sm text-zinc-700">
-        <input
-          type="checkbox"
-          checked={isActive}
-          onChange={(e) => setIsActive(e.target.checked)}
-          className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
-        />
-        Active (inactive clients still exist but their employees can't sign in)
-      </label>
 
-      {error && (
-        <p className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
+      <div className="flex items-center justify-between rounded-md border border-zinc-200 px-3 py-2.5 bg-zinc-50">
+        <div>
+          <Label htmlFor="client-active" className="mb-0 text-sm text-zinc-900">
+            Active
+          </Label>
+          <p className="text-xs text-zinc-500">
+            Inactive clients still exist but their employees can&apos;t sign in.
+          </p>
+        </div>
+        <Switch
+          id="client-active"
+          checked={isActive}
+          onCheckedChange={setIsActive}
+        />
+      </div>
 
       <div className="flex justify-end">
-        <button
-          type="submit"
-          disabled={!dirty || pending}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:bg-zinc-300 transition-colors"
-        >
-          {pending ? "Saving…" : "Save changes"}
-        </button>
+        <Button type="submit" disabled={!dirty || pending}>
+          {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+          Save changes
+        </Button>
       </div>
     </form>
   );
