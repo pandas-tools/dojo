@@ -2,7 +2,9 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCircle2, Circle, Loader2 } from "lucide-react";
 import { togglePublish } from "../actions";
+import { cn } from "@/lib/cn";
 
 export default function PublishToggle({
   lessonId,
@@ -26,13 +28,22 @@ export default function PublishToggle({
       type="button"
       onClick={flip}
       disabled={pending}
-      className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+      className={cn(
+        "inline-flex items-center gap-2 rounded-md border px-3 h-9 text-sm font-medium transition-colors",
+        "disabled:opacity-50 disabled:cursor-not-allowed",
         isPublished
-          ? "bg-emerald-600 text-white hover:bg-emerald-700"
-          : "bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
-      } disabled:opacity-50`}
+          ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
+          : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400",
+      )}
     >
-      {isPublished ? "Published" : "Draft — publish"}
+      {pending ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : isPublished ? (
+        <CheckCircle2 className="h-4 w-4" />
+      ) : (
+        <Circle className="h-4 w-4 text-zinc-400" />
+      )}
+      {isPublished ? "Published" : "Publish lesson"}
     </button>
   );
 }

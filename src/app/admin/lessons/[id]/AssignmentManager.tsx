@@ -2,7 +2,10 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
+import { toast } from "sonner";
 import { assignToClient, unassignFromClient } from "../actions";
+import { cn } from "@/lib/cn";
 
 type ClientRow = { id: string; name: string };
 
@@ -19,48 +22,51 @@ export default function AssignmentManager({
   const [pending, startTransition] = useTransition();
   const assigned = new Set(assignedIds);
 
-  function toggle(clientId: string) {
+  function toggle(client: ClientRow) {
+    const wasAssigned = assigned.has(client.id);
     startTransition(async () => {
-      if (assigned.has(clientId)) {
-        await unassignFromClient(lessonId, clientId);
+      if (wasAssigned) {
+        await unassignFromClient(lessonId, client.id);
+        toast.success(`Unassigned from ${client.name}`);
       } else {
-        await assignToClient(lessonId, clientId);
+        await assignToClient(lessonId, client.id);
+        toast.success(`Assigned to ${client.name}`);
       }
       router.refresh();
     });
   }
 
+  if (clients.length === 0) {
+    return (
+      <p className="text-sm text-zinc-500">
+        No clients configured yet. Create one to assign lessons.
+      </p>
+    );
+  }
+
   return (
-    <div className="rounded-md border border-zinc-200 bg-white p-4">
-      {clients.length === 0 ? (
-        <p className="text-sm text-zinc-500">No clients configured.</p>
-      ) : (
-        <ul className="space-y-2">
-          {clients.map((c) => {
-            const isAssigned = assigned.has(c.id);
-            return (
-              <li
-                key={c.id}
-                className="flex items-center justify-between text-sm"
-              >
-                <span>{c.name}</span>
-                <button
-                  type="button"
-                  onClick={() => toggle(c.id)}
-                  disabled={pending}
-                  className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                    isAssigned
-                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                      : "border border-zinc-300 text-zinc-700 hover:border-zinc-500"
-                  } disabled:opacity-50`}
-                >
-                  {isAssigned ? "Assigned ✓" : "Assign"}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+    <div className="flex flex-wrap gap-1.5">
+      {clients.map((c) => {
+        const isAssigned = assigned.has(c.id);
+        return (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => toggle(c)}
+            disabled={pending}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              "disabled:opacity-50",
+              isAssigned
+                ? "bg-zinc-900 text-white border-zinc-900 hover:bg-zinc-800"
+                : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400",
+            )}
+          >
+            {isAssigned && <Check className="h-3 w-3" />}
+            {c.name}
+          </button>
+        );
+      })}
     </div>
   );
 }

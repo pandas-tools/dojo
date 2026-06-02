@@ -2,7 +2,19 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { updateLesson } from "../actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type LessonType = "training" | "announcement" | "update";
 
@@ -12,12 +24,6 @@ type Props = {
   initialType: LessonType;
 };
 
-const TYPES: { value: LessonType; label: string }[] = [
-  { value: "training", label: "Training" },
-  { value: "announcement", label: "Announcement" },
-  { value: "update", label: "Update" },
-];
-
 export default function LessonMetaEditor({
   lessonId,
   initialInternalName,
@@ -25,7 +31,6 @@ export default function LessonMetaEditor({
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
   const [internalName, setInternalName] = useState(initialInternalName);
   const [type, setType] = useState<LessonType>(initialType);
 
@@ -34,7 +39,6 @@ export default function LessonMetaEditor({
 
   function save(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     startTransition(async () => {
       const res = await updateLesson({
         lessonId,
@@ -42,9 +46,10 @@ export default function LessonMetaEditor({
         type,
       });
       if (res?.error) {
-        setError(res.error);
+        toast.error(res.error);
         return;
       }
+      toast.success("Lesson metadata saved");
       router.refresh();
     });
   }
@@ -52,44 +57,39 @@ export default function LessonMetaEditor({
   return (
     <form
       onSubmit={save}
-      className="flex flex-col gap-3 sm:flex-row sm:items-end"
+      className="grid gap-4 sm:grid-cols-[1fr_180px_auto] sm:items-end"
     >
-      <label className="flex-1">
-        <span className="block text-xs font-medium text-zinc-700 mb-1">
-          Internal name
-        </span>
-        <input
+      <div>
+        <Label htmlFor="meta-name">Internal name</Label>
+        <Input
+          id="meta-name"
           value={internalName}
           onChange={(e) => setInternalName(e.target.value)}
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
-      </label>
-      <label>
-        <span className="block text-xs font-medium text-zinc-700 mb-1">
-          Type
-        </span>
-        <select
+      </div>
+      <div>
+        <Label htmlFor="meta-type">Type</Label>
+        <Select
           value={type}
-          onChange={(e) => setType(e.target.value as LessonType)}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          onValueChange={(v) => setType(v as LessonType)}
         >
-          {TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button
+          <SelectTrigger id="meta-type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="training">Training</SelectItem>
+            <SelectItem value="announcement">Announcement</SelectItem>
+            <SelectItem value="update">Update</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <Button
         type="submit"
         disabled={!dirty || pending || !internalName.trim()}
-        className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:bg-zinc-300 transition-colors"
       >
-        {pending ? "Saving…" : "Save"}
-      </button>
-      {error && (
-        <p className="text-sm text-red-700 sm:ml-3">{error}</p>
-      )}
+        {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+        Save
+      </Button>
     </form>
   );
 }
