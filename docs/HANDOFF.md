@@ -124,6 +124,7 @@ Workflow design (Iris drives): what steps the user takes, in what order, what ea
 
 | Commit | What |
 |---|---|
+| `d4073f0` | `docs(handoff)`: Dex's engineering enhancement pass on HANDOFF.md (Dex) |
 | `50c9506` | `feat`: analytics + browse read completion from lesson_events, not ratings (Dex) |
 | `d30005b` | `docs(handoff)`: first pass of this handoff document (Iris) |
 | `f1ea6b9` | `feat(watch)`: three-way content-type renderer + lesson tracking wired (Iris) |
@@ -146,10 +147,10 @@ Workflow design (Iris drives): what steps the user takes, in what order, what ea
 ### Operator action (Dimi)
 - **ImageKit credentials on Railway env.** `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT`. Until these are set, the upload endpoint returns 503 and image/carousel uploads can't go end-to-end. Video lessons unaffected. Dex offered two paths: A) Dimi creates a shared Pandas ImageKit account + pastes the keys; B) Dex provisions on Dimi's behalf. Decision pending.
 
-### In-flight on Dex's side
-- ✅ **Shipped** as `50c9506`: analytics + browse + admin clients detail now read completion from `lesson_events` instead of `lesson_completions`. Rating data still sourced from `lesson_completions` (decoupled the two signals — see commit body for the full split). Backfill ran in migration `0001_media_types_and_events.sql` so historical counts are preserved.
-- ✅ **Shipped** as part of the same commit: `/api/lessons/[id]/complete` (the RatingWidget endpoint) now ALSO fires a `rating_submitted` lesson_event best-effort alongside the existing `lesson_completions` row write. The events table carries the rating signal for analytics; the legacy `lesson_completions` row stays for back-compat.
-- ✅ **Shipped** in the same commit: `/browse` is now content-type-aware — image lessons show `imageUrl` as thumbnail, carousel lessons show the first slide. Old "thumbnail !== null" filter would have hidden every non-video lesson.
+### Just shipped (during this handoff write-up)
+- ✅ `50c9506` — analytics + browse + admin clients detail now read completion from `lesson_events` instead of `lesson_completions`. Rating data still sourced from `lesson_completions` (decoupled the two signals — see commit body). Backfill ran in migration `0001_media_types_and_events.sql` so historical counts are preserved.
+- ✅ Same commit: `/api/lessons/[id]/complete` (RatingWidget endpoint) now ALSO fires a `rating_submitted` lesson_event best-effort alongside the existing `lesson_completions` row write. Events table carries the rating signal for analytics; `lesson_completions` stays for back-compat.
+- ✅ Same commit: `/browse` is now content-type-aware — image lessons show `imageUrl` as thumbnail, carousel lessons show the first slide. Old "thumbnail !== null" filter would have hidden every non-video lesson.
 
 ### Deferred (acknowledged, not done)
 - **TranslationsManager and StoresManager internal polish** — they live inside the new Cards but their innards still use older styling. Functional but visually inherit from the previous era. Low priority.
@@ -161,9 +162,33 @@ Workflow design (Iris drives): what steps the user takes, in what order, what ea
 
 ## Conventions Iris uses
 
-- One worktree per topic when isolation matters; otherwise edits land on the shared `/apps/dojo/` checkout because Dojo is on direct-to-main pre-prod flow.
-- Visual QA via headless playwright against the live deploy. The script + chromium-headless-shell lives at `/tmp/iris-pw/`. Auth via `/tmp/dojo-login.sh <email> <cookie-jar>` (uses the dev magic-link log gate).
-- Mobile QA at 390x844 (iPhone-ish) via the same playwright rig in mobile mode. The admin layout has a mobile drawer (`Sheet`); tables scroll horizontally inside their bordered containers.
+### Design language source-of-truth
+- `src/app/globals.css` `@theme` carries the tokens — brand emerald `#10B981` is reserved as the affirmative accent (active / published / engagement-bar). Signal colors per intent: green/amber/red. Geist Sans canonical. Sane `:focus-visible` ring. Honors `prefers-reduced-motion` globally.
+- Surfaces are zinc neutrals on `bg-zinc-50` with white cards (`border-zinc-200`, `rounded-lg`, no shadow unless intentional). Restraint over expression — Linear/Stripe-dashboard reference.
+- Internal admin is functional first; the employee Reels shell is the brand-expression surface.
+
+### UI primitives discipline
+- Compose, don't sprawl. New surfaces use `src/components/ui/*` primitives — Button, Dialog, Input, Label, Textarea, Select, Switch, Card, Badge, EmptyState, PageHeader, Sheet, Toaster. If a pattern repeats 3+ times, lift it.
+- Use Radix under the hood for anything that needs real a11y (Dialog, Select, Switch, Sheet). No `npx shadcn add`; primitives are hand-pulled and shaped to the Dojo language.
+- Class composition via `cn()` (`src/lib/cn.ts`) — `clsx + tailwind-merge` so conflicting classes (`text-red-500 text-blue-500`) resolve cleanly.
+- Sonner for toasts; toaster mounted at the admin layout root. Use `toast.success` / `toast.error` for feedback after server actions; never inline error strings in the UI.
+- Icons via lucide-react. Consistent sizes (`h-3.5 w-3.5` inline, `h-4 w-4` button-leading, `h-5 w-5` for empty-state circle).
+
+### Frontend ship pattern
+- Same direct-to-main flow as Dex; same explicit-staging discipline (don't `git add -A` — filemode flips on this filesystem and you'll bundle 100+ no-op changes; stage paths explicitly). Verified the hard way mid-session.
+- Always `tsc --noEmit` clean before commit. The Dialog primitive's transition utilities don't depend on `tw-animate-css`; they use inline `data-[state=open]:` CSS classes that work with v4 out of the box.
+- New dependencies are best-in-class only and worth documenting in the commit body (Radix subsets, react-dropzone, sonner, lucide-react, clsx + tailwind-merge — all pulled in the V1 pass).
+
+### Visual + mobile QA loop
+- Headless playwright against the LIVE deploy, not a local dev server. Auth via `/tmp/dojo-login.sh <email> <cookie-jar>` (uses Dex's dev magic-link log gate).
+- Playwright + chromium-headless-shell at `/tmp/iris-pw/`. Two scripts: `shoot.mjs` (desktop 1440x900) and `shoot-mobile.mjs` (390x844 iPhone-ish, isMobile + hasTouch). Both load the cookie jar from `/tmp/dojo-admin-cookies.txt`.
+- For mobile-drawer-open / dialog-open / hover states, write a short interaction script (see `shoot-menu-open.mjs` as the pattern — click + waitForTimeout + screenshot).
+- VPS has no X server — chrome-devtools MCP can't launch a visible Chrome. Headless shell is the path; pinch-zoomable screenshots cover the visual diff need.
+
+### Lessons assumed but not always stated
+- The admin layout (Sheet drawer + flex-col on mobile) and Dialog primitive (capped width on mobile) are the load-bearing pieces of spec §1.1 (mobile-first). Don't regress them.
+- Tables inside `overflow-x-auto` inside a `rounded-lg overflow-hidden` Card — the outer overflow-hidden preserves the rounded corners; the inner scroll lets wide tables breathe on small viewports without breaking page layout.
+- Status pills are Badges, not bespoke inline spans. If you find yourself writing `<span className="rounded-full px-2 py-0.5 …">`, use Badge instead.
 
 ## Conventions Dex uses
 
