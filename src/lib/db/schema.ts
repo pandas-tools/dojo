@@ -10,6 +10,7 @@ import {
   index,
   check,
   pgEnum,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -23,6 +24,29 @@ export const lessonTypeEnum = pgEnum("lesson_type", [
   "training",
   "announcement",
   "update",
+]);
+
+// Media-shape of a lesson. Drives the renderer + the completion criteria:
+//   video    — Mux player, completed at 90% of duration watched.
+//   image    — single ImageKit-hosted image, completed at 5s of visible dwell.
+//   carousel — ordered slides (ImageKit-hosted images), completed once every
+//              slide has been viewed.
+export const lessonContentTypeEnum = pgEnum("lesson_content_type", [
+  "video",
+  "image",
+  "carousel",
+]);
+
+// Append-only event log for tracking employee interaction with a lesson.
+// One row per discrete event. Completion status is derived from this table
+// (a lesson_completed row for a user+lesson means they completed it) — the
+// lesson_completions table holds RATING data only now, decoupled from
+// completion.
+export const lessonEventTypeEnum = pgEnum("lesson_event_type", [
+  "lesson_opened",
+  "lesson_completed",
+  "lesson_engagement",
+  "rating_submitted",
 ]);
 
 export const clients = pgTable("clients", {
@@ -160,6 +184,9 @@ export const lessons = pgTable("lessons", {
   id: uuid("id").primaryKey().defaultRandom(),
   internalName: text("internal_name").notNull(),
   type: lessonTypeEnum("type").notNull().default("training"),
+  contentType: lessonContentTypeEnum("content_type")
+    .notNull()
+    .default("video"),
   sortOrder: integer("sort_order").notNull().default(0),
   isPublished: boolean("is_published").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -178,17 +205,30 @@ export const lessonTranslations = pgTable(
     title: text("title").notNull(),
     description: text("description"),
     notesMarkdown: text("notes_markdown"),
+    // Video media (populated only when lessons.content_type = 'video')
     muxPlaybackId: text("mux_playback_id"),
     muxAssetId: text("mux_asset_id"),
     muxUploadId: text("mux_upload_id"),
     durationSeconds: integer("duration_seconds"),
     thumbnailUrl: text("thumbnail_url"),
+    // Single-image media (populated only when lessons.content_type = 'image')
+    imageUrl: text("image_url"),
+    imageAlt: text("image_alt"),
+    // Carousel media (populated only when lessons.content_type = 'carousel').
+    // Ordered array of slides: [{ url: string, alt: string, caption?: string }, ...]
+    carouselSlides: jsonb("carousel_slides").$type<CarouselSlide[] | null>(),
   },
   (t) => ({
     uniqLessonLang: unique().on(t.lessonId, t.language),
     lessonIdx: index("idx_lesson_translations_lesson_id").on(t.lessonId),
   }),
 );
+
+export type CarouselSlide = {
+  url: string;
+  alt: string;
+  caption?: string;
+};
 
 export const clientLessons = pgTable(
   "client_lessons",
@@ -231,6 +271,48 @@ export const lessonCompletions = pgTable(
   }),
 );
 
+export const lessonEvents = pgTable(
+  "lesson_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lessonId: uuid("lesson_id")
+      .notNull()
+      .references(() => lessons.id, { onDelete: "cascade" }),
+    // Denormalised so analytics queries can scope by client without a join.
+    // Populated server-side from the user's clientId at write time.
+    clientId: uuid("client_id").references(() => clients.id, {
+      onDelete: "cascade",
+    }),
+    eventType: lessonEventTypeEnum("event_type").notNull(),
+    // Per-event payload — currentTimeSec/duration for video, dwellMs for
+    // image, slideIndex/totalSlides for carousel, rating for rating events,
+    // engagedMs for engagement heartbeats. Free-shape so we can add fields
+    // without a migration.
+    payload: jsonb("payload"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userLessonTypeIdx: index("idx_lesson_events_user_lesson_type").on(
+      t.userId,
+      t.lessonId,
+      t.eventType,
+    ),
+    clientCreatedIdx: index("idx_lesson_events_client_created").on(
+      t.clientId,
+      t.createdAt,
+    ),
+    lessonCreatedIdx: index("idx_lesson_events_lesson_created").on(
+      t.lessonId,
+      t.createdAt,
+    ),
+  }),
+);
+
 // Type helpers for use across the app
 export type Client = typeof clients.$inferSelect;
 export type NewClient = typeof clients.$inferInsert;
@@ -240,3 +322,5 @@ export type Lesson = typeof lessons.$inferSelect;
 export type LessonTranslation = typeof lessonTranslations.$inferSelect;
 export type Store = typeof stores.$inferSelect;
 export type LessonCompletion = typeof lessonCompletions.$inferSelect;
+export type LessonEvent = typeof lessonEvents.$inferSelect;
+export type NewLessonEvent = typeof lessonEvents.$inferInsert;
