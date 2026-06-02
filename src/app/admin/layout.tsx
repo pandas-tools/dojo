@@ -11,6 +11,7 @@ import {
 import { auth } from "@/lib/auth";
 import { signOutAction } from "../actions";
 import AdminNavLink from "./AdminNavLink";
+import MobileNavTrigger from "./MobileNavTrigger";
 import { Toaster } from "@/components/ui/toaster";
 
 export default async function AdminLayout({
@@ -23,7 +24,8 @@ export default async function AdminLayout({
   if (session.user.role !== "admin") redirect("/browse");
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex">
+    <div className="min-h-screen bg-zinc-50 flex flex-col sm:flex-row">
+      {/* Desktop sidebar */}
       <aside className="hidden sm:flex w-56 shrink-0 flex-col border-r border-zinc-200 bg-white">
         <div className="px-5 py-5 border-b border-zinc-200">
           <Link
@@ -88,28 +90,25 @@ export default async function AdminLayout({
         </div>
       </aside>
 
-      {/* Mobile top bar (sidebar collapses on narrow viewports) */}
-      <header className="sm:hidden flex items-center justify-between border-b border-zinc-200 bg-white px-5 py-3 w-full">
+      {/* Mobile top bar — sticky for navigation persistence on scroll */}
+      <header className="sm:hidden sticky top-0 z-30 flex items-center justify-between border-b border-zinc-200 bg-white/90 backdrop-blur px-4 py-3">
+        <MobileNavTrigger
+          email={session.user.email ?? ""}
+          signOutAction={signOutAction}
+        />
         <Link
           href="/admin"
-          className="flex items-center gap-2 font-semibold text-zinc-900 text-sm"
+          className="flex items-center gap-2 text-zinc-900"
         >
-          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-900 text-white text-[10px] font-bold">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-900 text-white text-xs font-bold">
             D
           </span>
-          Dojo
+          <span className="font-semibold tracking-tight text-sm">Dojo</span>
         </Link>
-        <form action={signOutAction}>
-          <button
-            type="submit"
-            className="text-xs text-zinc-600 hover:text-zinc-900"
-          >
-            Sign out
-          </button>
-        </form>
+        <span className="w-9" aria-hidden />
       </header>
 
-      <main className="flex-1 px-6 py-10 max-w-5xl mx-auto sm:mx-0 w-full">
+      <main className="flex-1 min-w-0 px-4 sm:px-6 py-6 sm:py-10 max-w-5xl sm:mx-0 mx-auto w-full">
         {children}
       </main>
 
