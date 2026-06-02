@@ -3,6 +3,18 @@
 > Source-of-truth snapshot for picking up Dojo cold. Updated when scope shifts.
 > Read this first; then `spec.md`, `architecture.md`, `decisions.md`, `deploy.md`.
 
+## First 10 minutes (cold-start playbook)
+
+If you've been dropped into Dojo with no prior context, do these in order:
+
+1. **Read `/apps/dojo/CLAUDE.md`** — hard rules, lane split, workflow stance. Less than 2 minutes.
+2. **Read this file end-to-end.** Don't skip — every section earned its keep.
+3. **Skim `docs/spec.md`** for the product story; `docs/architecture.md` for the code map; `docs/decisions.md` for ADR-level "why we did X." `docs/deploy.md` only when you need to touch Railway.
+4. **Pull the latest:** `cd /apps/dojo && git fetch origin && git log --oneline -10`. Check the "Recent commits" table here against what's on main — if there's drift, this doc is stale and the freshest commits are truth.
+5. **For visual work (Iris):** Source `/personas/iris/.env`, run `/tmp/dojo-login.sh dimitris@pandas.io /tmp/dojo-admin-cookies.txt` to grab a fresh admin cookie via the dev magic-link gate. Then `cd /tmp/iris-pw && node shoot.mjs …` to screenshot whatever surface you're touching.
+6. **For backend work (Dex):** Source `/personas/dex/.env`. Verify `RAILWAY_TOKEN` works with a no-op GraphQL ping. Then read `src/lib/db/schema.ts` to ground in the current data shape.
+7. **Don't start ad-hoc work — wait for the user prompt or read the Telegram thread.** The dojo Telegram group ID is `-5267432337`; messages from Dimi (`user_id="1886796381"`) and Dex (`user_id="8474592678"`) are the conversation history. If a `<channel>` tag arrives mid-prompt with `attachment_kind="voice"`, use the `ops-listen` skill to transcribe — voice notes are how Dimi communicates substantive direction.
+
 ## What Dojo is
 
 **Dojo is the internal training portal for retail employees of our clients.** A new client signs Pandas → their store employees need to learn the platform (Vision AI assessments, trade-in flows, etc.) → Dojo is how we train them at scale without sending a person on-site.
@@ -147,6 +159,13 @@ Workflow design (Iris drives): what steps the user takes, in what order, what ea
 ### Operator action (Dimi)
 - **ImageKit credentials on Railway env.** `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT`. Until these are set, the upload endpoint returns 503 and image/carousel uploads can't go end-to-end. Video lessons unaffected. Dex offered two paths: A) Dimi creates a shared Pandas ImageKit account + pastes the keys; B) Dex provisions on Dimi's behalf. Decision pending.
 
+### Things that ONLY the operator (Dimi) can do
+Useful for future sessions to know upfront — these can't be bypassed by either persona:
+- Set / rotate / delete Railway env vars on the dojo Railway project (Dex has read access via GraphQL but write permissions for sensitive vars sit with Dimi). Today's stuck-on-operator item is ImageKit (above).
+- Approve any external-facing change (PR push to a customer-facing repo, prod deploy of pandas-website, etc.). Dojo is pre-prod so direct-to-main is fine here.
+- Domain DNS for `learn.pandas.io` cutover when Dojo goes live (Cloudflare side, not Railway).
+- Add a new admin email to `ADMIN_ALLOWLIST` if that's how you want to bootstrap a teammate — though you can also add admins from the live Members surface once you're signed in.
+
 ### Just shipped (during this handoff write-up)
 - ✅ `50c9506` — analytics + browse + admin clients detail now read completion from `lesson_events` instead of `lesson_completions`. Rating data still sourced from `lesson_completions` (decoupled the two signals — see commit body). Backfill ran in migration `0001_media_types_and_events.sql` so historical counts are preserved.
 - ✅ Same commit: `/api/lessons/[id]/complete` (RatingWidget endpoint) now ALSO fires a `rating_submitted` lesson_event best-effort alongside the existing `lesson_completions` row write. Events table carries the rating signal for analytics; `lesson_completions` stays for back-compat.
@@ -237,8 +256,43 @@ Workflow design (Iris drives): what steps the user takes, in what order, what ea
 
 ## Telegram coordination (multi-bot discipline)
 
-- Both Iris and Dex receive every message in the dojo Telegram group; they coordinate via that channel.
+- **Chat ID:** `-5267432337` (dojo group, negative ID = group; positive IDs are 1:1 DMs).
+- **Members:** Dimi (`user_id="1886796381"`, `@dlampidis`), Iris (`@irisisap9bot`), Dex (`@dexisap9bot`, `user_id="8474592678"`).
+- Both Iris and Dex receive every message; they coordinate via this channel.
 - When Dimi names ONE persona (e.g. "Dex, …"), the other stays silent.
-- For acks/back-and-forth between agents that doesn't carry new info, stay silent — it reads as bot noise to Dimi.
+- For acks / back-and-forth between agents that doesn't carry new info, stay silent — it reads as bot noise to Dimi.
 - ANNOUNCE / DONE on substantive work. UPDATE only when materially over the original ETA.
-- See Iris's persona memory `feedback-message-volume-discipline` + `feedback-multi-bot-group-discipline` for the lock.
+- Voice notes from Dimi arrive as `attachment_kind="voice"`. Download via `mcp__plugin_telegram_telegram__download_attachment`, transcribe via OpenAI Whisper (the `ops-listen` skill on Iris's side; Dex has the same pattern). Treat the transcript as if Dimi had typed it.
+- Reply tool: `mcp__plugin_telegram_telegram__reply` with `chat_id` from the inbound message, `text` for plain content, `files` for attachments. Use `reply_to` only when threading under an earlier message; latest-message replies don't need it.
+- See Iris's persona memory `feedback-message-volume-discipline` + `feedback-multi-bot-group-discipline` for the lock. The most important rules: short replies, no acknowledgment-shaped messages, and **when two agents agree "let's ping Dimi together," ONE sends it — not both.**
+
+## Naming quirks worth knowing
+
+- **`/api/lessons/[id]/complete`** is the legacy rating endpoint (added pre-events). It writes a `lesson_completions` row AND now also emits a `rating_submitted` event. The naming is historical; the row it writes is the rating, not the completion. Completions go through `/api/lessons/[id]/event` with `type: "lesson_completed"`.
+- **`lesson_completions` table** also historical — it's where rating data lives (1-5 stars + completed_at). Despite the name, completion status is now read from `lesson_events`, not from this table. Don't conflate.
+- **`createLesson` server action** (in `src/app/admin/lessons/actions.ts`) is dead code — the New Lesson dialog uses `createLessonFromUpload` / `createImageLesson` / `createCarouselLesson` exclusively. Safe to delete in a cleanup pass.
+
+## Workflow inventory (locked 2026-06-02)
+
+27 existing workflows + ~13 missing. The list lived in the Telegram conversation; the consolidated view is now this doc. **Existing** (by domain):
+
+- **Lessons** (10): create lesson, add translation, upload video to translation, copy video across translations, clear video, reorder, edit metadata, publish/unpublish, assign/unassign to client, delete. Plus edit-translation + delete-translation = 12.
+- **Clients** (8): create, edit, manage domains, manage languages, manage stores (incl. CSV import), assign/unassign lessons (now bidirectional from lesson + client side), view employees, delete.
+- **Admin members** (3): list, add, remove.
+- **Analytics** (2): overall dashboard, per-client deep dive.
+- **Auth / admin session** (2): sign in, sign out.
+
+**Missing** (13, deferred):
+- Mux upload error recovery (failed assets stuck in ⏳ today).
+- Preview-as-employee (see a lesson as an employee would, pre-publish).
+- Drill into individual employee history (which lessons, when, with what rating).
+- Promote/demote/move user (role change, client reassignment).
+- Force a user through re-onboarding (support flow).
+- Magic-link / session admin actions (resend, force-revoke).
+- Bulk operations (publish many, assign many).
+- Search / filter on long lists.
+- Audit log of admin actions (we have lesson_events for employee side; not for admin).
+- Translation fallback config (what an employee sees when their language doesn't exist for a given lesson).
+- Per-lesson scheduling (publish at a future date).
+- CSV export of analytics.
+- Comments / feedback / questions (intentionally deferred — Dimi hasn't decided which framing).
