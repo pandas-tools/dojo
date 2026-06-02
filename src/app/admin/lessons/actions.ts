@@ -9,6 +9,7 @@ import {
   lessonTranslations,
   clientLessons,
 } from "@/lib/db/schema";
+import { createDirectUpload } from "@/lib/mux";
 
 async function requireAdmin() {
   const session = await auth();
@@ -16,6 +17,132 @@ async function requireAdmin() {
     throw new Error("forbidden");
   }
   return session;
+}
+
+const ALLOWED_LANGS = [
+  "en",
+  "fr",
+  "nl",
+  "de",
+  "es",
+  "it",
+  "pt",
+] as const;
+type AllowedLang = (typeof ALLOWED_LANGS)[number];
+
+const ALLOWED_TYPES = ["training", "announcement", "update"] as const;
+type AllowedType = (typeof ALLOWED_TYPES)[number];
+
+/**
+ * Step 1 of the "new lesson with video" flow: ask Mux for a direct upload URL
+ * without creating any DB rows yet. The caller uploads the file straight to
+ * Mux, holds onto the returned uploadId, and passes it back to
+ * createLessonFromUpload() in step 2.
+ *
+ * Returns null if the user is not an admin (so the client can't enumerate
+ * upload URLs).
+ */
+export async function prepareLessonUpload(input: { language?: string } = {}) {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "forbidden" as const };
+  }
+  const lang = (input.language ?? "en") as AllowedLang;
+  if (!ALLOWED_LANGS.includes(lang)) {
+    return { error: "unsupported language" as const };
+  }
+  const upload = await createDirectUpload({
+    corsOrigin: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+    language: lang,
+  });
+  return { ok: true as const, url: upload.url, uploadId: upload.id };
+}
+
+/**
+ * Step 2 of the "new lesson with video" flow (or step 1 if no video).
+ * Creates the lesson + English translation (with muxUploadId attached if
+ * present, so the Mux webhook can later find the row by uploadId) +
+ * optional empty translations for additional languages + client assignments
+ * in one transaction.
+ */
+export async function createLessonFromUpload(input: {
+  uploadId?: string;
+  internalName: string;
+  title: string;
+  description?: string;
+  notesMarkdown?: string;
+  type?: AllowedType;
+  additionalLanguages?: string[];
+  clientIds?: string[];
+  publish?: boolean;
+}) {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "forbidden" as const };
+  }
+  const internalName = input.internalName.trim();
+  const title = input.title.trim();
+  if (!internalName || !title) {
+    return { error: "internalName and title are required" as const };
+  }
+  const type: AllowedType = input.type ?? "training";
+  if (!ALLOWED_TYPES.includes(type)) {
+    return { error: "invalid type" as const };
+  }
+  const extraLangs = (input.additionalLanguages ?? [])
+    .filter((l): l is AllowedLang => (ALLOWED_LANGS as readonly string[]).includes(l))
+    .filter((l) => l !== "en");
+
+  // Find next sort_order
+  const [{ value: currentMax }] = await db
+    .select({ value: max(lessons.sortOrder) })
+    .from(lessons);
+  const nextSort = (currentMax ?? 0) + 10;
+
+  const lessonId = await db.transaction(async (tx) => {
+    const [lesson] = await tx
+      .insert(lessons)
+      .values({
+        internalName,
+        type,
+        sortOrder: nextSort,
+        isPublished: !!input.publish,
+      })
+      .returning();
+
+    await tx.insert(lessonTranslations).values({
+      lessonId: lesson.id,
+      language: "en",
+      title,
+      description: input.description?.trim() || null,
+      notesMarkdown: input.notesMarkdown?.trim() || null,
+      muxUploadId: input.uploadId ?? null,
+    });
+
+    for (const lang of extraLangs) {
+      await tx.insert(lessonTranslations).values({
+        lessonId: lesson.id,
+        language: lang,
+        // Seed with the English title so the row is valid; admin can rename later.
+        title,
+        description: null,
+      });
+    }
+
+    for (const clientId of input.clientIds ?? []) {
+      await tx
+        .insert(clientLessons)
+        .values({ lessonId: lesson.id, clientId })
+        .onConflictDoNothing();
+    }
+
+    return lesson.id;
+  });
+
+  revalidatePath("/admin/lessons");
+  return { ok: true as const, lessonId };
 }
 
 export async function createLesson(input: {
