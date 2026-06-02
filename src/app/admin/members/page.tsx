@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
 import { adminAllowlist } from "@/lib/env";
+import { PageHeader } from "@/components/ui/page-header";
 import MembersClient from "./MembersClient";
 
 export const metadata = { title: "Members · Admin · Dojo" };
@@ -34,15 +35,11 @@ export default async function AdminMembersPage() {
   }));
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Members</h1>
-        <p className="text-sm text-zinc-600 mt-1">
-          Manage who has admin access to Dojo. Bootstrap admins are seeded
-          via the ADMIN_ALLOWLIST environment variable; you can add more
-          here without redeploying.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Members"
+        description="Who has admin access to Dojo. Add or remove on the fly — bootstrap admins are seeded via the ADMIN_ALLOWLIST env var."
+      />
       <MembersClient admins={admins} />
     </div>
   );

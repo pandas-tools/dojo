@@ -9,6 +9,8 @@ import {
   type EmployeeRow,
   type TimelinePoint,
 } from "@/lib/analytics-detail";
+import { PageHeader } from "@/components/ui/page-header";
+import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
@@ -37,56 +39,50 @@ export default async function ClientDetailAnalyticsPage({
   if (!data) notFound();
 
   return (
-    <div className="space-y-8">
-      <div>
-        <Link
-          href="/admin/analytics"
-          className="text-sm text-zinc-500 hover:text-zinc-900"
-        >
-          ← All clients
-        </Link>
-        <h1 className="mt-1 text-2xl font-semibold">{data.clientName}</h1>
-        <p className="text-sm text-zinc-600">
-          {data.totals.storeCount} store{data.totals.storeCount === 1 ? "" : "s"}
-          {" · "}
-          {data.totals.employeeCount} employee
-          {data.totals.employeeCount === 1 ? "" : "s"} {" · "}
-          {data.totals.assignedLessonCount} lesson
-          {data.totals.assignedLessonCount === 1 ? "" : "s"} assigned
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        back={{ href: "/admin/analytics", label: "All clients" }}
+        title={data.clientName}
+        description={`${data.totals.storeCount} store${data.totals.storeCount === 1 ? "" : "s"} · ${data.totals.employeeCount} employee${data.totals.employeeCount === 1 ? "" : "s"} · ${data.totals.assignedLessonCount} lesson${data.totals.assignedLessonCount === 1 ? "" : "s"} assigned`}
+      />
 
-      <section>
-        <h2 className="text-sm font-medium text-zinc-700 mb-3">
-          Training funnel
-        </h2>
+      <Section title="Training funnel">
         <Funnel funnel={data.funnel} />
-      </section>
+      </Section>
 
-      <section>
-        <h2 className="text-sm font-medium text-zinc-700 mb-3">
-          Activity timeline (last 30 days)
-        </h2>
+      <Section title="Activity timeline (last 30 days)">
         <Timeline points={data.timeline} />
-      </section>
+      </Section>
 
-      <section>
-        <h2 className="text-sm font-medium text-zinc-700 mb-3">Stores</h2>
+      <Section title="Stores">
         <StoresTable rows={data.stores} />
-      </section>
+      </Section>
 
-      <section>
-        <h2 className="text-sm font-medium text-zinc-700 mb-3">
-          Lesson breakdown
-        </h2>
+      <Section title="Lesson breakdown">
         <LessonsTable rows={data.lessons} />
-      </section>
+      </Section>
 
-      <section>
-        <h2 className="text-sm font-medium text-zinc-700 mb-3">Employees</h2>
+      <Section title="Employees">
         <EmployeesTable rows={data.employees} />
-      </section>
+      </Section>
     </div>
+  );
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500 mb-2">
+        {title}
+      </h2>
+      {children}
+    </section>
   );
 }
 
@@ -253,26 +249,13 @@ function StoresTable({ rows }: { rows: StoreRow[] }) {
 
 function StatusPill({ status }: { status: StoreRow["status"] }) {
   const map = {
-    "on-track": { label: "On track", cls: "bg-emerald-100 text-emerald-800" },
-    "low-completion": {
-      label: "Low completion",
-      cls: "bg-amber-100 text-amber-800",
-    },
-    "no-activity": {
-      label: "No activity",
-      cls: "bg-zinc-200 text-zinc-700",
-    },
-    "no-data": {
-      label: "No lessons assigned",
-      cls: "bg-zinc-100 text-zinc-600",
-    },
-  } as const;
+    "on-track": { label: "On track", variant: "success" as const },
+    "low-completion": { label: "Low completion", variant: "warning" as const },
+    "no-activity": { label: "No activity", variant: "neutral" as const },
+    "no-data": { label: "No lessons", variant: "neutral" as const },
+  };
   const m = map[status];
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${m.cls}`}>
-      {m.label}
-    </span>
-  );
+  return <Badge variant={m.variant}>{m.label}</Badge>;
 }
 
 function LessonsTable({ rows }: { rows: LessonRow[] }) {
@@ -373,25 +356,12 @@ function EmployeesTable({ rows }: { rows: EmployeeRow[] }) {
 
 function EmployeeStatusPill({ status }: { status: EmployeeRow["status"] }) {
   const map = {
-    "not-started": {
-      label: "Not started",
-      cls: "bg-zinc-200 text-zinc-700",
-    },
-    "in-progress": {
-      label: "In progress",
-      cls: "bg-amber-100 text-amber-800",
-    },
-    completed: {
-      label: "Completed",
-      cls: "bg-emerald-100 text-emerald-800",
-    },
-  } as const;
+    "not-started": { label: "Not started", variant: "neutral" as const },
+    "in-progress": { label: "In progress", variant: "warning" as const },
+    completed: { label: "Completed", variant: "success" as const },
+  };
   const m = map[status];
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${m.cls}`}>
-      {m.label}
-    </span>
-  );
+  return <Badge variant={m.variant}>{m.label}</Badge>;
 }
 
 function formatRelative(iso: string): string {

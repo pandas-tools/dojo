@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { BarChart3 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getClientAnalytics, type ClientAnalytics } from "@/lib/analytics";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export const metadata = { title: "Analytics · Admin · Dojo" };
 export const dynamic = "force-dynamic";
@@ -13,21 +16,22 @@ export default async function AdminAnalyticsPage() {
   const data = await getClientAnalytics();
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Analytics</h1>
-        <p className="text-sm text-zinc-600 mt-1">
-          Training rollout health, per client. Refresh the page for the latest
-          numbers — no caching, no aggregation tables.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Analytics"
+        description="Training rollout health, per client. Live numbers — no caching, no aggregation tables."
+      />
 
       {data.length === 0 ? (
-        <p className="text-sm text-zinc-500">
-          No clients yet. Add one in <Link href="/admin/clients" className="underline">Clients</Link>.
-        </p>
+        <div className="rounded-lg border border-zinc-200 bg-white">
+          <EmptyState
+            icon={<BarChart3 className="h-5 w-5" />}
+            title="No clients yet"
+            description="Add a client first — analytics will populate from real activity."
+          />
+        </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {data.map((c) => (
             <ClientCard key={c.clientId} c={c} />
           ))}
@@ -39,28 +43,28 @@ export default async function AdminAnalyticsPage() {
 
 function ClientCard({ c }: { c: ClientAnalytics }) {
   const storeActivationPct =
-    c.storeCount > 0 ? Math.round((c.activeStoreCount / c.storeCount) * 100) : 0;
+    c.storeCount > 0
+      ? Math.round((c.activeStoreCount / c.storeCount) * 100)
+      : 0;
   const trainedPct =
     c.employeeCount > 0
       ? Math.round((c.trainedEmployeeCount / c.employeeCount) * 100)
       : 0;
 
   return (
-    <div className="rounded-md border border-zinc-200 bg-white p-6">
+    <Link
+      href={`/admin/analytics/${c.clientId}`}
+      className="block rounded-lg border border-zinc-200 bg-white p-6 hover:border-zinc-400 transition-colors"
+    >
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="text-lg font-medium">{c.name}</h2>
-          <p className="text-xs text-zinc-500">
+          <h2 className="text-base font-semibold text-zinc-900">{c.name}</h2>
+          <p className="text-xs text-zinc-500 mt-0.5">
             {c.assignedLessonCount} lesson
             {c.assignedLessonCount === 1 ? "" : "s"} assigned
           </p>
         </div>
-        <Link
-          href={`/admin/analytics/${c.clientId}`}
-          className="text-sm text-zinc-700 hover:underline"
-        >
-          Detail →
-        </Link>
+        <span className="text-xs text-zinc-400">View detail →</span>
       </div>
 
       <dl className="grid gap-6 sm:grid-cols-3">
@@ -87,7 +91,9 @@ function ClientCard({ c }: { c: ClientAnalytics }) {
                   ? `${c.avgTrainedPerActiveStore} per active store · ${trainedPct}% overall`
                   : `${trainedPct}% overall`
           }
-          bar={c.employeeCount > 0 ? c.trainedEmployeeCount / c.employeeCount : 0}
+          bar={
+            c.employeeCount > 0 ? c.trainedEmployeeCount / c.employeeCount : 0
+          }
           empty={c.employeeCount === 0 || c.assignedLessonCount === 0}
         />
         <Metric
@@ -102,7 +108,7 @@ function ClientCard({ c }: { c: ClientAnalytics }) {
           empty={c.avgRating === null}
         />
       </dl>
-    </div>
+    </Link>
   );
 }
 
@@ -122,7 +128,9 @@ function Metric({
   const pct = Math.max(0, Math.min(1, bar)) * 100;
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-zinc-500">{label}</dt>
+      <dt className="text-[11px] uppercase tracking-wide text-zinc-500">
+        {label}
+      </dt>
       <dd className="mt-1 text-2xl font-semibold text-zinc-900">{big}</dd>
       <p className="mt-1 text-xs text-zinc-600">{sub}</p>
       <div className="mt-2 h-1 w-full rounded-full bg-zinc-100">

@@ -2,7 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import { addAdmin, removeAdmin } from "./actions";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type AdminRow = {
   id: string;
@@ -16,35 +30,32 @@ export default function MembersClient({ admins }: { admins: AdminRow[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   function onAdd(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     startTransition(async () => {
       const res = await addAdmin({ email });
       if (res?.error) {
-        setError(res.error);
+        toast.error(res.error);
         return;
       }
+      toast.success(`Added ${email}`);
       setEmail("");
       router.refresh();
     });
   }
 
-  function onRemove(userId: string) {
-    if (
-      !confirm(
-        "Remove this admin? They will lose access on their next sign-in.",
-      )
-    )
-      return;
+  function onRemove(userId: string, userEmail: string) {
+    if (!confirm(`Remove ${userEmail} as admin?`)) return;
     setBusyId(userId);
-    setError(null);
     startTransition(async () => {
       const res = await removeAdmin({ userId });
-      if (res?.error) setError(res.error);
+      if (res?.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(`Removed ${userEmail}`);
+      }
       setBusyId(null);
       router.refresh();
     });
@@ -52,92 +63,93 @@ export default function MembersClient({ admins }: { admins: AdminRow[] }) {
 
   return (
     <div className="space-y-6">
-      <section>
-        <h2 className="text-sm font-medium text-zinc-700 mb-2">Add admin</h2>
-        <form
-          onSubmit={onAdd}
-          className="flex flex-col gap-2 sm:flex-row sm:items-end rounded-md border border-zinc-200 bg-white p-4"
-        >
-          <label className="flex-1">
-            <span className="block text-xs font-medium text-zinc-700 mb-1">
-              Email
-            </span>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="newadmin@pandas.io"
-              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={pending || !email.trim()}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:bg-zinc-300 transition-colors"
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Add admin</CardTitle>
+            <CardDescription>
+              They&apos;ll get admin access on their next magic-link sign-in.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={onAdd}
+            className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"
           >
-            {pending ? "Adding…" : "Add admin"}
-          </button>
-        </form>
-        {error && (
-          <p className="mt-2 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">
-            {error}
-          </p>
-        )}
-      </section>
+            <div>
+              <Label htmlFor="add-admin-email">Email</Label>
+              <Input
+                id="add-admin-email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="newadmin@pandas.io"
+              />
+            </div>
+            <Button type="submit" disabled={pending || !email.trim()}>
+              {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Add admin
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      <section>
-        <h2 className="text-sm font-medium text-zinc-700 mb-2">
-          Current admins
-        </h2>
-        <div className="rounded-md border border-zinc-200 bg-white overflow-hidden">
-          {admins.length === 0 ? (
-            <p className="p-6 text-sm text-zinc-500">No admins yet.</p>
-          ) : (
-            <ul className="divide-y divide-zinc-200">
-              {admins.map((a) => (
-                <li
-                  key={a.id}
-                  className="flex items-center justify-between px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-zinc-900">
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Current admins</CardTitle>
+            <CardDescription>
+              Bootstrap admins are seeded by the ADMIN_ALLOWLIST env var on the
+              host. Removing them here is effective until they sign in again —
+              edit the env var to fully revoke.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        {admins.length === 0 ? (
+          <EmptyState
+            icon={<ShieldCheck className="h-5 w-5" />}
+            title="No admins yet"
+            description="Add the first admin via the form above."
+          />
+        ) : (
+          <ul className="divide-y divide-zinc-100">
+            {admins.map((a) => (
+              <li
+                key={a.id}
+                className="flex items-center justify-between px-5 py-3"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-zinc-900 truncate">
                       {a.email}
-                      {a.self && (
-                        <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600">
-                          you
-                        </span>
-                      )}
-                      {a.fromEnv && (
-                        <span className="ml-2 rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-xs text-amber-800">
-                          bootstrap (env)
-                        </span>
-                      )}
                     </p>
-                    <p className="text-xs text-zinc-500">
-                      added {new Date(a.createdAt).toLocaleDateString()}
-                    </p>
+                    {a.self && <Badge variant="neutral">you</Badge>}
+                    {a.fromEnv && <Badge variant="warning">bootstrap</Badge>}
                   </div>
-                  <button
-                    type="button"
-                    disabled={a.self || pending}
-                    onClick={() => onRemove(a.id)}
-                    className="text-sm text-red-700 hover:underline disabled:text-zinc-300 disabled:cursor-not-allowed"
-                  >
-                    {busyId === a.id ? "Removing…" : "Remove"}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <p className="mt-2 text-xs text-zinc-500">
-          Bootstrap admins (those listed in the ADMIN_ALLOWLIST environment
-          variable) will be re-created on their next sign-in even after
-          removal here. To fully remove a bootstrap admin, also edit the env
-          var on the host.
-        </p>
-      </section>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    added {new Date(a.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={a.self || pending}
+                  onClick={() => onRemove(a.id, a.email)}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  {busyId === a.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : null}
+                  Remove
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
     </div>
   );
 }
