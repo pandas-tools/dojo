@@ -7,6 +7,7 @@ import {
   type StoreRow,
   type LessonRow,
   type EmployeeRow,
+  type TimelinePoint,
 } from "@/lib/analytics-detail";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +64,13 @@ export default async function ClientDetailAnalyticsPage({
       </section>
 
       <section>
+        <h2 className="text-sm font-medium text-zinc-700 mb-3">
+          Activity timeline (last 30 days)
+        </h2>
+        <Timeline points={data.timeline} />
+      </section>
+
+      <section>
         <h2 className="text-sm font-medium text-zinc-700 mb-3">Stores</h2>
         <StoresTable rows={data.stores} />
       </section>
@@ -78,6 +86,77 @@ export default async function ClientDetailAnalyticsPage({
         <h2 className="text-sm font-medium text-zinc-700 mb-3">Employees</h2>
         <EmployeesTable rows={data.employees} />
       </section>
+    </div>
+  );
+}
+
+function Timeline({ points }: { points: TimelinePoint[] }) {
+  const total = points.reduce((a, p) => a + p.completions, 0);
+  if (total === 0) {
+    return (
+      <p className="text-sm text-zinc-500 rounded-md border border-zinc-200 bg-white p-4">
+        No completions in the last 30 days yet.
+      </p>
+    );
+  }
+  const max = Math.max(1, ...points.map((p) => p.completions));
+  const width = 600;
+  const height = 120;
+  const padding = { top: 8, right: 8, bottom: 18, left: 8 };
+  const innerW = width - padding.left - padding.right;
+  const innerH = height - padding.top - padding.bottom;
+  const slot = innerW / points.length;
+  const barW = Math.max(3, slot - 2);
+  const firstLabel = new Date(points[0].date).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  const lastLabel = new Date(points[points.length - 1].date).toLocaleDateString(
+    undefined,
+    { month: "short", day: "numeric" },
+  );
+  return (
+    <div className="rounded-md border border-zinc-200 bg-white p-4">
+      <div className="flex items-baseline justify-between mb-2 text-xs text-zinc-500">
+        <span>{total} completion{total === 1 ? "" : "s"} in 30 days</span>
+        <span>peak day {max}</span>
+      </div>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full h-32"
+        role="img"
+        aria-label="Daily completions for the last 30 days"
+      >
+        {points.map((p, i) => {
+          const x = padding.left + i * slot + (slot - barW) / 2;
+          const h = (p.completions / max) * innerH;
+          const y = padding.top + (innerH - h);
+          return (
+            <g key={p.date}>
+              <rect
+                x={x}
+                y={y}
+                width={barW}
+                height={Math.max(p.completions > 0 ? 2 : 0, h)}
+                rx="1"
+                className="fill-emerald-500"
+              />
+              <title>
+                {new Date(p.date).toLocaleDateString(undefined, {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                })}
+                : {p.completions} completion{p.completions === 1 ? "" : "s"}
+              </title>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="flex items-baseline justify-between mt-1 text-xs text-zinc-500">
+        <span>{firstLabel}</span>
+        <span>{lastLabel}</span>
+      </div>
     </div>
   );
 }

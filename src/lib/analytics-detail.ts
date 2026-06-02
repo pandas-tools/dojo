@@ -53,6 +53,12 @@ export type EmployeeRow = {
   status: "not-started" | "in-progress" | "completed";
 };
 
+export type TimelinePoint = {
+  // YYYY-MM-DD in UTC
+  date: string;
+  completions: number;
+};
+
 export type ClientDetailAnalytics = {
   clientId: string;
   clientName: string;
@@ -66,6 +72,10 @@ export type ClientDetailAnalytics = {
   stores: StoreRow[];
   lessons: LessonRow[];
   employees: EmployeeRow[];
+  // Completion count per day for the last 30 days. Always exactly 30
+  // points, oldest first, even when most buckets are zero — keeps the
+  // chart axis stable.
+  timeline: TimelinePoint[];
 };
 
 export async function getClientDetailAnalytics(
@@ -101,14 +111,19 @@ export async function getClientDetailAnalytics(
           .from(lessonTranslations)
           .where(inArray(lessonTranslations.lessonId, assignedLessonIds))
       : Promise.resolve([] as (typeof lessonTranslations.$inferSelect)[]),
-    employeeRows.length > 0
+    employeeRows.length > 0 && assignedLessonIds.length > 0
       ? db
           .select()
           .from(lessonCompletions)
           .where(
-            inArray(
-              lessonCompletions.userId,
-              employeeRows.map((u) => u.id),
+            and(
+              inArray(
+                lessonCompletions.userId,
+                employeeRows.map((u) => u.id),
+              ),
+              // Restrict to currently-assigned lessons so stale completions
+              // from a previously-assigned lesson can't inflate counts.
+              inArray(lessonCompletions.lessonId, assignedLessonIds),
             ),
           )
       : Promise.resolve([] as (typeof lessonCompletions.$inferSelect)[]),
@@ -282,6 +297,35 @@ export async function getClientDetailAnalytics(
       return a.email.localeCompare(b.email);
     });
 
+  // TIMELINE — completions per day for the last 30 days, oldest first.
+  // Buckets are computed in UTC for stability across regions; the page
+  // formats them in the viewer's locale at render time.
+  const DAYS = 30;
+  const now = new Date();
+  const startUtc = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - (DAYS - 1),
+  );
+  const bucketCounts = new Map<string, number>();
+  for (const c of completionRows) {
+    const d = c.completedAt;
+    const ts = Date.UTC(
+      d.getUTCFullYear(),
+      d.getUTCMonth(),
+      d.getUTCDate(),
+    );
+    if (ts < startUtc) continue;
+    const key = new Date(ts).toISOString().slice(0, 10);
+    bucketCounts.set(key, (bucketCounts.get(key) ?? 0) + 1);
+  }
+  const timeline: TimelinePoint[] = [];
+  for (let i = 0; i < DAYS; i++) {
+    const ts = startUtc + i * 24 * 60 * 60 * 1000;
+    const key = new Date(ts).toISOString().slice(0, 10);
+    timeline.push({ date: key, completions: bucketCounts.get(key) ?? 0 });
+  }
+
   return {
     clientId: client.id,
     clientName: client.name,
@@ -295,5 +339,6 @@ export async function getClientDetailAnalytics(
     stores: storeRowsOut,
     lessons: lessonRowsOut,
     employees: employeeRowsOut,
+    timeline,
   };
 }

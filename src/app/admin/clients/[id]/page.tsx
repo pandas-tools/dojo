@@ -12,6 +12,7 @@ import {
   users,
   lessons,
   lessonTranslations,
+  lessonCompletions,
 } from "@/lib/db/schema";
 import ClientDetailEditor from "./ClientDetailEditor";
 import DomainsEditor from "./DomainsEditor";
@@ -48,8 +49,8 @@ export default async function ClientDetailPage({
 
   // Lessons assigned to this client (read-only here; assignment lives on /admin/lessons)
   let assignedLessonRows: { id: string; internalName: string; title: string | null }[] = [];
-  if (assignments.length > 0) {
-    const lessonIds = assignments.map((a) => a.lessonId);
+  const lessonIds = assignments.map((a) => a.lessonId);
+  if (lessonIds.length > 0) {
     const lessonRows = await db.query.lessons.findMany({
       where: (l, { inArray }) => inArray(l.id, lessonIds),
       orderBy: (l, { asc }) => [asc(l.sortOrder)],
@@ -72,6 +73,67 @@ export default async function ClientDetailPage({
       title: titleByLesson.get(l.id) ?? null,
     }));
   }
+
+  // Per-employee completions, restricted to lessons currently assigned to
+  // this client. Mirrors the analytics pattern so stale completions from
+  // a previous tenant assignment can't inflate the counts here.
+  const completionRows =
+    clientUsers.length > 0 && lessonIds.length > 0
+      ? await db
+          .select({
+            userId: lessonCompletions.userId,
+            lessonId: lessonCompletions.lessonId,
+            completedAt: lessonCompletions.completedAt,
+          })
+          .from(lessonCompletions)
+          .where(
+            and(
+              inArray(
+                lessonCompletions.userId,
+                clientUsers.map((u) => u.id),
+              ),
+              inArray(lessonCompletions.lessonId, lessonIds),
+            ),
+          )
+      : [];
+
+  const completionsByUser = new Map<
+    string,
+    { count: number; lastAt: Date | null }
+  >();
+  for (const c of completionRows) {
+    const prior = completionsByUser.get(c.userId) ?? {
+      count: 0,
+      lastAt: null as Date | null,
+    };
+    prior.count += 1;
+    if (!prior.lastAt || c.completedAt > prior.lastAt) prior.lastAt = c.completedAt;
+    completionsByUser.set(c.userId, prior);
+  }
+
+  const storeNameById = new Map(clientStores.map((s) => [s.id, s.name]));
+  const totalAssigned = lessonIds.length;
+
+  // Sort employees: most active first (by last completion), then alphabetical.
+  const employees = [...clientUsers]
+    .sort((a, b) => {
+      const aLast = completionsByUser.get(a.id)?.lastAt?.getTime() ?? 0;
+      const bLast = completionsByUser.get(b.id)?.lastAt?.getTime() ?? 0;
+      if (aLast !== bLast) return bLast - aLast;
+      return a.email.localeCompare(b.email);
+    })
+    .map((u) => {
+      const stat = completionsByUser.get(u.id);
+      return {
+        id: u.id,
+        email: u.email,
+        storeName: u.storeId
+          ? (storeNameById.get(u.storeId) ?? "—")
+          : "HQ / other",
+        completed: stat?.count ?? 0,
+        lastActive: stat?.lastAt ?? null,
+      };
+    });
 
   return (
     <div className="space-y-8">
@@ -146,6 +208,65 @@ export default async function ClientDetailPage({
           <Stat label="Lessons assigned" value={assignments.length} />
           <Stat label="Allowed domains" value={domains.length} />
         </dl>
+      </section>
+
+      <section>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-medium text-zinc-700">
+            Employees ({employees.length})
+          </h2>
+          <Link
+            href={`/admin/analytics/${client.id}`}
+            className="text-xs text-zinc-700 hover:underline"
+          >
+            Full analytics →
+          </Link>
+        </div>
+        <div className="rounded-md border border-zinc-200 bg-white overflow-hidden">
+          {employees.length === 0 ? (
+            <p className="p-6 text-sm text-zinc-500">
+              No employees have signed in yet.
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500">
+                <tr>
+                  <th className="px-4 py-2">Email</th>
+                  <th className="px-4 py-2">Store</th>
+                  <th className="px-4 py-2">Lessons completed</th>
+                  <th className="px-4 py-2">Last active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.slice(0, 25).map((e) => (
+                  <tr key={e.id} className="border-t border-zinc-200">
+                    <td className="px-4 py-2 font-medium">{e.email}</td>
+                    <td className="px-4 py-2 text-zinc-600">{e.storeName}</td>
+                    <td className="px-4 py-2 text-zinc-600">
+                      {e.completed} / {totalAssigned}
+                    </td>
+                    <td className="px-4 py-2 text-zinc-600">
+                      {e.lastActive
+                        ? e.lastActive.toLocaleDateString()
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {employees.length > 25 && (
+            <p className="border-t border-zinc-200 bg-zinc-50 px-4 py-2 text-xs text-zinc-500">
+              Showing 25 of {employees.length}.{" "}
+              <Link
+                href={`/admin/analytics/${client.id}`}
+                className="text-zinc-700 hover:underline"
+              >
+                See the full list in analytics →
+              </Link>
+            </p>
+          )}
+        </div>
       </section>
 
       {assignedLessonRows.length > 0 && (

@@ -8,6 +8,7 @@ import {
   clients,
 } from "@/lib/db/schema";
 import NewLessonForm from "./NewLessonForm";
+import ReorderButtons from "./ReorderButtons";
 import { auth } from "@/lib/auth";
 
 export const metadata = { title: "Lessons · Admin · Dojo" };
@@ -72,7 +73,9 @@ export default async function AdminLessonsPage() {
             <table className="w-full text-sm">
               <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500">
                 <tr>
+                  <th className="px-4 py-2">Order</th>
                   <th className="px-4 py-2">Internal name</th>
+                  <th className="px-4 py-2">Type</th>
                   <th className="px-4 py-2">Translations</th>
                   <th className="px-4 py-2">Assigned to</th>
                   <th className="px-4 py-2">Published</th>
@@ -80,13 +83,23 @@ export default async function AdminLessonsPage() {
                 </tr>
               </thead>
               <tbody>
-                {list.map((l) => {
+                {list.map((l, i) => {
                   const ts = transByLesson.get(l.id) ?? [];
                   const assigned = assignmentsByLesson.get(l.id) ?? [];
                   return (
                     <tr key={l.id} className="border-t border-zinc-200">
+                      <td className="px-4 py-2">
+                        <ReorderButtons
+                          lessonId={l.id}
+                          canMoveUp={i > 0}
+                          canMoveDown={i < list.length - 1}
+                        />
+                      </td>
                       <td className="px-4 py-2 font-medium">
                         {l.internalName}
+                      </td>
+                      <td className="px-4 py-2 text-zinc-600 capitalize">
+                        {l.type}
                       </td>
                       <td className="px-4 py-2 text-zinc-600">
                         {ts.length === 0

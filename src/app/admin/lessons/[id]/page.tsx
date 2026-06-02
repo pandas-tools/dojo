@@ -12,6 +12,7 @@ import {
 import PublishToggle from "./PublishToggle";
 import AssignmentManager from "./AssignmentManager";
 import TranslationsManager from "./TranslationsManager";
+import LessonMetaEditor from "./LessonMetaEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,19 @@ export default async function LessonDetailPage({
           isPublished={lesson.isPublished}
         />
       </div>
+
+      <section>
+        <h2 className="text-sm font-medium text-zinc-700 mb-2">
+          Lesson metadata
+        </h2>
+        <div className="rounded-md border border-zinc-200 bg-white p-4">
+          <LessonMetaEditor
+            lessonId={lesson.id}
+            initialInternalName={lesson.internalName}
+            initialType={lesson.type as "training" | "announcement" | "update"}
+          />
+        </div>
+      </section>
 
       <section>
         <h2 className="text-sm font-medium text-zinc-700 mb-2">
