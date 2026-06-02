@@ -32,9 +32,13 @@ Next.js 16 (App Router) + TypeScript + Tailwind v4 + Drizzle + Auth.js v5 + Mux.
 
 ## Workflow
 
-This repo is being built by Dex (CTO agent) autonomously through the initial phases. Once the MVP is live and Dimi joins the loop, the same branch + PR workflow used in `pandas-website` applies.
+Dojo is **pre-production**. Nothing real has shipped to actual client employees yet; the public Railway URL is internal-only. Optimise for speed of iteration.
 
-For now, while we're still scaffolding through Phase 2:
-- Direct commits to `main` are acceptable for foundation work (Phase 1) since there's nothing to break yet.
-- From Phase 2 onward, prefer `dex/<slug>` branches + PRs that auto-merge after `code-reviewer` clears them.
-- Every phase ends with `code-reviewer` on the diff and a `chrome-devtools` smoke pass on any new UI surface.
+- **Ship straight to `main`.** No `develop` branch. No PR review gate.
+- **Direct commits to `main` are fine** for small/medium changes.
+- **For larger work, a PR is OK only if it auto-merges** (`gh pr merge --auto --squash` after creating it). Don't leave a PR open waiting for human review.
+- **Do not send Dimi the PR link or preview URL.** He doesn't want to be in the merge loop at this stage. Confirm the change shipped after it's merged.
+- **Bundle work.** Prefer one bigger PR over many small ones for related changes.
+- **Quality bar is unchanged.** Speed ≠ sloppiness. Every change still runs through `code-reviewer` on the diff and a `chrome-devtools` smoke pass on any new UI surface. Tests must pass. Never `--no-verify`, never `--force` to `main`.
+
+This rule **lapses the moment dojo goes into real production** (real client employees actively training, or the `learn.pandas.io` cutover). At that point: revert to the standard Pandas flow — feature branches → `develop` → `main`, with Dimi-approved promotion to production.

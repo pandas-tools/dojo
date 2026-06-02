@@ -1,8 +1,9 @@
 # Dojo — Technical Design Spec
 
-**Date:** 2026-04-10
+**Date:** 2026-04-10 (product spec); stack updated 2026-06-02
 **Status:** Approved
-**Authors:** Dimitris Lampidis, Ted (Claude)
+
+> The product description in §1, §4 (Data Model), §7 (routes), §8 (Mux), §9 (Analytics), §10 (MVP Scope), and §11 (Future Vision) is the authoritative source for what Dojo does. For the current stack and implementation patterns, [`decisions.md`](decisions.md) and [`architecture.md`](architecture.md) are the source of truth — this spec was originally written against a Supabase implementation and was pivoted on 2026-05-14. Stack-bearing sections (§2, §3, §5, §6, §7 data-fetching paragraph) have been rewritten to reflect the current implementation.
 
 ---
 
@@ -12,32 +13,36 @@ Pandas deploys Vision AI technology to telecom operators and tech retailers acro
 
 The platform is designed as a Pandas-internal product first, with the architecture to support becoming a standalone product later.
 
+### 1.1 Mobile-first (hard constraint)
+
+The vast majority of employees will access Dojo from a mobile phone — on the shop floor, between customers, during a break. Mobile is the primary surface; desktop is the fallback. Every design, layout, performance, and interaction decision is judged on mobile first. Touch targets, gesture handling, viewport, font sizing, video controls, network behaviour on cellular, and time-to-first-meaningful-paint are all evaluated against a mid-range Android on a degraded connection — not a developer's MacBook. Desktop should work; mobile must feel native.
+
+This constraint is load-bearing for the UX architecture (the Reels shell exists precisely because mobile employees expect TikTok/Stories interaction patterns, not Netflix navigation) and for every future feature decision.
+
 ## 2. Tech Stack
 
 | Layer | Technology | Notes |
 |-------|-----------|-------|
-| Framework | Next.js (App Router) + TypeScript | Server Components by default, Client Components where interactivity is needed |
-| Hosting | Vercel (Pro plan) | Edge middleware, serverless functions |
-| Database + Auth | Supabase (free tier → Pro when shipping to first client) | Postgres, Row-Level Security, magic link auth |
-| Video | Mux | Adaptive streaming (HLS), auto-captions, direct upload |
-| Styling | TBD (frontend phase) | To be decided when frontend work begins |
+| Framework | Next.js 16 (App Router) + TypeScript | Server Components by default, Client Components where interactivity is needed |
+| Hosting | Railway | Web service + managed Postgres in a single Railway project |
+| Database | Postgres on Railway | Managed service; `DATABASE_URL` provided via Railway reference variable |
+| ORM | Drizzle | Schema-first, lightweight, TypeScript-typed; plain SQL migrations under `drizzle/` |
+| Auth | Auth.js v5 (`next-auth@5.0.0-beta.31+`) + Resend (magic link) | JWT strategy; Drizzle adapter for user/account/verification-token tables |
+| Email | Resend | Sending domain `mkt.pandas.io` for now (eventually `learn.pandas.io`) |
+| Video | Mux | Adaptive streaming (HLS), auto-captions via Whisper, direct upload |
+| Styling | Tailwind v4 (utility classes) | No component library yet — decided in `decisions.md` (revisit after MVP) |
 
-### Cost Profile
-
-| Phase | Stack | Monthly Cost |
-|-------|-------|-------------|
-| Building & testing | Vercel Pro + Supabase Free + Mux Free | ~$20 (existing Vercel plan) |
-| Production (first client) | Vercel Pro + Supabase Pro + Mux Free | ~$45 |
-
-Mux is effectively free at this scale: ~10 minutes of stored video, delivery well within the 100K free minutes/month tier.
+Cost profile is dominated by Railway (web + Postgres) plus Mux (effectively free at the projected volume — sub-1k minutes of stored content, delivery well within Mux's free tier). Resend is on the existing Pandas plan.
 
 ## 3. Architecture Approach
 
-**Supabase-heavy.** Lean into Supabase for everything it can do — database with Row-Level Security policies, Supabase Auth for magic links, business logic in Next.js API routes and Server Components. The database enforces multi-tenant isolation via RLS.
+**Railway-native, Next.js Server Components-driven.** The web service runs on Railway alongside its Postgres, talks to Postgres through Drizzle, and serves the UI via Next.js App Router with Server Components by default. There is no separate Edge runtime, no serverless function fan-out, no SDK reaching the DB from the browser. Every database touch happens server-side from a Server Component, a Route Handler, or a Server Action.
 
 ### Multi-Tenancy
 
-Shared database with a `client_id` tenant column on all tenant-scoped tables. RLS policies on every table ensure employees can only access their own client's data. No schema-per-tenant or database-per-tenant complexity — this is a handful of clients with hundreds of employees, not thousands of tenants.
+Shared database with a `client_id` tenant column on all tenant-scoped tables. Tenant isolation is enforced **in the application layer** via the `scopedDb(user)` helper in `src/lib/db/scoped.ts`, not in Postgres via Row-Level Security. Every employee-facing query goes through `scopedDb` and auto-injects the user's `client_id` filter. An integration test (`src/tests/tenant-isolation.test.ts`) fails the build if any tenant-table query bypasses the helper. Rationale and trade-offs are documented in [`decisions.md`](decisions.md) (entry: "Postgres on Railway, no Row-Level Security").
+
+This is a handful of clients with hundreds of employees, not thousands of tenants — schema-per-tenant or database-per-tenant complexity is not justified.
 
 ## 4. Data Model
 
@@ -97,11 +102,11 @@ CSV import requires `name` as the only mandatory column. Optional columns: `city
 
 ### `users`
 
-Extended user data linked to Supabase Auth.
+Application user record. Created by an Auth.js event callback on first successful sign-in (see §5).
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | uuid, PK, FK → auth.users | Same ID as Supabase Auth user |
+| id | uuid, PK | `uuid_generate_v4` default. Auth.js account/session rows reference this `id`. |
 | client_id | uuid, FK → clients, nullable | Resolved from email domain at signup. Null for Pandas internal admins |
 | store_id | uuid, FK → stores, nullable | Null = HQ / not assigned to a store |
 | email | text, unique | Synced from auth on signup |
@@ -204,37 +209,43 @@ users ── lesson_completions ── lessons (many:many through completions)
 
 ### Domain-Allowlisted Magic Link Authentication
 
-Employees self-onboard by entering their work email. The system validates the email domain against `client_allowed_domains` and sends a magic link + OTP code. No passwords, no invites, no admin overhead per employee.
+Employees self-onboard by entering their work email. The system validates the email domain against `client_allowed_domains` and sends a magic link via Resend. No passwords, no invites, no admin overhead per employee.
+
+The auth layer is **Auth.js v5** with the **Resend email provider**, JWT session strategy, and the **Drizzle adapter** writing users/accounts/verification-tokens to the same Postgres database.
 
 **First-time employee signup:**
 
-1. Employee opens the portal URL, enters their work email (e.g., jan@orange.be)
-2. Next.js API route (`/api/auth/login`) checks: does "orange.be" exist in `client_allowed_domains`?
-   - No → "This email is not authorized. Contact your manager."
-   - Yes → Call Supabase `signInWithOtp()` to send magic link + OTP
-3. Employee clicks link or enters code → authenticated
-4. Database trigger fires: looks up `client_id` from the matching domain, creates a row in `users` (id = auth user id, client_id, email, role = 'employee')
-5. Employee enters the onboarding flow: Language → Welcome → Store selection → Reels shell
-6. After store selection, the user is redirected to `/watch/[firstLessonId]` where `firstLessonId` is the first lesson by `sort_order` assigned to their client. The Reels shell auto-advances through all assigned lessons in sequence.
-7. `onboarding_completed = true`, `store_confirmed_at = now()`
+1. Employee opens the portal URL, enters their work email (e.g., jan@orange.be).
+2. The client first calls `POST /api/auth/check-domain` (Next.js Route Handler). The server checks:
+   - Is "orange.be" in `client_allowed_domains`? → resolves to that client.
+   - Or is the email pre-registered in `users` with `role = 'admin'`? → admin path.
+   - Otherwise → reject with "This email is not authorized. Contact your manager."
+3. If allowed, the client invokes the `signIn("resend", { email })` Server Action. Auth.js stores a verification token and Resend sends the magic link.
+4. Employee clicks the magic link → Auth.js verifies the token → JWT cookie is set.
+5. The Auth.js `events.createUser` callback (in `src/lib/auth.ts`) resolves `client_id` from the email domain, populates `client_id`, `email`, and sets `role = 'employee'` (or `'admin'` for the allowlisted addresses).
+6. Employee enters the onboarding flow: Language → Welcome → Store selection → Reels shell.
+7. After store selection, the user is redirected to `/watch/[firstLessonId]` where `firstLessonId` is the first lesson by `sort_order` assigned to their client. The Reels shell auto-advances through all assigned lessons in sequence.
+8. `onboarding_completed = true`, `store_confirmed_at = now()`. The server action calls `unstable_update()` so the JWT is re-issued with the fresh claims and middleware sees the updated state on the next request.
 
 **Returning employee login:**
 
-1. Enter email → magic link/OTP → authenticated
+1. Enter email → magic link → authenticated.
 2. Middleware checks: `onboarding_completed`? `store_confirmed_at` older than 30 days?
-3. If all good → straight to Browse shell
+3. If all good → straight to Browse shell.
 
 **Admin login:**
 
-Same magic link flow. Admin users are pre-registered in the `users` table with `role = 'admin'` and `client_id = null`. Their email does not need to match any `client_allowed_domains` — they're explicitly whitelisted. After auth, middleware routes them to `/admin`.
+Same magic link flow. Admin users are pre-registered in the `users` table with `role = 'admin'` and `client_id = null`. Their email does not need to match any `client_allowed_domains` — they're explicitly whitelisted via `ADMIN_ALLOWLIST` and the `users` row. After auth, middleware routes them to `/admin`.
 
 **Admin management:** The admin panel has a Members section where Pandas team members can add/remove admin users by email.
 
 ### Middleware Routing
 
+Auth.js middleware (`src/middleware.ts`) runs on every request. To stay Edge-compatible it uses the slim `auth.config.ts` (no DB access); JWT claims are the source of truth for onboarding/role state.
+
 ```
 Every request:
-  → Is user authenticated?
+  → Is user authenticated (valid JWT)?
     → No  → redirect to /login
     → Yes → Is role = admin?
       → Yes → Is path /admin/*? → Allow
@@ -248,107 +259,52 @@ Every request:
 
 ### Domain Validation
 
-Domain validation runs server-side in a Next.js API route (`/api/auth/login`) using the **service role key** (bypasses RLS, since this runs before the user is authenticated). The logic is:
+Domain validation runs server-side in `POST /api/auth/check-domain` using the regular Drizzle client. It runs before any email is sent — no email is ever delivered to an unauthorized address. The logic is:
 
-1. Extract the domain from the submitted email
-2. Check if the domain exists in `client_allowed_domains` → if yes, send OTP
-3. If no domain match, check if a `users` row exists with that email and `role = 'admin'` → if yes, send OTP
-4. If neither condition is met → reject with "This email is not authorized"
+1. Extract the domain from the submitted email.
+2. Check if the domain exists in `client_allowed_domains` → if yes, allow `signIn`.
+3. If no domain match, check if a `users` row exists with that email and `role = 'admin'` → if yes, allow `signIn`.
+4. If neither condition is met → reject with "This email is not authorized".
 
-No email is ever sent to unauthorized addresses. The two-step check ensures both employees (domain match) and admins (explicit whitelist) can authenticate through the same login screen.
+The two-step check ensures both employees (domain match) and admins (explicit whitelist) can authenticate through the same login screen.
 
-## 6. Row-Level Security
+## 6. Tenant Isolation
 
-RLS ensures that even with a bug in application code, one client's employees can never access another client's data.
+Tenant isolation is enforced at the **application layer**, not in the database. Postgres has no Row-Level Security policies (decision: [`decisions.md` — "Postgres on Railway, no Row-Level Security"](decisions.md)).
 
-Every authenticated Supabase request includes a JWT with the user's ID. RLS policies use this to look up the user's `client_id` and scope every query.
+The rule: every employee-facing query goes through `scopedDb(user)` (`src/lib/db/scoped.ts`). The helper returns a Drizzle wrapper that automatically injects `where client_id = user.clientId` on every tenant-scoped table. There is no untyped escape hatch — the wrapper does not expose a "raw" query method to the rest of the app.
 
-### Core Policies
+```ts
+// inside a Server Component or Route Handler
+import { auth } from "@/lib/auth";
+import { scopedDb } from "@/lib/db/scoped";
 
-```sql
--- Users: SELECT own record only
-CREATE POLICY "users_select_own" ON users
-  FOR SELECT USING (id = auth.uid());
+const session = await auth();
+if (!session?.user) return new Response("unauthorized", { status: 401 });
 
--- Users: no INSERT policy for authenticated role.
--- Row creation is handled by a SECURITY DEFINER trigger function
--- that fires on auth.users insert. This bypasses RLS.
--- No authenticated user should be able to insert into users directly.
-
--- Users: no client-side UPDATE. All profile updates go through
--- PATCH /api/user/profile (server-side, service role key).
--- This prevents users from modifying their own role, client_id,
--- or onboarding_completed via the client-side SDK.
-
--- Clients: users can see their own client (for branding/logo)
-CREATE POLICY "clients_own" ON clients
-  FOR SELECT USING (
-    id = (SELECT client_id FROM users WHERE id = auth.uid())
-  );
-
--- Stores: users can only see stores for their client
-CREATE POLICY "stores_same_client" ON stores
-  FOR SELECT USING (
-    client_id = (SELECT client_id FROM users WHERE id = auth.uid())
-  );
-
--- Lessons: users can only see published lessons assigned to their client
-CREATE POLICY "lessons_for_client" ON lessons
-  FOR SELECT USING (
-    id IN (
-      SELECT lesson_id FROM client_lessons
-      WHERE client_id = (SELECT client_id FROM users WHERE id = auth.uid())
-    )
-    AND is_published = true
-  );
-
--- Translations: users see translations for accessible lessons only
-CREATE POLICY "translations_for_accessible_lessons" ON lesson_translations
-  FOR SELECT USING (
-    lesson_id IN (
-      SELECT lesson_id FROM client_lessons
-      WHERE client_id = (SELECT client_id FROM users WHERE id = auth.uid())
-    )
-  );
-
--- Completions: SELECT/UPDATE/DELETE own records
-CREATE POLICY "completions_select_own" ON lesson_completions
-  FOR SELECT USING (user_id = auth.uid());
-
--- Completions: INSERT only for own user_id AND only for assigned lessons
-CREATE POLICY "completions_insert_own" ON lesson_completions
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    AND lesson_id IN (
-      SELECT lesson_id FROM client_lessons
-      WHERE client_id = (SELECT client_id FROM users WHERE id = auth.uid())
-    )
-  );
-
--- Client languages: users see their client's languages
-CREATE POLICY "languages_same_client" ON client_languages
-  FOR SELECT USING (
-    client_id = (SELECT client_id FROM users WHERE id = auth.uid())
-  );
-
--- client_allowed_domains: no policy for authenticated role.
--- Only queried server-side via service role key during login.
+const db = scopedDb(session.user);
+const lessons = await db.lessons.list();   // already filtered by client_id
 ```
 
-### User Creation Trigger
+### Why app-layer scoping, not RLS
 
-The `users` row is created by a **SECURITY DEFINER** function triggered on `auth.users` insert. This function:
-1. Looks up the `client_id` by matching the new user's email domain against `client_allowed_domains`
-2. Inserts a row into `users` with the auth user's ID, resolved `client_id`, email, and `role = 'employee'`
-3. Runs with elevated privileges (bypasses RLS), so no INSERT policy is needed on `users` for the `authenticated` role
+- One Next.js app talks to one Postgres database. There is no third-party SDK (browser SDK, mobile SDK, edge functions from another service) hitting the DB. The DB does not need to be the trust boundary.
+- A single query helper + an integration test that proves cross-tenant reads are rejected is simpler than parallel SQL policy files. The build fails if any route handler bypasses the helper.
+- Plain Postgres = no vendor lock-in on the data plane.
 
-For admin users (pre-registered with `role = 'admin'` and `client_id = null`), the row is created manually via the admin panel using the service role key.
+Trade-off documented in `decisions.md`: if a second service ever talks to this DB directly (background worker, cron container), it must also use `scopedDb` or write its own scoping. The CI test that asserts cross-tenant isolation is the backstop.
 
-### Admin Access
+### Admin operations
 
-Admin operations go through Next.js API routes using a Supabase **service role key** (bypasses RLS). The service role key is server-side only — never exposed to the browser. No complex admin RLS policies needed for MVP.
+Admin routes (`role === 'admin'`, `client_id === null`) use the raw Drizzle client (`@/lib/db/client.ts`) and self-enforce authorization at the top of each handler — `if (session.user.role !== 'admin') return 403`. Middleware redirects unauthorized users; it does not authorize the action. Authorization is a server-side check on every admin write.
 
-All employee profile updates (`PATCH /api/user/profile`) also go through the server-side API route with the service role key. This ensures users cannot modify sensitive fields (`role`, `client_id`) via the client-side SDK. The API route validates and restricts updates to: `preferred_language`, `subtitles_enabled`, `store_id`, `store_confirmed_at`, `onboarding_completed`.
+### Profile updates
+
+All employee profile updates go through `PATCH /api/user/profile` (server-side). The handler validates input and restricts mutable fields to: `preferred_language`, `subtitles_enabled`, `store_id`, `store_confirmed_at`, `onboarding_completed`. The user cannot modify `role` or `client_id` by submitting them — those are never accepted by the route handler.
+
+### User row creation
+
+The `users` row is created by Auth.js's `events.createUser` callback (`src/lib/auth.ts`) on the first successful magic-link verification. The callback resolves `client_id` by matching the email domain against `client_allowed_domains`, sets `role = 'employee'` (or `'admin'` if the email is in `ADMIN_ALLOWLIST`), and writes the row server-side. No user-driven INSERT path exists.
 
 ## 7. API & Route Design
 
@@ -399,11 +355,11 @@ GET  /api/admin/analytics         → Completion stats per client
 GET  /api/admin/analytics/[clientId] → Client detail: funnel, store table, lesson breakdown
 ```
 
-All admin routes use the Supabase service role key server-side. Standard REST conventions apply — only non-obvious routes are listed explicitly above.
+All admin routes self-enforce `session.user.role === 'admin'` at the top of the handler and query Postgres via the raw Drizzle client. Standard REST conventions apply — only non-obvious routes are listed explicitly above.
 
 ### Data Fetching Pattern
 
-Employee-facing pages use the **Supabase client-side SDK with RLS** for simple reads. The user's JWT scopes all queries automatically. API routes are used for operations that need server-side logic: domain validation, Mux uploads, CSV parsing, analytics aggregation.
+Employee-facing pages query Postgres via Drizzle through `scopedDb(user)` (§6) directly from **Server Components**. There is no client-side database SDK; the browser never holds a database connection. Client Components receive already-scoped data as props or fetch via Route Handlers / Server Actions. Route Handlers and Server Actions are used for everything that needs server-side logic: domain validation, Mux upload URL signing, CSV parsing, analytics aggregation, profile mutations.
 
 ## 8. Mux Integration
 
@@ -554,4 +510,4 @@ All analytics are derived from existing tables — no separate analytics tables 
 
 The Dojo is the first use case for a broader **retail employee communication platform**. The same pattern — short video + notes, pushed to distributed employees — works for product launches, policy changes, seasonal promotions, and operational announcements. The data model supports this via the `type` field on lessons without requiring architectural changes.
 
-The `role` field on users supports future expansion to `client_admin` without schema changes. A client admin would have `role = 'client_admin'` with a `client_id`, giving them RLS-scoped access to their own client's data plus additional UI surfaces for analytics.
+The `role` field on users supports future expansion to `client_admin` without schema changes. A client admin would have `role = 'client_admin'` with a `client_id`, giving them tenant-scoped access to their own client's data (via the same `scopedDb` pattern) plus additional UI surfaces for analytics.
