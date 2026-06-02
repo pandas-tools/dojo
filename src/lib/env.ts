@@ -11,6 +11,15 @@ const envSchema = z.object({
   MUX_WEBHOOK_SECRET: z.string().min(1),
   NEXT_PUBLIC_SITE_URL: z.string().url(),
   ADMIN_ALLOWLIST: z.string().default(""),
+  // ImageKit — used for single-image and carousel-slide lesson media.
+  // Optional at the schema level because the shared Pandas ImageKit account
+  // hadn't been provisioned at first ship time. When all three are unset,
+  // the upload endpoint returns a clear error and admins can only create
+  // video lessons. Once the operator sets all three on Railway, image +
+  // carousel lessons start working with no code change.
+  IMAGEKIT_PUBLIC_KEY: z.string().min(1).optional(),
+  IMAGEKIT_PRIVATE_KEY: z.string().min(1).optional(),
+  IMAGEKIT_URL_ENDPOINT: z.string().url().optional(),
 });
 
 type Env = z.infer<typeof envSchema>;
@@ -28,6 +37,9 @@ const BUILD_STUB: Env = {
   MUX_WEBHOOK_SECRET: "stub",
   NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
   ADMIN_ALLOWLIST: "",
+  IMAGEKIT_PUBLIC_KEY: undefined,
+  IMAGEKIT_PRIVATE_KEY: undefined,
+  IMAGEKIT_URL_ENDPOINT: undefined,
 };
 
 export function env(): Env {

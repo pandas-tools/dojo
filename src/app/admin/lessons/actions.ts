@@ -8,6 +8,7 @@ import {
   lessons,
   lessonTranslations,
   clientLessons,
+  type CarouselSlide,
 } from "@/lib/db/schema";
 import { createDirectUpload } from "@/lib/mux";
 
@@ -128,6 +129,212 @@ export async function createLessonFromUpload(input: {
         // Seed with the English title so the row is valid; admin can rename later.
         title,
         description: null,
+      });
+    }
+
+    for (const clientId of input.clientIds ?? []) {
+      await tx
+        .insert(clientLessons)
+        .values({ lessonId: lesson.id, clientId })
+        .onConflictDoNothing();
+    }
+
+    return lesson.id;
+  });
+
+  revalidatePath("/admin/lessons");
+  return { ok: true as const, lessonId };
+}
+
+/**
+ * Create a single-image lesson. Same shape as createLessonFromUpload but
+ * for the 'image' content type — the caller has already uploaded the
+ * image to ImageKit via /api/admin/lessons/upload-image and is passing
+ * the resulting public URL + alt text.
+ *
+ * Image lessons follow the 5-second-dwell completion rule on the client
+ * tracker (decided 2026-06-02). The server doesn't need to know about
+ * dwell time; it just stores the media.
+ */
+export async function createImageLesson(input: {
+  imageUrl: string;
+  imageAlt: string;
+  internalName: string;
+  title: string;
+  description?: string;
+  notesMarkdown?: string;
+  type?: AllowedType;
+  additionalLanguages?: string[];
+  clientIds?: string[];
+  publish?: boolean;
+}) {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "forbidden" as const };
+  }
+  const internalName = input.internalName.trim();
+  const title = input.title.trim();
+  const imageUrl = input.imageUrl.trim();
+  const imageAlt = input.imageAlt.trim();
+  if (!internalName || !title) {
+    return { error: "internalName and title are required" as const };
+  }
+  if (!imageUrl || !imageAlt) {
+    return { error: "imageUrl and imageAlt are required" as const };
+  }
+  const type: AllowedType = input.type ?? "training";
+  if (!ALLOWED_TYPES.includes(type)) {
+    return { error: "invalid type" as const };
+  }
+  const extraLangs = (input.additionalLanguages ?? [])
+    .filter((l): l is AllowedLang =>
+      (ALLOWED_LANGS as readonly string[]).includes(l),
+    )
+    .filter((l) => l !== "en");
+
+  const [{ value: currentMax }] = await db
+    .select({ value: max(lessons.sortOrder) })
+    .from(lessons);
+  const nextSort = (currentMax ?? 0) + 10;
+
+  const lessonId = await db.transaction(async (tx) => {
+    const [lesson] = await tx
+      .insert(lessons)
+      .values({
+        internalName,
+        type,
+        contentType: "image",
+        sortOrder: nextSort,
+        isPublished: !!input.publish,
+      })
+      .returning();
+
+    await tx.insert(lessonTranslations).values({
+      lessonId: lesson.id,
+      language: "en",
+      title,
+      description: input.description?.trim() || null,
+      notesMarkdown: input.notesMarkdown?.trim() || null,
+      imageUrl,
+      imageAlt,
+    });
+
+    for (const lang of extraLangs) {
+      // Reuse the same image for additional languages by default — admin
+      // can swap the per-language image in the translations editor later.
+      await tx.insert(lessonTranslations).values({
+        lessonId: lesson.id,
+        language: lang,
+        title,
+        description: null,
+        imageUrl,
+        imageAlt,
+      });
+    }
+
+    for (const clientId of input.clientIds ?? []) {
+      await tx
+        .insert(clientLessons)
+        .values({ lessonId: lesson.id, clientId })
+        .onConflictDoNothing();
+    }
+
+    return lesson.id;
+  });
+
+  revalidatePath("/admin/lessons");
+  return { ok: true as const, lessonId };
+}
+
+/**
+ * Create a carousel lesson with an ordered array of image slides.
+ * Each slide must already be uploaded to ImageKit (the caller hits
+ * /api/admin/lessons/upload-image per slide). The slides array carries
+ * { url, alt, caption? } in display order.
+ *
+ * Carousel lessons follow the all-slides-viewed completion rule on the
+ * client tracker.
+ */
+export async function createCarouselLesson(input: {
+  slides: CarouselSlide[];
+  internalName: string;
+  title: string;
+  description?: string;
+  notesMarkdown?: string;
+  type?: AllowedType;
+  additionalLanguages?: string[];
+  clientIds?: string[];
+  publish?: boolean;
+}) {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "forbidden" as const };
+  }
+  const internalName = input.internalName.trim();
+  const title = input.title.trim();
+  if (!internalName || !title) {
+    return { error: "internalName and title are required" as const };
+  }
+  if (!Array.isArray(input.slides) || input.slides.length < 2) {
+    return {
+      error: "Carousel needs at least 2 slides — use an image lesson for 1." as const,
+    };
+  }
+  for (const s of input.slides) {
+    if (!s.url || !s.alt) {
+      return { error: "Every slide needs both url and alt text" as const };
+    }
+  }
+  const type: AllowedType = input.type ?? "training";
+  if (!ALLOWED_TYPES.includes(type)) {
+    return { error: "invalid type" as const };
+  }
+  const slides: CarouselSlide[] = input.slides.map((s) => ({
+    url: s.url,
+    alt: s.alt,
+    ...(s.caption ? { caption: s.caption } : {}),
+  }));
+  const extraLangs = (input.additionalLanguages ?? [])
+    .filter((l): l is AllowedLang =>
+      (ALLOWED_LANGS as readonly string[]).includes(l),
+    )
+    .filter((l) => l !== "en");
+
+  const [{ value: currentMax }] = await db
+    .select({ value: max(lessons.sortOrder) })
+    .from(lessons);
+  const nextSort = (currentMax ?? 0) + 10;
+
+  const lessonId = await db.transaction(async (tx) => {
+    const [lesson] = await tx
+      .insert(lessons)
+      .values({
+        internalName,
+        type,
+        contentType: "carousel",
+        sortOrder: nextSort,
+        isPublished: !!input.publish,
+      })
+      .returning();
+
+    await tx.insert(lessonTranslations).values({
+      lessonId: lesson.id,
+      language: "en",
+      title,
+      description: input.description?.trim() || null,
+      notesMarkdown: input.notesMarkdown?.trim() || null,
+      carouselSlides: slides,
+    });
+
+    for (const lang of extraLangs) {
+      await tx.insert(lessonTranslations).values({
+        lessonId: lesson.id,
+        language: lang,
+        title,
+        description: null,
+        carouselSlides: slides,
       });
     }
 

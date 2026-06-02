@@ -18,10 +18,17 @@ import {
   lessons,
   lessonTranslations,
   lessonCompletions,
+  lessonEvents,
   stores,
   clients,
   clientLanguages,
 } from "./schema";
+
+type LessonEventType =
+  | "lesson_opened"
+  | "lesson_completed"
+  | "lesson_engagement"
+  | "rating_submitted";
 
 export type ScopedUser = {
   id: string;
@@ -162,10 +169,15 @@ export function scopedDb(user: ScopedUser) {
     },
 
     completions: {
-      // Returns the user's completions restricted to lessons currently
+      // Returns the user's RATINGS, restricted to lessons currently
       // assigned to their client. Stale completions from a previous
       // client (if the user were ever reassigned in the DB) are filtered
       // out so /browse and /watch never resurface them.
+      //
+      // Naming note: this table is now semantically "ratings" — the
+      // boolean "did they complete it" signal moved into lesson_events.
+      // Kept the name for back-compat with existing call sites; we'll
+      // rename in a follow-up bundle if the signal:noise warrants.
       forUser: async () => {
         const assignments = await db
           .select({ lessonId: clientLessons.lessonId })
@@ -209,6 +221,89 @@ export function scopedDb(user: ScopedUser) {
             set: { rating, completedAt: new Date() },
           })
           .returning();
+      },
+    },
+
+    events: {
+      // Append a tracker event for a lesson the user has access to.
+      // Verifies the lesson is currently assigned to this client first —
+      // refuses to write an event for a lesson the user can't actually
+      // see (defensive against a stale tab + a re-assignment that already
+      // happened on the admin side).
+      //
+      // For lesson_opened and lesson_completed we de-dupe per (user,
+      // lesson) so the tracker can safely re-emit on retries — first one
+      // wins. lesson_engagement and rating_submitted always insert.
+      write: async (
+        lessonId: string,
+        eventType: LessonEventType,
+        payload: Record<string, unknown> | null,
+      ) => {
+        const [assignment] = await db
+          .select()
+          .from(clientLessons)
+          .where(
+            and(
+              eq(clientLessons.clientId, cid),
+              eq(clientLessons.lessonId, lessonId),
+            ),
+          );
+        if (!assignment) {
+          throw new Error("Lesson not assigned to user's client");
+        }
+
+        const dedupable =
+          eventType === "lesson_opened" || eventType === "lesson_completed";
+        if (dedupable) {
+          const [existing] = await db
+            .select({ id: lessonEvents.id })
+            .from(lessonEvents)
+            .where(
+              and(
+                eq(lessonEvents.userId, user.id),
+                eq(lessonEvents.lessonId, lessonId),
+                eq(lessonEvents.eventType, eventType),
+              ),
+            )
+            .limit(1);
+          if (existing) return existing;
+        }
+
+        const [row] = await db
+          .insert(lessonEvents)
+          .values({
+            userId: user.id,
+            lessonId,
+            clientId: cid,
+            eventType,
+            payload,
+          })
+          .returning({ id: lessonEvents.id });
+        return row;
+      },
+
+      // Read all lesson_completed events for the user's currently-assigned
+      // lessons. Used by /browse and /watch to mark which lessons are
+      // already "done" for this user. Replaces the previous "rating row
+      // exists = completed" signal.
+      completedLessonIds: async (): Promise<Set<string>> => {
+        const assignments = await db
+          .select({ lessonId: clientLessons.lessonId })
+          .from(clientLessons)
+          .where(eq(clientLessons.clientId, cid));
+        const assignedIds = assignments.map((a) => a.lessonId);
+        if (assignedIds.length === 0) return new Set();
+        const rows = await db
+          .select({ lessonId: lessonEvents.lessonId })
+          .from(lessonEvents)
+          .where(
+            and(
+              eq(lessonEvents.userId, user.id),
+              eq(lessonEvents.eventType, "lesson_completed"),
+              inArray(lessonEvents.lessonId, assignedIds),
+            ),
+          );
+        return new Set(rows.map((r) => r.lessonId));
       },
     },
   };
