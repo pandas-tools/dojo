@@ -8,7 +8,7 @@ const envSchema = z.object({
   AUTH_EMAIL_FROM: z.string().email(),
   MUX_TOKEN_ID: z.string().min(1),
   MUX_TOKEN_SECRET: z.string().min(1),
-  MUX_WEBHOOK_SECRET: z.string().min(1).optional(),
+  MUX_WEBHOOK_SECRET: z.string().min(1),
   NEXT_PUBLIC_SITE_URL: z.string().url(),
   ADMIN_ALLOWLIST: z.string().default(""),
 });
@@ -19,7 +19,7 @@ let cached: Env | null = null;
 
 const BUILD_STUB: Env = {
   DATABASE_URL: "postgres://stub@localhost:5432/stub",
-  AUTH_SECRET: "stub-build-secret-stub-build-secret",
+  AUTH_SECRET: "BUILD_STUB_DO_NOT_USE_REPLACE_ME_AT_RUNTIME",
   AUTH_URL: "http://localhost:3000",
   AUTH_RESEND_KEY: "re_stub",
   AUTH_EMAIL_FROM: "stub@example.com",

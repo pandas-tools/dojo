@@ -33,26 +33,36 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  const { role, onboardingCompleted } = session.user;
+  const { role, onboardingCompleted, storeConfirmedAt } = session.user;
 
   // Admin gate
   if (path.startsWith("/admin") || path.startsWith("/api/admin")) {
     if (role !== "admin") {
-      return NextResponse.redirect(new URL("/browse", nextUrl));
+      return NextResponse.redirect(new URL("/", nextUrl));
     }
     return NextResponse.next();
-  }
-
-  // Employee onboarding gate
-  if (role === "employee" && !onboardingCompleted) {
-    if (!path.startsWith("/onboarding")) {
-      return NextResponse.redirect(new URL("/onboarding", nextUrl));
-    }
   }
 
   // Admin redirected away from employee routes
   if (role === "admin" && (path.startsWith("/browse") || path.startsWith("/watch"))) {
     return NextResponse.redirect(new URL("/admin", nextUrl));
+  }
+
+  // Employee gates: onboarding first, then 30-day store re-confirmation.
+  // Both funnel to /onboarding; the page itself pre-fills the current
+  // selection when it's a re-confirmation rather than a first-time setup.
+  // storeConfirmedAt comes off the JWT as epoch ms (set by the full Node
+  // auth.ts jwt callback after each DB refresh).
+  if (role === "employee") {
+    const needsOnboarding = !onboardingCompleted;
+    const STORE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+    const needsReconfirm =
+      onboardingCompleted &&
+      (storeConfirmedAt === null ||
+        Date.now() - storeConfirmedAt > STORE_TTL_MS);
+    if ((needsOnboarding || needsReconfirm) && !path.startsWith("/onboarding")) {
+      return NextResponse.redirect(new URL("/onboarding", nextUrl));
+    }
   }
 
   return NextResponse.next();

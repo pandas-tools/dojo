@@ -10,19 +10,52 @@ type StoreRow = {
   city: string | null;
 };
 
-const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "fr", label: "Français" },
-  { code: "nl", label: "Nederlands" },
-];
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: "English",
+  fr: "Français",
+  nl: "Nederlands",
+  de: "Deutsch",
+  es: "Español",
+  it: "Italiano",
+  pt: "Português",
+};
 
-export default function OnboardingForm({ stores }: { stores: StoreRow[] }) {
+function labelFor(code: string) {
+  return LANGUAGE_LABELS[code] ?? code.toUpperCase();
+}
+
+type Props = {
+  stores: StoreRow[];
+  languages: string[];
+  initialLanguage: string;
+  initialStoreId: string | null;
+  mode: "first" | "reconfirm";
+};
+
+export default function OnboardingForm({
+  stores,
+  languages,
+  initialLanguage,
+  initialStoreId,
+  mode,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [language, setLanguage] = useState("en");
-  const [storeId, setStoreId] = useState<string>(stores[0]?.id ?? "");
-  const [hq, setHq] = useState(false);
+
+  const defaultLanguage = languages.includes(initialLanguage)
+    ? initialLanguage
+    : (languages[0] ?? "en");
+  const [language, setLanguage] = useState(defaultLanguage);
+
+  // initialStoreId === null means "HQ / not assigned to a store" — the user
+  // explicitly checked the HQ box on a previous run. Distinguish that from
+  // a fresh user with no selection yet.
+  const initialIsHq = mode === "reconfirm" && initialStoreId === null;
+  const [hq, setHq] = useState(initialIsHq);
+  const [storeId, setStoreId] = useState<string>(
+    initialStoreId ?? stores[0]?.id ?? "",
+  );
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,7 +69,9 @@ export default function OnboardingForm({ stores }: { stores: StoreRow[] }) {
         setError(res.error);
         return;
       }
-      router.push("/browse");
+      // Bounce through root so the (now fresh) JWT routes us into the
+      // unified Reels experience without a separate first-time path.
+      router.push("/");
       router.refresh();
     });
   }
@@ -52,9 +87,9 @@ export default function OnboardingForm({ stores }: { stores: StoreRow[] }) {
           onChange={(e) => setLanguage(e.target.value)}
           className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         >
-          {LANGUAGES.map((l) => (
-            <option key={l.code} value={l.code}>
-              {l.label}
+          {languages.map((code) => (
+            <option key={code} value={code}>
+              {labelFor(code)}
             </option>
           ))}
         </select>
@@ -103,7 +138,7 @@ export default function OnboardingForm({ stores }: { stores: StoreRow[] }) {
         disabled={pending}
         className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:bg-zinc-300 transition-colors"
       >
-        {pending ? "Saving…" : "Continue"}
+        {pending ? "Saving…" : mode === "reconfirm" ? "Confirm" : "Continue"}
       </button>
     </form>
   );

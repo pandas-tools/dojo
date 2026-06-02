@@ -162,10 +162,24 @@ export function scopedDb(user: ScopedUser) {
     },
 
     completions: {
-      forUser: () =>
-        db.query.lessonCompletions.findMany({
-          where: eq(lessonCompletions.userId, user.id),
-        }),
+      // Returns the user's completions restricted to lessons currently
+      // assigned to their client. Stale completions from a previous
+      // client (if the user were ever reassigned in the DB) are filtered
+      // out so /browse and /watch never resurface them.
+      forUser: async () => {
+        const assignments = await db
+          .select({ lessonId: clientLessons.lessonId })
+          .from(clientLessons)
+          .where(eq(clientLessons.clientId, cid));
+        const assignedIds = assignments.map((a) => a.lessonId);
+        if (assignedIds.length === 0) return [];
+        return db.query.lessonCompletions.findMany({
+          where: and(
+            eq(lessonCompletions.userId, user.id),
+            inArray(lessonCompletions.lessonId, assignedIds),
+          ),
+        });
+      },
       upsert: async (lessonId: string, rating: number) => {
         // Verify lesson is assigned to user's client first
         const [assignment] = await db

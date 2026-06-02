@@ -42,6 +42,10 @@ export async function completeOnboarding(input: {
   // DB) sees onboardingCompleted=true on the very next request. Without
   // this, /browse → middleware reads stale token.onboardingCompleted=false
   // → redirects back to /onboarding → loop.
+  // Force Auth.js to re-issue the JWT with the fresh DB values so the
+  // Edge middleware (which never queries the DB) sees onboardingCompleted
+  // and a fresh storeConfirmedAt on the very next request. Otherwise the
+  // middleware's 30-day gate keeps redirecting back here.
   await unstable_update({
     user: {
       preferredLanguage: input.language,

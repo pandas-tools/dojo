@@ -65,13 +65,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       // Refresh user fields from DB on:
       //   - sign-in (user is set)
       //   - explicit unstable_update() call (trigger === 'update')
-      //   - any request where the JWT is missing/stale (no role yet, or
-      //     onboarding still false)
+      //   - any request where the JWT is missing core claims (no role yet,
+      //     or no uid — i.e., the cookie predates the current schema)
       const needsRefresh =
         !!user?.id ||
         trigger === "update" ||
-        token.onboardingCompleted !== true ||
-        token.role === undefined;
+        token.role === undefined ||
+        token.uid === undefined;
       if (!needsRefresh) return token;
 
       const id = (user?.id ?? token.sub) as string | undefined;
@@ -87,23 +87,29 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       // Self-heal: `events.createUser` is fire-and-forget in Auth.js v5,
       // so on the very first sign-in the JWT callback may run before that
       // event sets role/client_id. Re-derive them from the email here
-      // (idempotent — same logic as events.createUser) so we never serve
-      // a "employee with null client_id" or a missed-admin token.
+      // (idempotent — same logic as events.createUser).
+      //
+      // Only invoke checkEmailAllowed (an extra DB read) when the row
+      // genuinely looks stale: a non-admin user with no clientId, OR an
+      // admin row that still has a clientId set. This avoids paying the
+      // domain-check round-trip on every refresh and removes the latent
+      // role-flip hazard where an admin's email accidentally added to a
+      // client's allowed-domains row would silently demote them.
       let role = row.role;
       let clientId = row.clientId;
-      if (row.email) {
+      const looksStale =
+        (role !== "admin" && clientId === null) ||
+        (role === "admin" && clientId !== null);
+      if (looksStale && row.email) {
         const allowed = await checkEmailAllowed(row.email);
-        if (allowed.kind === "admin" && (role !== "admin" || clientId !== null)) {
+        if (allowed.kind === "admin") {
           role = "admin";
           clientId = null;
           await db
             .update(users)
             .set({ role, clientId, updatedAt: new Date() })
             .where(eq(users.id, row.id));
-        } else if (
-          allowed.kind === "employee" &&
-          (role !== "employee" || clientId !== allowed.clientId)
-        ) {
+        } else if (allowed.kind === "employee") {
           role = "employee";
           clientId = allowed.clientId;
           await db
@@ -119,6 +125,12 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       token.onboardingCompleted = row.onboardingCompleted;
       token.preferredLanguage = row.preferredLanguage;
       token.storeId = row.storeId;
+      // Serialise as epoch ms so the Edge-safe slim config can read it
+      // without importing Date.
+      token.storeConfirmedAt = row.storeConfirmedAt
+        ? row.storeConfirmedAt.getTime()
+        : null;
+      token.subtitlesEnabled = row.subtitlesEnabled;
       return token;
     },
   },

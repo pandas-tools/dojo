@@ -15,6 +15,11 @@ declare module "next-auth" {
       onboardingCompleted: boolean;
       preferredLanguage: string;
       storeId: string | null;
+      // Epoch ms of the user's last store-confirmation. Middleware compares
+      // this to "now" to enforce the 30-day re-confirmation gate. Null when
+      // never confirmed.
+      storeConfirmedAt: number | null;
+      subtitlesEnabled: boolean;
     } & import("next-auth").DefaultSession["user"];
   }
 }
@@ -45,6 +50,10 @@ export const authConfig: NextAuthConfig = {
         session.user.preferredLanguage =
           (token.preferredLanguage as string) ?? "en";
         session.user.storeId = (token.storeId as string | null) ?? null;
+        session.user.storeConfirmedAt =
+          (token.storeConfirmedAt as number | null) ?? null;
+        session.user.subtitlesEnabled =
+          (token.subtitlesEnabled as boolean) ?? true;
       }
       return session;
     },
