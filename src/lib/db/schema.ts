@@ -28,8 +28,8 @@ export const lessonTypeEnum = pgEnum("lesson_type", [
 
 // Media-shape of a lesson. Drives the renderer + the completion criteria:
 //   video    — Mux player, completed at 90% of duration watched.
-//   image    — single ImageKit-hosted image, completed at 5s of visible dwell.
-//   carousel — ordered slides (ImageKit-hosted images), completed once every
+//   image    — single bucket-hosted image, completed at 5s of visible dwell.
+//   carousel — ordered slides (bucket-hosted images), completed once every
 //              slide has been viewed.
 export const lessonContentTypeEnum = pgEnum("lesson_content_type", [
   "video",

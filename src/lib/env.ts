@@ -11,15 +11,18 @@ const envSchema = z.object({
   MUX_WEBHOOK_SECRET: z.string().min(1),
   NEXT_PUBLIC_SITE_URL: z.string().url(),
   ADMIN_ALLOWLIST: z.string().default(""),
-  // ImageKit — used for single-image and carousel-slide lesson media.
-  // Optional at the schema level because the shared Pandas ImageKit account
-  // hadn't been provisioned at first ship time. When all three are unset,
-  // the upload endpoint returns a clear error and admins can only create
-  // video lessons. Once the operator sets all three on Railway, image +
-  // carousel lessons start working with no code change.
-  IMAGEKIT_PUBLIC_KEY: z.string().min(1).optional(),
-  IMAGEKIT_PRIVATE_KEY: z.string().min(1).optional(),
-  IMAGEKIT_URL_ENDPOINT: z.string().url().optional(),
+  // Railway Bucket (S3-compatible, Tigris-backed) for single-image and
+  // carousel-slide lesson media. Wired in from the dojo-media bucket's
+  // reference variables. URL style is read explicitly so we stay portable
+  // if we ever swap the backend (R2, MinIO, etc.). Validated lazily — the
+  // upload + serve routes hit readBucketConfig() and throw a single clear
+  // error if anything's missing.
+  ASSET_BUCKET_ENDPOINT: z.string().url().optional(),
+  ASSET_BUCKET_NAME: z.string().min(1).optional(),
+  ASSET_BUCKET_ACCESS_KEY_ID: z.string().min(1).optional(),
+  ASSET_BUCKET_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  ASSET_BUCKET_REGION: z.string().min(1).optional(),
+  ASSET_BUCKET_URL_STYLE: z.enum(["virtual-host", "path-style"]).optional(),
 });
 
 type Env = z.infer<typeof envSchema>;
@@ -37,9 +40,12 @@ const BUILD_STUB: Env = {
   MUX_WEBHOOK_SECRET: "stub",
   NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
   ADMIN_ALLOWLIST: "",
-  IMAGEKIT_PUBLIC_KEY: undefined,
-  IMAGEKIT_PRIVATE_KEY: undefined,
-  IMAGEKIT_URL_ENDPOINT: undefined,
+  ASSET_BUCKET_ENDPOINT: undefined,
+  ASSET_BUCKET_NAME: undefined,
+  ASSET_BUCKET_ACCESS_KEY_ID: undefined,
+  ASSET_BUCKET_SECRET_ACCESS_KEY: undefined,
+  ASSET_BUCKET_REGION: undefined,
+  ASSET_BUCKET_URL_STYLE: undefined,
 };
 
 export function env(): Env {

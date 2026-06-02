@@ -57,11 +57,11 @@ type Step = "type-picker" | "media" | "uploading" | "configure";
 type CarouselSlide = {
   /** Stable client-side id for list ops (drag/reorder/delete). Not sent to server. */
   clientId: string;
-  /** ImageKit URL once upload completes. */
+  /** Proxy URL once upload completes. */
   url: string;
   alt: string;
   thumbnailDataUrl: string;
-  /** True while ImageKit is uploading; false once URL is set. */
+  /** True while the upload is in flight; false once URL is set. */
   uploading: boolean;
 };
 
@@ -214,11 +214,11 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
     autofillNames(chosen.name);
   }, []);
 
-  // -- IMAGE upload (ImageKit via server route) ---------------------------
+  // -- IMAGE upload (server route → Railway Bucket) -----------------------
 
-  async function uploadImageToImageKit(chosen: File): Promise<{
+  async function uploadImageToServer(chosen: File): Promise<{
     url: string;
-    fileId: string;
+    key: string;
   } | null> {
     const formData = new FormData();
     formData.append("file", chosen);
@@ -232,7 +232,7 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
       } | null;
       throw new Error(body?.error ?? `Image upload failed (${res.status})`);
     }
-    return (await res.json()) as { ok: true; url: string; fileId: string };
+    return (await res.json()) as { ok: true; url: string; key: string };
   }
 
   const onImageDrop = useCallback((files: File[]) => {
@@ -251,7 +251,7 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
 
     (async () => {
       try {
-        const result = await uploadImageToImageKit(chosen);
+        const result = await uploadImageToServer(chosen);
         if (result) {
           setImageUrl(result.url);
           autofillNames(chosen.name);
@@ -317,7 +317,7 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
           const f = files[i]!;
           const placeholder = placeholders[i]!;
           try {
-            const result = await uploadImageToImageKit(f);
+            const result = await uploadImageToServer(f);
             if (result) {
               setSlides((prev) =>
                 prev.map((s) =>

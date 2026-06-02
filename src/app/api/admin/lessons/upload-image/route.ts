@@ -1,8 +1,8 @@
 // Multipart image upload for lesson media (image lessons + carousel slides).
-// Admin-gated. Streams the bytes through this server straight into ImageKit
-// — the browser never gets ImageKit credentials, the URL is generated
-// server-side, and the response carries just the public URL + fileId so the
-// caller can save them on a lesson translation row.
+// Admin-gated. Streams the bytes through this server into the Railway Bucket
+// — the browser never gets bucket credentials, the URL is generated
+// server-side, and the response carries just the proxy URL + key so the
+// caller can save the URL on a lesson translation row.
 //
 // Sized for the New Lesson dialog's drag-drop / picker UX on the admin side.
 // One file per request keeps the form-data parsing simple; a carousel of 10
@@ -10,22 +10,12 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { uploadLessonImage, imagekitConfigured } from "@/lib/imagekit";
+import { uploadLessonImage } from "@/lib/media-storage";
 
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user || session.user.role !== "admin") {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
-
-  if (!imagekitConfigured()) {
-    return NextResponse.json(
-      {
-        error:
-          "Image upload is disabled — ImageKit credentials are not set on this deployment. Ask the operator to set IMAGEKIT_PUBLIC_KEY, IMAGEKIT_PRIVATE_KEY, and IMAGEKIT_URL_ENDPOINT on Railway. Video lessons are unaffected.",
-      },
-      { status: 503 },
-    );
   }
 
   let form: FormData;
@@ -46,9 +36,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const folder = form.get("folder");
-  const folderStr = typeof folder === "string" ? folder : undefined;
-
   const buffer = Buffer.from(await file.arrayBuffer());
 
   try {
@@ -56,7 +43,6 @@ export async function POST(req: Request) {
       buffer,
       mimeType: file.type || "application/octet-stream",
       filename: file.name || "image",
-      folder: folderStr,
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
