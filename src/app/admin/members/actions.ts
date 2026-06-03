@@ -2,7 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { auth, signIn } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
 import { writeAuditEntry } from "@/lib/audit-log";
@@ -111,4 +111,49 @@ async function requireAdminOrError() {
     return { error: "forbidden" } as const;
   }
   return session;
+}
+
+/**
+ * Resend a magic-link sign-in email to a specific user. Admin support flow
+ * for the "I never got my login email" case. Routes through the same
+ * Auth.js Resend provider the public /login form uses, so the receiving
+ * email is identical to a fresh sign-in trigger by the user themselves.
+ *
+ * Works for both employees and admins — any user row with a real email
+ * gets one. We don't expose ANY existence signal back to the caller (return
+ * shape is identical whether the user exists or not) so an admin can't
+ * use this to probe whether an email is registered.
+ */
+export async function resendMagicLink(input: { userId: string }) {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "forbidden" };
+  }
+  const [target] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.id, input.userId))
+    .limit(1);
+  // Silent on not-found so we don't leak existence.
+  if (!target?.email) {
+    return { ok: true as const };
+  }
+  try {
+    await signIn("resend", { email: target.email, redirect: false });
+  } catch (err) {
+    return {
+      error:
+        err instanceof Error
+          ? `Could not send magic link: ${err.message}`
+          : "Could not send magic link",
+    };
+  }
+  await writeAuditEntry({
+    action: "employee.resend_magic_link",
+    targetType: "user",
+    targetId: target.id,
+    payload: { email: target.email },
+  });
+  return { ok: true as const };
 }
