@@ -98,9 +98,21 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
     null,
   );
   const [imageUploading, setImageUploading] = useState(false);
+  // Aspect ratio (width / height) read from the upload endpoint's response.
+  // Persisted on lesson_translations.aspect_ratio so the Reels viewer can
+  // size its container without probing the asset at view time. Null if
+  // the endpoint couldn't parse the header (rare for standard formats).
+  const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
 
   // Carousel state
   const [slides, setSlides] = useState<CarouselSlide[]>([]);
+  // Carousel canvas aspect — locked in from the first uploaded slide and
+  // reused as the renderer's container size. Slides that don't match this
+  // ratio letterbox at view time; admins are expected to upload at a
+  // consistent ratio.
+  const [carouselAspectRatio, setCarouselAspectRatio] = useState<number | null>(
+    null,
+  );
 
   // Configure state
   const [internalName, setInternalName] = useState("");
@@ -124,7 +136,9 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
     setImageAlt("");
     setImageThumbDataUrl(null);
     setImageUploading(false);
+    setImageAspectRatio(null);
     setSlides([]);
+    setCarouselAspectRatio(null);
     setInternalName("");
     setTitle("");
     setDescription("");
@@ -219,6 +233,9 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
   async function uploadImageToServer(chosen: File): Promise<{
     url: string;
     key: string;
+    width: number | null;
+    height: number | null;
+    aspectRatio: number | null;
   } | null> {
     const formData = new FormData();
     formData.append("file", chosen);
@@ -232,7 +249,14 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
       } | null;
       throw new Error(body?.error ?? `Image upload failed (${res.status})`);
     }
-    return (await res.json()) as { ok: true; url: string; key: string };
+    return (await res.json()) as {
+      ok: true;
+      url: string;
+      key: string;
+      width: number | null;
+      height: number | null;
+      aspectRatio: number | null;
+    };
   }
 
   const onImageDrop = useCallback((files: File[]) => {
@@ -254,6 +278,7 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
         const result = await uploadImageToServer(chosen);
         if (result) {
           setImageUrl(result.url);
+          setImageAspectRatio(result.aspectRatio);
           autofillNames(chosen.name);
         }
       } catch (err) {
@@ -326,6 +351,13 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
                     : s,
                 ),
               );
+              // Lock the carousel's canvas aspect to the first slide
+              // whose aspect we know — once set, later slides don't
+              // overwrite. Slides at different ratios letterbox in the
+              // renderer; admins should upload at a consistent ratio.
+              if (result.aspectRatio !== null) {
+                setCarouselAspectRatio((prev) => prev ?? result.aspectRatio);
+              }
             }
           } catch (err) {
             // Remove the failed placeholder + surface error
@@ -351,7 +383,13 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
   }
 
   function removeSlide(clientId: string) {
-    setSlides((prev) => prev.filter((s) => s.clientId !== clientId));
+    setSlides((prev) => {
+      const next = prev.filter((s) => s.clientId !== clientId);
+      // If the user cleared every slide, drop the locked canvas aspect so
+      // the next upload re-locks from scratch.
+      if (next.length === 0) setCarouselAspectRatio(null);
+      return next;
+    });
   }
 
   function moveSlide(clientId: string, direction: "up" | "down") {
@@ -452,6 +490,7 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
         ...shared,
         imageUrl: imageUrl ?? "",
         imageAlt: imageAlt.trim(),
+        aspectRatio: imageAspectRatio,
       });
     } else {
       result = await createCarouselLesson({
@@ -460,6 +499,7 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
           url: s.url,
           alt: s.alt.trim(),
         })),
+        aspectRatio: carouselAspectRatio,
       });
     }
 
@@ -677,6 +717,7 @@ export function NewLessonDialog({ clients }: NewLessonDialogProps) {
                       setImageUrl(null);
                       setImageAlt("");
                       setImageThumbDataUrl(null);
+                      setImageAspectRatio(null);
                     }}
                     disabled={imageUploading}
                     className="absolute top-2 right-2 rounded-md bg-white/90 backdrop-blur px-2 py-1 text-xs font-medium text-zinc-700 border border-zinc-200 hover:bg-white disabled:opacity-50"

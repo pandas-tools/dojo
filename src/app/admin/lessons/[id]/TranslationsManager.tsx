@@ -526,14 +526,25 @@ function VideoMedia({
                   : `${Math.round(t.durationSeconds / 60)} min`}
               </span>
             )}
-            <button
-              type="button"
-              onClick={onClearVideo}
-              disabled={pending}
-              className="ml-auto text-xs text-red-700 hover:underline disabled:opacity-50"
-            >
-              Clear video
-            </button>
+            <div className="ml-auto flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onResync}
+                disabled={pending}
+                title="Re-read playback id, duration, and aspect ratio from Mux. Use if metadata looks stale."
+                className="text-xs text-zinc-500 hover:text-zinc-700 hover:underline disabled:opacity-50"
+              >
+                Resync metadata
+              </button>
+              <button
+                type="button"
+                onClick={onClearVideo}
+                disabled={pending}
+                className="text-xs text-red-700 hover:underline disabled:opacity-50"
+              >
+                Clear video
+              </button>
+            </div>
           </div>
           {t.thumbnailUrl && (
             /* eslint-disable-next-line @next/next/no-img-element */
