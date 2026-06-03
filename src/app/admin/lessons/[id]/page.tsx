@@ -91,14 +91,15 @@ export default async function LessonDetailPage({
             <CardTitle>Translations</CardTitle>
             <CardDescription>
               English is required and acts as the system-wide fallback. Add
-              other languages with their own video (dubbed) or share the
-              English video (subtitled via Mux auto-captions).
+              other languages with their own media, or share the English
+              version with the localized title and description.
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
           <TranslationsManager
             lessonId={lesson.id}
+            contentType={lesson.contentType as "video" | "image" | "carousel"}
             translations={translations.map((t) => ({
               id: t.id,
               language: t.language,
@@ -109,6 +110,9 @@ export default async function LessonDetailPage({
               muxUploadId: t.muxUploadId,
               durationSeconds: t.durationSeconds,
               thumbnailUrl: t.thumbnailUrl,
+              imageUrl: t.imageUrl,
+              imageAlt: t.imageAlt,
+              carouselSlides: t.carouselSlides,
             }))}
           />
         </CardContent>
