@@ -48,15 +48,45 @@ export default function ReelsShell({
     <main className="fixed inset-0 bg-black text-white overflow-hidden touch-none select-none">
       <div
         onClick={onTap}
-        className="absolute inset-0 flex items-center justify-center"
+        className="absolute inset-0 z-0 flex items-center justify-center"
       >
         {children}
       </div>
 
-      {/* Persistent back button — never fades */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-30">
+      {/* Bottom overlay: title + description inline. Higher z than the back
+          chevron's chrome since both occupy the absolute fixed layer; lifts
+          above the Mux player iframe stacking context. */}
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-x-0 bottom-0 z-40 transition-opacity duration-300",
+          overlayVisible ? "opacity-100" : "opacity-0",
+        )}
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/45 to-transparent"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black via-black/70 to-transparent"
+          aria-hidden
+        />
+        <div className="relative px-5 pb-6 pt-12 max-w-2xl">
+          <p className="text-[15px] leading-snug drop-shadow-md">
+            <span className="font-semibold">{title}</span>
+            {description && (
+              <>
+                <span className="mx-1.5 text-white/70">·</span>
+                <span className="text-white/90">{description}</span>
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* Persistent back button — never fades */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-50"
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+      >
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 to-transparent"
           aria-hidden
         />
         <div className="relative px-4 pt-3">
@@ -64,34 +94,10 @@ export default function ReelsShell({
             href={backHref}
             aria-label="Back to lessons"
             onClick={(e) => e.stopPropagation()}
-            className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/45 backdrop-blur transition-colors hover:bg-black/65"
+            className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/55 backdrop-blur transition-colors hover:bg-black/70"
           >
             <ChevronLeft className="h-5 w-5 text-white" />
           </Link>
-        </div>
-      </div>
-
-      {/* Bottom overlay: title + description inline */}
-      <div
-        className={cn(
-          "pointer-events-none absolute inset-x-0 bottom-0 z-20 transition-opacity duration-300",
-          overlayVisible ? "opacity-100" : "opacity-0",
-        )}
-      >
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/85 via-black/50 to-transparent"
-          aria-hidden
-        />
-        <div className="relative px-5 pb-8 pt-10 max-w-2xl">
-          <p className="text-[15px] leading-snug">
-            <span className="font-semibold">{title}</span>
-            {description && (
-              <>
-                <span className="mx-1.5 text-white/70">·</span>
-                <span className="text-white/85">{description}</span>
-              </>
-            )}
-          </p>
         </div>
       </div>
     </main>
