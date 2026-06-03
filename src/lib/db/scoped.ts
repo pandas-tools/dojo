@@ -30,6 +30,24 @@ type LessonEventType =
   | "lesson_engagement"
   | "rating_submitted";
 
+type LessonContentType = "video" | "image" | "carousel";
+
+// Translation is "media-complete" for a given content_type when it has the
+// asset the viewer needs to render anything useful — Mux playback id for
+// video, image_url for image, at least 2 carousel slides for carousel.
+// Used by the forLesson/forLessons translation resolvers to silently
+// fall back to English when the preferred-language row exists but has
+// no media (e.g. admin created a French placeholder but never uploaded).
+function isTranslationMediaComplete(
+  t: typeof lessonTranslations.$inferSelect,
+  contentType: LessonContentType,
+): boolean {
+  if (contentType === "video") return !!t.muxPlaybackId;
+  if (contentType === "image") return !!t.imageUrl;
+  const slides = Array.isArray(t.carouselSlides) ? t.carouselSlides : [];
+  return slides.length >= 2;
+}
+
 export type ScopedUser = {
   id: string;
   clientId: string;
@@ -100,7 +118,12 @@ export function scopedDb(user: ScopedUser) {
     },
 
     translations: {
-      // Get translation for a lesson in a preferred language, with English fallback
+      // Get translation for a lesson in a preferred language, with media-aware
+      // English fallback. Returns the preferred translation iff (a) its row
+      // exists AND (b) it's media-complete for the lesson's content_type;
+      // otherwise returns English. This means an FR placeholder admin
+      // created but never uploaded silently shows EN instead of an empty
+      // viewer — exactly what an employee should see.
       forLesson: async (lessonId: string, preferred: string) => {
         // Check the lesson is assigned to this client
         const [assignment] = await db
@@ -114,12 +137,26 @@ export function scopedDb(user: ScopedUser) {
           );
         if (!assignment) return null;
 
+        const lesson = await db.query.lessons.findFirst({
+          where: eq(lessons.id, lessonId),
+        });
+        if (!lesson) return null;
+
         const all = await db.query.lessonTranslations.findMany({
           where: eq(lessonTranslations.lessonId, lessonId),
         });
+        const en = all.find((t) => t.language === "en") ?? null;
         const inPreferred = all.find((t) => t.language === preferred);
-        if (inPreferred) return inPreferred;
-        return all.find((t) => t.language === "en") ?? null;
+        if (
+          inPreferred &&
+          isTranslationMediaComplete(
+            inPreferred,
+            lesson.contentType as LessonContentType,
+          )
+        ) {
+          return inPreferred;
+        }
+        return en;
       },
 
       /**
@@ -145,9 +182,17 @@ export function scopedDb(user: ScopedUser) {
         const assignedSet = new Set(assignments.map((a) => a.lessonId));
         const safeIds = lessonIds.filter((id) => assignedSet.has(id));
         if (safeIds.length === 0) return out;
-        const all = await db.query.lessonTranslations.findMany({
-          where: (t, { inArray }) => inArray(t.lessonId, safeIds),
-        });
+        const [lessonRows, all] = await Promise.all([
+          db.query.lessons.findMany({
+            where: (l, { inArray }) => inArray(l.id, safeIds),
+          }),
+          db.query.lessonTranslations.findMany({
+            where: (t, { inArray }) => inArray(t.lessonId, safeIds),
+          }),
+        ]);
+        const contentTypeByLesson = new Map<string, LessonContentType>(
+          lessonRows.map((l) => [l.id, l.contentType as LessonContentType]),
+        );
         const byLesson = new Map<
           string,
           (typeof lessonTranslations.$inferSelect)[]
@@ -158,10 +203,13 @@ export function scopedDb(user: ScopedUser) {
           byLesson.set(t.lessonId, arr);
         }
         for (const id of safeIds) {
+          const ct = contentTypeByLesson.get(id);
+          if (!ct) continue;
           const candidates = byLesson.get(id) ?? [];
           const pref = candidates.find((t) => t.language === preferred);
           const en = candidates.find((t) => t.language === "en");
-          const chosen = pref ?? en;
+          const chosen =
+            pref && isTranslationMediaComplete(pref, ct) ? pref : en;
           if (chosen) out.set(id, chosen);
         }
         return out;
