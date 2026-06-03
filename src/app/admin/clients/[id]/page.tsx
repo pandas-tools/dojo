@@ -304,10 +304,15 @@ export default async function ClientDetailPage({
                 {employees.slice(0, 25).map((e) => (
                   <tr
                     key={e.id}
-                    className="border-b last:border-b-0 border-zinc-100"
+                    className="border-b last:border-b-0 border-zinc-100 hover:bg-zinc-50/70 transition-colors"
                   >
                     <td className="px-5 py-2.5 font-medium text-zinc-900">
-                      {e.email}
+                      <Link
+                        href={`/admin/employees/${e.id}`}
+                        className="hover:underline"
+                      >
+                        {e.email}
+                      </Link>
                     </td>
                     <td className="px-5 py-2.5 text-zinc-600">{e.storeName}</td>
                     <td className="px-5 py-2.5 text-zinc-700">

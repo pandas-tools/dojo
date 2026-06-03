@@ -334,8 +334,18 @@ function EmployeesTable({ rows }: { rows: EmployeeRow[] }) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.userId} className="border-t border-zinc-200">
-              <td className="px-3 py-2 font-mono text-xs">{r.email}</td>
+            <tr
+              key={r.userId}
+              className="border-t border-zinc-200 hover:bg-zinc-50/70 transition-colors"
+            >
+              <td className="px-3 py-2 font-mono text-xs">
+                <Link
+                  href={`/admin/employees/${r.userId}`}
+                  className="hover:underline"
+                >
+                  {r.email}
+                </Link>
+              </td>
               <td className="px-3 py-2 text-zinc-600">{r.storeName ?? "—"}</td>
               <td className="px-3 py-2 text-right">
                 {r.completedCount} / {r.assignedCount}
