@@ -14,7 +14,6 @@ export default function VideoLessonViewer({
   title,
   subtitlesEnabled,
   disableTracking = false,
-  aspectRatio,
   active = true,
 }: {
   lessonId: string;
@@ -22,7 +21,8 @@ export default function VideoLessonViewer({
   title?: string;
   subtitlesEnabled?: boolean;
   disableTracking?: boolean;
-  /** width/height. Pass when known; falls back to 9:16 for Reels-first content. */
+  /** Unused — viewer uses object-fit: contain so the player letterboxes
+   *  itself to the video's native aspect regardless. Kept for parity. */
   aspectRatio?: number | null;
   /** Reels-feed mode: only the active lesson autoplays + emits tracking. Inactive
    *  lessons stay mounted (so swipe-in is instant) but paused and silent. */
@@ -66,17 +66,13 @@ export default function VideoLessonViewer({
     return () => window.clearTimeout(id);
   }, []);
 
-  // Pause inactive players, play active ones. Mux Player exposes play()/pause()
-  // on the element instance.
   useEffect(() => {
     const el = playerRef.current as unknown as
       | { play?: () => Promise<void>; pause?: () => void }
       | null;
     if (!el) return;
     if (active) {
-      el.play?.().catch(() => {
-        /* autoplay restrictions etc — ignore */
-      });
+      el.play?.().catch(() => {});
     } else {
       el.pause?.();
     }
@@ -88,13 +84,18 @@ export default function VideoLessonViewer({
     setShowSoundHint(false);
   }
 
-  const ar = aspectRatio && aspectRatio > 0 ? aspectRatio : 9 / 16;
+  // Mux Player honors `--media-object-fit` on the host element to pass
+  // through to the inner video. `contain` makes the video respect its
+  // native aspect and letterbox the rest with the section's black
+  // background. The cast keeps Mux's narrowed prop type happy.
+  const playerStyle: Record<string, string> = {
+    height: "100%",
+    width: "100%",
+    "--media-object-fit": "contain",
+  };
 
   return (
-    <div
-      className="relative max-h-full max-w-full"
-      style={{ aspectRatio: String(ar), height: "100dvh" }}
-    >
+    <div className="relative h-full w-full">
       <MuxPlayer
         ref={(el) => {
           playerRef.current = el as unknown as HTMLElement;
@@ -110,7 +111,7 @@ export default function VideoLessonViewer({
         nohotkeys
         defaultHiddenCaptions={!subtitlesEnabled}
         preload={active ? "auto" : "metadata"}
-        style={{ height: "100%", width: "100%" }}
+        style={playerStyle}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}

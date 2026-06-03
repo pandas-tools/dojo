@@ -79,12 +79,9 @@ export default function CarouselLessonViewer({
   const slide = slides[index];
   if (!slide) return null;
 
-  const ar = aspectRatio && aspectRatio > 0 ? aspectRatio : 9 / 16;
-
   return (
     <div
-      className="relative max-h-full max-w-full select-none"
-      style={{ aspectRatio: String(ar), height: "100dvh" }}
+      className="relative h-full w-full select-none"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
       onClick={onClick}
@@ -93,7 +90,7 @@ export default function CarouselLessonViewer({
       <img
         src={slide.url}
         alt={slide.alt}
-        className="h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-contain"
         draggable={false}
       />
 

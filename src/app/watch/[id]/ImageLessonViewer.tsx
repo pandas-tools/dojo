@@ -10,14 +10,15 @@ export default function ImageLessonViewer({
   imageUrl,
   imageAlt,
   disableTracking = false,
-  aspectRatio,
   active = true,
 }: {
   lessonId: string;
   imageUrl: string;
   imageAlt: string;
   disableTracking?: boolean;
-  /** width/height. Used to reserve correct layout space before the image loads. */
+  /** Unused at present — viewport sizing uses object-contain so the image
+   *  is shown at its native aspect regardless. Kept in the prop set for
+   *  parity with the other viewers. */
   aspectRatio?: number | null;
   /** Reels-feed mode: only the active lesson runs the dwell-completion timer. */
   active?: boolean;
@@ -46,18 +47,13 @@ export default function ImageLessonViewer({
     return () => window.clearInterval(interval);
   }, [emitCompleted, disableTracking, active]);
 
-  const ar = aspectRatio && aspectRatio > 0 ? aspectRatio : 9 / 16;
-
   return (
-    <div
-      className="relative max-h-full max-w-full"
-      style={{ aspectRatio: String(ar), height: "100dvh" }}
-    >
+    <div className="relative h-full w-full">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={imageUrl}
         alt={imageAlt}
-        className="h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-contain"
         draggable={false}
       />
     </div>
