@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import PublishToggle from "./PublishToggle";
+import PreviewLinkButton from "../../PreviewLinkButton";
 import AssignmentManager from "./AssignmentManager";
 import TranslationsManager from "./TranslationsManager";
 import LessonMetaEditor from "./LessonMetaEditor";
@@ -60,10 +61,16 @@ export default async function LessonDetailPage({
             : null
         }
         action={
-          <PublishToggle
-            lessonId={lesson.id}
-            isPublished={lesson.isPublished}
-          />
+          <div className="flex items-center gap-2">
+            <PreviewLinkButton
+              mode={{ kind: "lesson", lessonId: lesson.id }}
+              label="Preview"
+            />
+            <PublishToggle
+              lessonId={lesson.id}
+              isPublished={lesson.isPublished}
+            />
+          </div>
         }
       />
 

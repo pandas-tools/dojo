@@ -9,14 +9,17 @@ export default function ImageLessonViewer({
   lessonId,
   imageUrl,
   imageAlt,
+  disableTracking = false,
 }: {
   lessonId: string;
   imageUrl: string;
   imageAlt: string;
+  disableTracking?: boolean;
 }) {
   const { emitCompleted } = useLessonTracking({
     lessonId,
     contentType: "image",
+    enabled: !disableTracking,
   });
 
   const [completed, setCompleted] = useState(false);

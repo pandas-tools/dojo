@@ -10,13 +10,16 @@ type Slide = { url: string; alt: string; caption?: string };
 export default function CarouselLessonViewer({
   lessonId,
   slides,
+  disableTracking = false,
 }: {
   lessonId: string;
   slides: Slide[];
+  disableTracking?: boolean;
 }) {
   const { emitCompleted } = useLessonTracking({
     lessonId,
     contentType: "carousel",
+    enabled: !disableTracking,
   });
 
   const [index, setIndex] = useState(0);

@@ -24,6 +24,7 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import ClientDetailEditor from "./ClientDetailEditor";
+import PreviewLinkButton from "../../PreviewLinkButton";
 import DomainsEditor from "./DomainsEditor";
 import LanguagesEditor from "./LanguagesEditor";
 import StoresManager from "./StoresManager";
@@ -169,6 +170,7 @@ export default async function ClientDetailPage({
             )}
           </span>
         }
+        action={<PreviewLinkButton mode={{ kind: "client", clientId: client.id }} />}
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

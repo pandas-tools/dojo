@@ -11,17 +11,20 @@ export default function VideoLessonViewer({
   playbackId,
   title,
   subtitlesEnabled,
+  disableTracking = false,
 }: {
   lessonId: string;
   playbackId: string;
   title?: string;
   subtitlesEnabled?: boolean;
+  disableTracking?: boolean;
 }) {
   const [playing, setPlaying] = useState(false);
   const { emitCompleted } = useLessonTracking({
     lessonId,
     contentType: "video",
     videoPlaying: playing,
+    enabled: !disableTracking,
   });
 
   const completedRef = useRef(false);
