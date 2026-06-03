@@ -53,21 +53,22 @@ export default function ReelsShell({
         {children}
       </div>
 
-      {/* Bottom overlay: title + description inline. Higher z than the back
-          chevron's chrome since both occupy the absolute fixed layer; lifts
-          above the Mux player iframe stacking context. */}
+      {/* Bottom overlay — title + description inline. Explicit height +
+          flex-end so the text sits anchored to the bottom of the gradient,
+          not collapsing to the height of its content. */}
       <div
         className={cn(
-          "pointer-events-none absolute inset-x-0 bottom-0 z-40 transition-opacity duration-300",
+          "pointer-events-none absolute inset-x-0 bottom-0 z-40 flex items-end transition-opacity duration-300",
+          "h-56 px-5",
           overlayVisible ? "opacity-100" : "opacity-0",
         )}
-        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)" }}
       >
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black via-black/70 to-transparent"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent"
           aria-hidden
         />
-        <div className="relative px-5 pb-6 pt-12 max-w-2xl">
+        <div className="relative max-w-2xl">
           <p className="text-[15px] leading-snug drop-shadow-md">
             <span className="font-semibold">{title}</span>
             {description && (
