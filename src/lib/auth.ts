@@ -12,11 +12,18 @@
 import NextAuth from "next-auth";
 import Resend from "next-auth/providers/resend";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "./db/client";
-import { users, accounts, verificationTokens } from "./db/schema";
+import {
+  users,
+  accounts,
+  verificationTokens,
+  stores,
+  clientLanguages,
+} from "./db/schema";
 import { checkEmailAllowed } from "./domain";
 import { authConfig } from "./auth.config";
+import { writeAuditEntry } from "./audit-log";
 
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   ...authConfig,
@@ -158,12 +165,69 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         }
       }
 
+      // Auto re-onboarding (#3): if an employee's selected store no longer
+      // exists / isn't active, OR their preferred language has been removed
+      // from their client's allowed languages, clear onboardingCompleted so
+      // middleware routes them back through /onboarding on the next
+      // request. Catches CSV-driven store deletions and admin-driven
+      // language removals without an explicit admin button — the employee
+      // self-fixes on next session refresh. Only runs for employees with a
+      // clientId who currently look onboarded; admins and unauthed users
+      // skip the check.
+      let onboardingCompleted = row.onboardingCompleted;
+      let storeId = row.storeId;
+      let preferredLanguage = row.preferredLanguage;
+      if (role === "employee" && clientId && onboardingCompleted) {
+        const [storeOk, langOk] = await Promise.all([
+          storeId
+            ? db
+                .select({ id: stores.id })
+                .from(stores)
+                .where(and(eq(stores.id, storeId), eq(stores.isActive, true)))
+                .limit(1)
+                .then((r) => r.length > 0)
+            : Promise.resolve(false),
+          db
+            .select({ language: clientLanguages.language })
+            .from(clientLanguages)
+            .where(
+              and(
+                eq(clientLanguages.clientId, clientId),
+                eq(clientLanguages.language, preferredLanguage),
+              ),
+            )
+            .limit(1)
+            .then((r) => r.length > 0),
+        ]);
+        if (!storeOk || !langOk) {
+          const patch: Partial<typeof users.$inferInsert> = {
+            onboardingCompleted: false,
+            updatedAt: new Date(),
+          };
+          if (!storeOk) patch.storeId = null;
+          if (!langOk) patch.preferredLanguage = "en";
+          await db.update(users).set(patch).where(eq(users.id, row.id));
+          // Audit as a system action (no actor) — useful when investigating
+          // why an employee unexpectedly hit onboarding.
+          await writeAuditEntry({
+            action: "employee.auto_reonboarding",
+            targetType: "user",
+            targetId: row.id,
+            payload: { storeOk, langOk, previousStoreId: storeId, previousLanguage: preferredLanguage },
+            actorUserId: null,
+          });
+          onboardingCompleted = false;
+          if (!storeOk) storeId = null;
+          if (!langOk) preferredLanguage = "en";
+        }
+      }
+
       token.uid = row.id;
       token.role = role;
       token.clientId = clientId;
-      token.onboardingCompleted = row.onboardingCompleted;
-      token.preferredLanguage = row.preferredLanguage;
-      token.storeId = row.storeId;
+      token.onboardingCompleted = onboardingCompleted;
+      token.preferredLanguage = preferredLanguage;
+      token.storeId = storeId;
       // Serialise as epoch ms so the Edge-safe slim config can read it
       // without importing Date.
       token.storeConfirmedAt = row.storeConfirmedAt
