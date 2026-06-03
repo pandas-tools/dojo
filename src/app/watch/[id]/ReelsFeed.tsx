@@ -274,9 +274,10 @@ export default function ReelsFeed({
             href={backHref}
             aria-label="Back to lessons"
             onClick={(e) => e.stopPropagation()}
-            className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/55 backdrop-blur transition-colors hover:bg-black/70"
+            className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center text-white transition-opacity hover:opacity-80"
+            style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.45))" }}
           >
-            <ChevronLeft className="h-5 w-5 text-white" />
+            <ChevronLeft className="h-7 w-7" strokeWidth={2.25} />
           </Link>
         </div>
       </div>
