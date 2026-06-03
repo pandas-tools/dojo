@@ -6,6 +6,7 @@ import type { CarouselSlide } from "@/lib/db/schema";
 import VideoLessonViewer from "@/app/watch/[id]/VideoLessonViewer";
 import ImageLessonViewer from "@/app/watch/[id]/ImageLessonViewer";
 import CarouselLessonViewer from "@/app/watch/[id]/CarouselLessonViewer";
+import ReelsShell from "@/app/watch/[id]/ReelsShell";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Preview lesson · Dojo" };
@@ -24,90 +25,46 @@ export default async function PreviewWatchPage({
   const { header, lesson, translation } = data;
 
   return (
-    <main className="min-h-screen bg-zinc-900 text-zinc-50">
-      <PreviewBanner clientName={header.clientName} token={token} />
-      <header className="border-b border-zinc-800">
-        <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
-          <Link
-            href={`/preview/${token}/browse`}
-            className="text-sm text-zinc-300 hover:text-white"
-          >
-            ← Back
-          </Link>
-          <span className="text-xs text-zinc-500">{header.clientName}</span>
-        </div>
-      </header>
-
-      <section className="mx-auto max-w-5xl px-6 py-8">
-        <h1 className="text-2xl font-semibold mb-2">{translation.title}</h1>
-        {translation.description && (
-          <p className="text-zinc-300 mb-6">{translation.description}</p>
+    <>
+      <ReelsShell
+        backHref={`/preview/${token}/browse`}
+        title={translation.title}
+        description={translation.description}
+      >
+        {lesson.contentType === "video" && translation.muxPlaybackId && (
+          <VideoLessonViewer
+            lessonId={lesson.id}
+            playbackId={translation.muxPlaybackId}
+            title={translation.title}
+            subtitlesEnabled
+            disableTracking
+            aspectRatio={translation.aspectRatio}
+          />
         )}
-
-        <div className="mb-6">
-          {lesson.contentType === "video" && translation.muxPlaybackId && (
-            <div className="aspect-video rounded-md overflow-hidden bg-black">
-              <VideoLessonViewer
-                lessonId={lesson.id}
-                playbackId={translation.muxPlaybackId}
-                title={translation.title}
-                subtitlesEnabled
-                disableTracking
-              />
-            </div>
-          )}
-          {lesson.contentType === "image" && translation.imageUrl && (
-            <ImageLessonViewer
-              lessonId={lesson.id}
-              imageUrl={translation.imageUrl}
-              imageAlt={translation.imageAlt ?? translation.title}
-              disableTracking
-            />
-          )}
-          {lesson.contentType === "carousel" && translation.carouselSlides && (
-            <CarouselLessonViewer
-              lessonId={lesson.id}
-              slides={translation.carouselSlides as CarouselSlide[]}
-              disableTracking
-            />
-          )}
-        </div>
-
-        <div className="rounded-md border border-zinc-700 bg-zinc-800/40 p-4 text-sm text-zinc-300">
-          Rating is disabled in preview mode. Employees see a 1–5 star widget
-          here after viewing.
-        </div>
-
-        {translation.notesMarkdown && (
-          <details className="mt-8 rounded-md border border-zinc-800 p-4 text-sm">
-            <summary className="cursor-pointer font-medium">Notes</summary>
-            <div className="mt-3 whitespace-pre-wrap text-zinc-300">
-              {translation.notesMarkdown}
-            </div>
-          </details>
+        {lesson.contentType === "image" && translation.imageUrl && (
+          <ImageLessonViewer
+            lessonId={lesson.id}
+            imageUrl={translation.imageUrl}
+            imageAlt={translation.imageAlt ?? translation.title}
+            disableTracking
+            aspectRatio={translation.aspectRatio}
+          />
         )}
-      </section>
-    </main>
-  );
-}
-
-function PreviewBanner({
-  clientName,
-  token,
-}: {
-  clientName: string;
-  token: string;
-}) {
-  return (
-    <div className="bg-amber-100 text-amber-900 text-xs px-4 py-2 text-center">
-      <span className="font-medium">Preview mode</span> · viewing as a{" "}
-      {clientName} employee · ratings and analytics are disabled ·{" "}
+        {lesson.contentType === "carousel" && translation.carouselSlides && (
+          <CarouselLessonViewer
+            lessonId={lesson.id}
+            slides={translation.carouselSlides as CarouselSlide[]}
+            disableTracking
+            aspectRatio={translation.aspectRatio}
+          />
+        )}
+      </ReelsShell>
       <Link
         href={`/preview/${token}/browse`}
-        className="underline underline-offset-2"
+        className="fixed top-3 right-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-amber-400/90 px-2.5 py-1 text-[11px] font-medium text-amber-950 backdrop-blur hover:bg-amber-300"
       >
-        all lessons
+        Preview · {header.clientName}
       </Link>
-    </div>
+    </>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLessonTracking } from "@/lib/useLessonTracking";
 import { cn } from "@/lib/cn";
 
@@ -11,10 +10,13 @@ export default function CarouselLessonViewer({
   lessonId,
   slides,
   disableTracking = false,
+  aspectRatio,
 }: {
   lessonId: string;
   slides: Slide[];
   disableTracking?: boolean;
+  /** width/height of the slides. All slides assumed consistent. Default 9:16. */
+  aspectRatio?: number | null;
 }) {
   const { emitCompleted } = useLessonTracking({
     lessonId,
@@ -24,7 +26,6 @@ export default function CarouselLessonViewer({
 
   const [index, setIndex] = useState(0);
   const viewedRef = useRef<Set<number>>(new Set([0]));
-  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const goTo = useCallback(
     (next: number) => {
@@ -41,7 +42,6 @@ export default function CarouselLessonViewer({
     [emitCompleted, slides.length],
   );
 
-  // Keyboard navigation
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "ArrowRight") goTo(index + 1);
@@ -51,7 +51,6 @@ export default function CarouselLessonViewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [goTo, index]);
 
-  // Touch swipe
   const touchStartX = useRef<number | null>(null);
   function onTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0]?.clientX ?? null;
@@ -66,83 +65,59 @@ export default function CarouselLessonViewer({
     else goTo(index - 1);
   }
 
-  const slide = slides[index];
-  const slidesViewedPct = useMemo(
-    () => Math.round((viewedRef.current.size / slides.length) * 100),
-    // We deliberately recompute on `index` change so the % indicator refreshes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [index, slides.length],
-  );
+  // Tap left/right halves to navigate (Reels-style).
+  function onClick(e: React.MouseEvent) {
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < rect.width / 2) goTo(index - 1);
+    else goTo(index + 1);
+  }
 
+  const slide = slides[index];
   if (!slide) return null;
+
+  const ar = aspectRatio && aspectRatio > 0 ? aspectRatio : 9 / 16;
 
   return (
     <div
-      ref={containerRef}
-      className="relative mx-auto max-w-xl select-none"
+      className="relative max-h-full max-w-full select-none"
+      style={{ aspectRatio: String(ar), height: "100dvh" }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
+      onClick={onClick}
     >
-      <div className="relative aspect-square sm:aspect-[4/5] rounded-md overflow-hidden bg-black">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={slide.url}
-          alt={slide.alt}
-          className="h-full w-full object-contain"
-        />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={slide.url}
+        alt={slide.alt}
+        className="h-full w-full object-cover"
+        draggable={false}
+      />
 
-        {slide.caption && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent text-white text-sm">
-            {slide.caption}
-          </div>
-        )}
-
-        {/* Prev/next chevrons (desktop) */}
-        {index > 0 && (
-          <button
-            type="button"
-            aria-label="Previous slide"
-            onClick={() => goTo(index - 1)}
-            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-        )}
-        {index < slides.length - 1 && (
-          <button
-            type="button"
-            aria-label="Next slide"
-            onClick={() => goTo(index + 1)}
-            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        )}
-      </div>
-
-      {/* Dot indicator */}
-      <div className="mt-3 flex items-center justify-center gap-1.5">
+      {/* Slide progress bars — Instagram-stories style */}
+      <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex gap-1">
         {slides.map((_, i) => (
-          <button
+          <div
             key={i}
-            type="button"
-            onClick={() => goTo(i)}
-            aria-label={`Go to slide ${i + 1}`}
-            className={cn(
-              "h-1.5 rounded-full transition-all",
-              i === index
-                ? "w-6 bg-zinc-100"
-                : viewedRef.current.has(i)
-                  ? "w-1.5 bg-zinc-400"
-                  : "w-1.5 bg-zinc-700",
-            )}
-          />
+            className="h-0.5 flex-1 rounded-full bg-white/30 overflow-hidden"
+          >
+            <div
+              className={cn(
+                "h-full rounded-full bg-white transition-all duration-300",
+                i < index ? "w-full" : i === index ? "w-full" : "w-0",
+              )}
+            />
+          </div>
         ))}
       </div>
 
-      <p className="mt-2 text-center text-xs text-zinc-400">
-        Slide {index + 1} of {slides.length} · {slidesViewedPct}% viewed
-      </p>
+      {slide.caption && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-32 z-10 px-5">
+          <p className="rounded-lg bg-black/55 backdrop-blur-sm px-3 py-2 text-sm text-white">
+            {slide.caption}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

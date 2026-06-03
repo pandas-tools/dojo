@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLessonTracking } from "@/lib/useLessonTracking";
 
 const COMPLETION_DWELL_MS = 5_000;
@@ -10,11 +10,14 @@ export default function ImageLessonViewer({
   imageUrl,
   imageAlt,
   disableTracking = false,
+  aspectRatio,
 }: {
   lessonId: string;
   imageUrl: string;
   imageAlt: string;
   disableTracking?: boolean;
+  /** width/height. Used to reserve correct layout space before the image loads. */
+  aspectRatio?: number | null;
 }) {
   const { emitCompleted } = useLessonTracking({
     lessonId,
@@ -22,12 +25,8 @@ export default function ImageLessonViewer({
     enabled: !disableTracking,
   });
 
-  const [completed, setCompleted] = useState(false);
-
   useEffect(() => {
-    // 5-second visible-dwell timer. We don't fight the visibility API ourselves
-    // since useLessonTracking's heartbeat already won't engage when the tab
-    // is hidden — this is just the time-on-content threshold.
+    if (disableTracking) return;
     let elapsed = 0;
     let lastTick = Date.now();
     const interval = window.setInterval(() => {
@@ -38,26 +37,26 @@ export default function ImageLessonViewer({
       lastTick = now;
       if (elapsed >= COMPLETION_DWELL_MS) {
         window.clearInterval(interval);
-        setCompleted(true);
         emitCompleted({ dwellMs: elapsed });
       }
     }, 250);
     return () => window.clearInterval(interval);
-  }, [emitCompleted]);
+  }, [emitCompleted, disableTracking]);
+
+  const ar = aspectRatio && aspectRatio > 0 ? aspectRatio : 9 / 16;
 
   return (
-    <div className="relative aspect-square sm:aspect-[4/5] rounded-md overflow-hidden bg-black mb-6 mx-auto max-w-xl">
+    <div
+      className="relative max-h-full max-w-full"
+      style={{ aspectRatio: String(ar), height: "100dvh" }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={imageUrl}
         alt={imageAlt}
-        className="h-full w-full object-contain"
+        className="h-full w-full object-cover"
+        draggable={false}
       />
-      {completed && (
-        <div className="absolute bottom-3 left-3 rounded-full bg-emerald-500/90 text-white text-xs font-medium px-2.5 py-1">
-          Completed
-        </div>
-      )}
     </div>
   );
 }
