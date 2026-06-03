@@ -9,7 +9,19 @@ type AssetReadyData = {
   upload_id?: string;
   playback_ids?: { id: string; policy: string }[];
   duration?: number;
+  /** Mux serves this as "W:H" (e.g. "1920:1080" or "9:16"). */
+  aspect_ratio?: string;
 };
+
+function parseAspectRatio(s: string | undefined): number | null {
+  if (!s) return null;
+  const m = s.match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  const w = Number(m[1]);
+  const h = Number(m[2]);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || h === 0) return null;
+  return w / h;
+}
 
 type UploadAssetCreatedData = {
   id: string;
@@ -68,6 +80,7 @@ export async function POST(req: Request) {
         rows.push(...fallback);
       }
 
+      const aspectRatio = parseAspectRatio(data.aspect_ratio);
       for (const row of rows) {
         await db
           .update(lessonTranslations)
@@ -79,6 +92,7 @@ export async function POST(req: Request) {
               : row.durationSeconds,
             thumbnailUrl,
             muxErrorMessage: null,
+            aspectRatio: aspectRatio ?? row.aspectRatio,
           })
           .where(eq(lessonTranslations.id, row.id));
       }

@@ -317,6 +317,7 @@ export async function copyMuxFromEnglish(input: {
       durationSeconds: en.durationSeconds,
       thumbnailUrl: en.thumbnailUrl,
       muxErrorMessage: null,
+      aspectRatio: en.aspectRatio,
     })
     .where(eq(lessonTranslations.id, input.translationId));
   await writeAuditEntry({
@@ -361,6 +362,7 @@ export async function clearMux(input: {
       durationSeconds: null,
       thumbnailUrl: null,
       muxErrorMessage: null,
+      aspectRatio: null,
     })
     .where(eq(lessonTranslations.id, input.translationId));
   await writeAuditEntry({
@@ -417,6 +419,7 @@ export async function resyncMuxUpload(input: {
         durationSeconds: state.durationSeconds ?? t.durationSeconds,
         thumbnailUrl: state.thumbnailUrl,
         muxErrorMessage: null,
+        aspectRatio: state.aspectRatio ?? t.aspectRatio,
       })
       .where(eq(lessonTranslations.id, input.translationId));
   } else if (state.status === "errored") {
@@ -464,6 +467,8 @@ export async function updateImageLesson(input: {
   lessonId: string;
   imageUrl: string;
   imageAlt: string;
+  /** Width / height of the new image — from the upload endpoint response. */
+  aspectRatio?: number | null;
 }) {
   try {
     await requireAdminLesson(input.lessonId);
@@ -485,10 +490,16 @@ export async function updateImageLesson(input: {
   }
 
   const oldUrl = t.imageUrl;
+  const aspectRatio =
+    typeof input.aspectRatio === "number" &&
+    Number.isFinite(input.aspectRatio) &&
+    input.aspectRatio > 0
+      ? input.aspectRatio
+      : null;
 
   await db
     .update(lessonTranslations)
-    .set({ imageUrl, imageAlt })
+    .set({ imageUrl, imageAlt, aspectRatio })
     .where(eq(lessonTranslations.id, input.translationId));
 
   if (oldUrl && oldUrl !== imageUrl) {
@@ -537,7 +548,7 @@ export async function clearImage(input: {
 
   await db
     .update(lessonTranslations)
-    .set({ imageUrl: null, imageAlt: null })
+    .set({ imageUrl: null, imageAlt: null, aspectRatio: null })
     .where(eq(lessonTranslations.id, input.translationId));
 
   if (oldUrl) {
@@ -601,7 +612,11 @@ export async function copyImageFromEnglish(input: {
 
   await db
     .update(lessonTranslations)
-    .set({ imageUrl: en.imageUrl, imageAlt: en.imageAlt })
+    .set({
+      imageUrl: en.imageUrl,
+      imageAlt: en.imageAlt,
+      aspectRatio: en.aspectRatio,
+    })
     .where(eq(lessonTranslations.id, input.translationId));
 
   if (oldUrl && oldUrl !== en.imageUrl) {
@@ -636,6 +651,8 @@ export async function updateCarouselLesson(input: {
   translationId: string;
   lessonId: string;
   slides: CarouselSlide[];
+  /** Aspect of the carousel canvas (typically the first slide's). */
+  aspectRatio?: number | null;
 }) {
   try {
     await requireAdminLesson(input.lessonId);
@@ -667,10 +684,16 @@ export async function updateCarouselLesson(input: {
   }
 
   const oldSlides = (t.carouselSlides ?? []) as CarouselSlide[];
+  const aspectRatio =
+    typeof input.aspectRatio === "number" &&
+    Number.isFinite(input.aspectRatio) &&
+    input.aspectRatio > 0
+      ? input.aspectRatio
+      : null;
 
   await db
     .update(lessonTranslations)
-    .set({ carouselSlides: slides })
+    .set({ carouselSlides: slides, aspectRatio })
     .where(eq(lessonTranslations.id, input.translationId));
 
   await maybeGcCarouselUrls({
@@ -722,7 +745,7 @@ export async function clearCarousel(input: {
 
   await db
     .update(lessonTranslations)
-    .set({ carouselSlides: null })
+    .set({ carouselSlides: null, aspectRatio: null })
     .where(eq(lessonTranslations.id, input.translationId));
 
   await maybeGcCarouselUrls({
@@ -790,7 +813,7 @@ export async function copyCarouselFromEnglish(input: {
 
   await db
     .update(lessonTranslations)
-    .set({ carouselSlides: newSlides })
+    .set({ carouselSlides: newSlides, aspectRatio: en?.aspectRatio ?? null })
     .where(eq(lessonTranslations.id, input.translationId));
 
   await maybeGcCarouselUrls({

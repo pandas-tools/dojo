@@ -4,6 +4,7 @@ import {
   text,
   boolean,
   integer,
+  real,
   timestamp,
   primaryKey,
   unique,
@@ -232,6 +233,13 @@ export const lessonTranslations = pgTable(
     // Carousel media (populated only when lessons.content_type = 'carousel').
     // Ordered array of slides: [{ url: string, alt: string, caption?: string }, ...]
     carouselSlides: jsonb("carousel_slides").$type<CarouselSlide[] | null>(),
+    // Aspect ratio of the rendering canvas as width/height (1.7778 for 16:9,
+    // 0.5625 for 9:16, 1.0 for square). Populated at upload time from the
+    // image header (image/carousel) or from Mux asset metadata (video).
+    // Nullable for legacy rows that pre-date this column. Renderers use it
+    // to flex the viewer container; carousels render at the FIRST slide's
+    // aspect — admins are expected to upload slides at a consistent ratio.
+    aspectRatio: real("aspect_ratio"),
   },
   (t) => ({
     uniqLessonLang: unique().on(t.lessonId, t.language),

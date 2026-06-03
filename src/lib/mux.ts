@@ -128,7 +128,18 @@ export type MuxAssetState = {
   durationSeconds: number | null;
   thumbnailUrl: string | null;
   errorMessage: string | null;
+  aspectRatio: number | null;
 };
+
+function parseMuxAspectRatio(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const m = s.match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  const w = Number(m[1]);
+  const h = Number(m[2]);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || h === 0) return null;
+  return w / h;
+}
 
 /**
  * Fetch the current state of a Mux upload + its asset (if one's been
@@ -152,6 +163,7 @@ export async function readMuxUploadState(
       durationSeconds: null,
       thumbnailUrl: null,
       errorMessage: "Upload not found on Mux",
+      aspectRatio: null,
     };
   }
   if (upload.error?.message) {
@@ -161,6 +173,7 @@ export async function readMuxUploadState(
       durationSeconds: null,
       thumbnailUrl: null,
       errorMessage: upload.error.message,
+      aspectRatio: null,
     };
   }
   if (!upload.asset_id) {
@@ -170,6 +183,7 @@ export async function readMuxUploadState(
       durationSeconds: null,
       thumbnailUrl: null,
       errorMessage: null,
+      aspectRatio: null,
     };
   }
   const asset = await mux.video.assets.retrieve(upload.asset_id).catch(() => null);
@@ -180,6 +194,7 @@ export async function readMuxUploadState(
       durationSeconds: null,
       thumbnailUrl: null,
       errorMessage: "Asset not found on Mux",
+      aspectRatio: null,
     };
   }
   if (asset.status === "ready") {
@@ -193,6 +208,7 @@ export async function readMuxUploadState(
         ? `https://image.mux.com/${playbackId}/thumbnail.jpg?time=1`
         : null,
       errorMessage: null,
+      aspectRatio: parseMuxAspectRatio(asset.aspect_ratio),
     };
   }
   if (asset.status === "errored") {
@@ -203,6 +219,7 @@ export async function readMuxUploadState(
       durationSeconds: null,
       thumbnailUrl: null,
       errorMessage: errors?.join("; ") ?? "Mux reported an error processing this asset",
+      aspectRatio: null,
     };
   }
   return {
@@ -211,5 +228,6 @@ export async function readMuxUploadState(
     durationSeconds: null,
     thumbnailUrl: null,
     errorMessage: null,
+    aspectRatio: null,
   };
 }

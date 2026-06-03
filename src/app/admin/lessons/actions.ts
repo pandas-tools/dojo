@@ -174,6 +174,10 @@ export async function createLessonFromUpload(input: {
 export async function createImageLesson(input: {
   imageUrl: string;
   imageAlt: string;
+  /** Width / height of the uploaded image. Caller gets it from the
+   *  upload endpoint's response. Stored on the translation row so the
+   *  Reels + Library viewers can flex the canvas without probing. */
+  aspectRatio?: number | null;
   internalName: string;
   title: string;
   description?: string;
@@ -192,6 +196,12 @@ export async function createImageLesson(input: {
   const title = input.title.trim();
   const imageUrl = input.imageUrl.trim();
   const imageAlt = input.imageAlt.trim();
+  const aspectRatio =
+    typeof input.aspectRatio === "number" &&
+    Number.isFinite(input.aspectRatio) &&
+    input.aspectRatio > 0
+      ? input.aspectRatio
+      : null;
   if (!internalName || !title) {
     return { error: "internalName and title are required" as const };
   }
@@ -233,6 +243,7 @@ export async function createImageLesson(input: {
       notesMarkdown: input.notesMarkdown?.trim() || null,
       imageUrl,
       imageAlt,
+      aspectRatio,
     });
 
     for (const lang of extraLangs) {
@@ -245,6 +256,7 @@ export async function createImageLesson(input: {
         description: null,
         imageUrl,
         imageAlt,
+        aspectRatio,
       });
     }
 
@@ -287,6 +299,11 @@ export async function createImageLesson(input: {
  */
 export async function createCarouselLesson(input: {
   slides: CarouselSlide[];
+  /** Width / height of the carousel's render canvas — typically the
+   *  first slide's aspect, computed client-side from the upload response.
+   *  Stored on the translation row; renderer uses it as the canvas size,
+   *  any non-conforming slide letterboxes inside. */
+  aspectRatio?: number | null;
   internalName: string;
   title: string;
   description?: string;
@@ -325,6 +342,12 @@ export async function createCarouselLesson(input: {
     alt: s.alt,
     ...(s.caption ? { caption: s.caption } : {}),
   }));
+  const aspectRatio =
+    typeof input.aspectRatio === "number" &&
+    Number.isFinite(input.aspectRatio) &&
+    input.aspectRatio > 0
+      ? input.aspectRatio
+      : null;
   const extraLangs = (input.additionalLanguages ?? [])
     .filter((l): l is AllowedLang =>
       (ALLOWED_LANGS as readonly string[]).includes(l),
@@ -355,6 +378,7 @@ export async function createCarouselLesson(input: {
       description: input.description?.trim() || null,
       notesMarkdown: input.notesMarkdown?.trim() || null,
       carouselSlides: slides,
+      aspectRatio,
     });
 
     for (const lang of extraLangs) {
@@ -364,6 +388,7 @@ export async function createCarouselLesson(input: {
         title,
         description: null,
         carouselSlides: slides,
+        aspectRatio,
       });
     }
 
