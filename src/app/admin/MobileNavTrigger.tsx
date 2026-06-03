@@ -10,6 +10,7 @@ import {
   Building2,
   BarChart3,
   Users,
+  ScrollText,
   LogOut,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/admin/clients", label: "Clients", Icon: Building2 },
   { href: "/admin/analytics", label: "Analytics", Icon: BarChart3 },
   { href: "/admin/members", label: "Members", Icon: Users },
+  { href: "/admin/audit-log", label: "Audit log", Icon: ScrollText },
 ];
 
 export default function MobileNavTrigger({

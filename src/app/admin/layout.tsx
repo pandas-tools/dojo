@@ -6,6 +6,7 @@ import {
   Building2,
   BarChart3,
   Users,
+  ScrollText,
   LogOut,
 } from "lucide-react";
 import { auth } from "@/lib/auth";
@@ -66,6 +67,12 @@ export default async function AdminLayout({
             icon={<Users className="h-4 w-4" />}
           >
             Members
+          </AdminNavLink>
+          <AdminNavLink
+            href="/admin/audit-log"
+            icon={<ScrollText className="h-4 w-4" />}
+          >
+            Audit log
           </AdminNavLink>
         </nav>
         <div className="border-t border-zinc-200 px-4 py-3">
