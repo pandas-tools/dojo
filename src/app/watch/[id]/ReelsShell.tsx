@@ -53,35 +53,15 @@ export default function ReelsShell({
         {children}
       </div>
 
-      {/* Bottom overlay — title + description inline. Lives above the
-          mux-player video stack — HTML5 video composites in its own GPU
-          layer that ignores DOM z-index unless siblings are also promoted
-          into a compositor layer. `transform: translateZ(0)` promotes us. */}
+      {/* TEMPORARY DEBUG: red bar at the bottom to prove the overlay
+          element is actually rendering visibly above the mux-player. */}
       <div
-        className={cn(
-          "pointer-events-none fixed inset-x-0 bottom-0 z-50 flex items-end transition-opacity duration-300",
-          "h-56 px-5",
-          overlayVisible ? "opacity-100" : "opacity-0",
-        )}
-        style={{
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)",
-          transform: "translateZ(0)",
-          willChange: "opacity",
-        }}
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-50"
+        style={{ transform: "translateZ(0)" }}
       >
-        <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent"
-          aria-hidden
-        />
-        <p className="relative z-10 max-w-2xl text-[15px] leading-snug drop-shadow-md">
-          <span className="font-semibold">{title}</span>
-          {description && (
-            <>
-              <span className="mx-1.5 text-white/70">·</span>
-              <span className="text-white/90">{description}</span>
-            </>
-          )}
-        </p>
+        <div className="bg-red-600 px-4 py-3 text-white text-base font-bold">
+          DEBUG · {title}
+        </div>
       </div>
 
       {/* Persistent back button — never fades. Same GPU-layer trick as the
