@@ -78,14 +78,41 @@ export async function POST(req: Request) {
               ? Math.round(data.duration)
               : row.durationSeconds,
             thumbnailUrl,
+            muxErrorMessage: null,
           })
           .where(eq(lessonTranslations.id, row.id));
       }
       break;
     }
     case "video.asset.errored": {
-      const data = payload.data as AssetReadyData;
+      const data = payload.data as AssetReadyData & {
+        errors?: { messages?: string[] };
+      };
       console.error("Mux asset errored", data);
+      const message =
+        data.errors?.messages?.join("; ") ??
+        "Mux reported an error processing this asset";
+      // Update by asset id OR upload id — either may be set on the row.
+      const rows = await db
+        .select()
+        .from(lessonTranslations)
+        .where(
+          data.upload_id
+            ? eq(lessonTranslations.muxUploadId, data.upload_id)
+            : eq(lessonTranslations.muxAssetId, data.id),
+        );
+      const targets = rows.length
+        ? rows
+        : await db
+            .select()
+            .from(lessonTranslations)
+            .where(eq(lessonTranslations.muxAssetId, data.id));
+      for (const row of targets) {
+        await db
+          .update(lessonTranslations)
+          .set({ muxErrorMessage: message })
+          .where(eq(lessonTranslations.id, row.id));
+      }
       break;
     }
     default:

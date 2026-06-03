@@ -22,6 +22,13 @@
       "when": 1780466923290,
       "tag": "0002_admin_audit_log",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780468040936,
+      "tag": "0003_mux_error_message",
+      "breakpoints": true
     }
   ]
 }

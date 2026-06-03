@@ -14,6 +14,7 @@ import {
   isValidLessonMediaKey,
 } from "@/lib/media-storage";
 import { writeAuditEntry } from "@/lib/audit-log";
+import { readMuxUploadState } from "@/lib/mux";
 
 // Convert a stored media URL back into its bucket key, or null if the URL
 // isn't one we own (defends against trying to delete external/legacy URLs).
@@ -315,6 +316,7 @@ export async function copyMuxFromEnglish(input: {
       muxUploadId: null,
       durationSeconds: en.durationSeconds,
       thumbnailUrl: en.thumbnailUrl,
+      muxErrorMessage: null,
     })
     .where(eq(lessonTranslations.id, input.translationId));
   await writeAuditEntry({
@@ -358,6 +360,7 @@ export async function clearMux(input: {
       muxUploadId: null,
       durationSeconds: null,
       thumbnailUrl: null,
+      muxErrorMessage: null,
     })
     .where(eq(lessonTranslations.id, input.translationId));
   await writeAuditEntry({
@@ -368,6 +371,81 @@ export async function clearMux(input: {
   });
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   return { ok: true };
+}
+
+/**
+ * Recovery action for video translations stuck in ⏳ — fetch the actual
+ * state from Mux and sync the DB row accordingly. Use when a webhook
+ * was missed (network glitch, Mux outage) or fired with an error we
+ * want to surface.
+ *
+ * Returns the resolved status so the admin UI can show the outcome:
+ *   - "ready":     filled in playback_id/duration/thumbnail, cleared error
+ *   - "errored":   stored mux_error_message so the UI can show "Failed: …"
+ *                  plus a "Clear & re-upload" option
+ *   - "preparing": no DB change; Mux is still processing
+ *   - "unknown":   couldn't find the upload/asset on Mux
+ */
+export async function resyncMuxUpload(input: {
+  translationId: string;
+  lessonId: string;
+}) {
+  try {
+    await requireAdminLesson(input.lessonId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "forbidden" };
+  }
+  const [t] = await db
+    .select()
+    .from(lessonTranslations)
+    .where(eq(lessonTranslations.id, input.translationId))
+    .limit(1);
+  if (!t || t.lessonId !== input.lessonId) {
+    return { error: "Translation does not belong to this lesson" };
+  }
+  if (!t.muxUploadId) {
+    return { error: "Nothing to resync — no Mux upload has been started" };
+  }
+
+  const state = await readMuxUploadState(t.muxUploadId);
+
+  if (state.status === "ready" && state.playbackId) {
+    await db
+      .update(lessonTranslations)
+      .set({
+        muxPlaybackId: state.playbackId,
+        durationSeconds: state.durationSeconds ?? t.durationSeconds,
+        thumbnailUrl: state.thumbnailUrl,
+        muxErrorMessage: null,
+      })
+      .where(eq(lessonTranslations.id, input.translationId));
+  } else if (state.status === "errored") {
+    await db
+      .update(lessonTranslations)
+      .set({ muxErrorMessage: state.errorMessage })
+      .where(eq(lessonTranslations.id, input.translationId));
+  } else if (state.status === "unknown") {
+    await db
+      .update(lessonTranslations)
+      .set({ muxErrorMessage: state.errorMessage })
+      .where(eq(lessonTranslations.id, input.translationId));
+  }
+  // "preparing" → leave DB alone; admin can resync again later.
+
+  await writeAuditEntry({
+    action: "translation.video.resync",
+    targetType: "translation",
+    targetId: input.translationId,
+    payload: {
+      lessonId: input.lessonId,
+      language: t.language,
+      resolved: state.status,
+      errorMessage: state.errorMessage ?? null,
+    },
+  });
+
+  revalidatePath(`/admin/lessons/${input.lessonId}`);
+  return { ok: true as const, status: state.status, error: state.errorMessage };
 }
 
 // ---------------------------------------------------------------------------

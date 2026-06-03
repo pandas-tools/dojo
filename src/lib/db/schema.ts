@@ -220,6 +220,12 @@ export const lessonTranslations = pgTable(
     muxUploadId: text("mux_upload_id"),
     durationSeconds: integer("duration_seconds"),
     thumbnailUrl: text("thumbnail_url"),
+    // Surfaces a Mux processing failure ("invalid_input", "encoding_error",
+    // etc.) so the admin UI can show a recover/clear affordance instead
+    // of leaving the lesson stuck on ⏳. Set from the asset.errored webhook
+    // and by the resyncMuxUpload admin action. Cleared on a successful
+    // asset.ready, on clearMux, and on a fresh upload start.
+    muxErrorMessage: text("mux_error_message"),
     // Single-image media (populated only when lessons.content_type = 'image')
     imageUrl: text("image_url"),
     imageAlt: text("image_alt"),

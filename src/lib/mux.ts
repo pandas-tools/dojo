@@ -121,3 +121,95 @@ export async function createDirectUpload(opts: {
   });
   return upload;
 }
+
+export type MuxAssetState = {
+  status: "preparing" | "ready" | "errored" | "unknown";
+  playbackId: string | null;
+  durationSeconds: number | null;
+  thumbnailUrl: string | null;
+  errorMessage: string | null;
+};
+
+/**
+ * Fetch the current state of a Mux upload + its asset (if one's been
+ * spawned yet). Used by the admin "resync stuck upload" recovery action
+ * when a webhook was missed or fired with an error we want to surface.
+ *
+ * The Upload object carries asset_id once Mux has created an asset for
+ * the bytes; the Asset object carries playback_ids + duration + status.
+ * If either is in `errored` state we return its error message so the
+ * admin can decide whether to clear and re-upload.
+ */
+export async function readMuxUploadState(
+  uploadId: string,
+): Promise<MuxAssetState> {
+  const mux = getMux();
+  const upload = await mux.video.uploads.retrieve(uploadId).catch(() => null);
+  if (!upload) {
+    return {
+      status: "unknown",
+      playbackId: null,
+      durationSeconds: null,
+      thumbnailUrl: null,
+      errorMessage: "Upload not found on Mux",
+    };
+  }
+  if (upload.error?.message) {
+    return {
+      status: "errored",
+      playbackId: null,
+      durationSeconds: null,
+      thumbnailUrl: null,
+      errorMessage: upload.error.message,
+    };
+  }
+  if (!upload.asset_id) {
+    return {
+      status: "preparing",
+      playbackId: null,
+      durationSeconds: null,
+      thumbnailUrl: null,
+      errorMessage: null,
+    };
+  }
+  const asset = await mux.video.assets.retrieve(upload.asset_id).catch(() => null);
+  if (!asset) {
+    return {
+      status: "unknown",
+      playbackId: null,
+      durationSeconds: null,
+      thumbnailUrl: null,
+      errorMessage: "Asset not found on Mux",
+    };
+  }
+  if (asset.status === "ready") {
+    const playbackId = asset.playback_ids?.[0]?.id ?? null;
+    return {
+      status: "ready",
+      playbackId,
+      durationSeconds:
+        typeof asset.duration === "number" ? Math.round(asset.duration) : null,
+      thumbnailUrl: playbackId
+        ? `https://image.mux.com/${playbackId}/thumbnail.jpg?time=1`
+        : null,
+      errorMessage: null,
+    };
+  }
+  if (asset.status === "errored") {
+    const errors = (asset.errors as { messages?: string[] } | undefined)?.messages;
+    return {
+      status: "errored",
+      playbackId: null,
+      durationSeconds: null,
+      thumbnailUrl: null,
+      errorMessage: errors?.join("; ") ?? "Mux reported an error processing this asset",
+    };
+  }
+  return {
+    status: "preparing",
+    playbackId: null,
+    durationSeconds: null,
+    thumbnailUrl: null,
+    errorMessage: null,
+  };
+}

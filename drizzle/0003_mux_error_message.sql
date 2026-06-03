@@ -1,0 +1,1 @@
+ALTER TABLE "lesson_translations" ADD COLUMN "mux_error_message" text;
