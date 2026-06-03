@@ -1,10 +1,113 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
-import { lessons, lessonTranslations } from "@/lib/db/schema";
+import {
+  lessons,
+  lessonTranslations,
+  type CarouselSlide,
+} from "@/lib/db/schema";
+import {
+  deleteLessonImage,
+  isValidLessonMediaKey,
+} from "@/lib/media-storage";
+
+// Convert a stored media URL back into its bucket key, or null if the URL
+// isn't one we own (defends against trying to delete external/legacy URLs).
+function keyFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const prefix = "/api/media/";
+  if (!url.startsWith(prefix)) return null;
+  const key = url.slice(prefix.length);
+  return isValidLessonMediaKey(key) ? key : null;
+}
+
+// True if any OTHER translation on this lesson still references the URL on
+// its image_url column. Lets us safely garbage-collect the bucket key when
+// an image is swapped/cleared without breaking translations that share it
+// (the copyImageFromEnglish flow deliberately produces that sharing).
+async function imageUrlStillReferenced(input: {
+  lessonId: string;
+  url: string;
+  excludingTranslationId: string;
+}): Promise<boolean> {
+  const rows = await db
+    .select({ id: lessonTranslations.id })
+    .from(lessonTranslations)
+    .where(
+      and(
+        eq(lessonTranslations.lessonId, input.lessonId),
+        eq(lessonTranslations.imageUrl, input.url),
+      ),
+    );
+  return rows.some((r) => r.id !== input.excludingTranslationId);
+}
+
+// True if any OTHER translation on this lesson still references the URL
+// inside its carousel_slides jsonb. Uses Postgres @> containment so the
+// match is "any slide whose url equals this URL", caption/alt irrelevant.
+async function carouselUrlStillReferenced(input: {
+  lessonId: string;
+  url: string;
+  excludingTranslationId: string;
+}): Promise<boolean> {
+  const needle = JSON.stringify([{ url: input.url }]);
+  const rows = await db
+    .select({ id: lessonTranslations.id })
+    .from(lessonTranslations)
+    .where(
+      and(
+        eq(lessonTranslations.lessonId, input.lessonId),
+        sql`${lessonTranslations.carouselSlides} @> ${needle}::jsonb`,
+      ),
+    );
+  return rows.some((r) => r.id !== input.excludingTranslationId);
+}
+
+// Best-effort: delete a bucket key iff no other translation on the lesson
+// still references the URL. Swallows errors — orphaned objects are cheap
+// (low storage cost, $0 egress) and we never want admin writes to fail
+// because of bucket flakiness.
+async function maybeGcImageUrl(input: {
+  lessonId: string;
+  oldUrl: string | null;
+  excludingTranslationId: string;
+}): Promise<void> {
+  const key = keyFromUrl(input.oldUrl);
+  if (!key) return;
+  const still = await imageUrlStillReferenced({
+    lessonId: input.lessonId,
+    url: input.oldUrl!,
+    excludingTranslationId: input.excludingTranslationId,
+  });
+  if (still) return;
+  await deleteLessonImage(key);
+}
+
+async function maybeGcCarouselUrls(input: {
+  lessonId: string;
+  oldSlides: CarouselSlide[];
+  newSlides: CarouselSlide[];
+  excludingTranslationId: string;
+}): Promise<void> {
+  const newUrls = new Set(input.newSlides.map((s) => s.url));
+  const removedUrls = input.oldSlides
+    .map((s) => s.url)
+    .filter((u) => !newUrls.has(u));
+  for (const url of removedUrls) {
+    const key = keyFromUrl(url);
+    if (!key) continue;
+    const still = await carouselUrlStillReferenced({
+      lessonId: input.lessonId,
+      url,
+      excludingTranslationId: input.excludingTranslationId,
+    });
+    if (still) continue;
+    await deleteLessonImage(key);
+  }
+}
 
 async function requireAdminLesson(lessonId: string) {
   const session = await auth();
@@ -232,6 +335,327 @@ export async function clearMux(input: {
       thumbnailUrl: null,
     })
     .where(eq(lessonTranslations.id, input.translationId));
+  revalidatePath(`/admin/lessons/${input.lessonId}`);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Image lesson translation surface
+// ---------------------------------------------------------------------------
+
+/**
+ * Swap the image on an image-lesson translation. Expects an already-uploaded
+ * image (the client POSTs to /api/admin/lessons/upload-image first and
+ * passes the returned proxy URL in). Server replaces image_url + image_alt,
+ * then garbage-collects the old bucket object iff no other translation on
+ * this lesson still references it.
+ */
+export async function updateImageLesson(input: {
+  translationId: string;
+  lessonId: string;
+  imageUrl: string;
+  imageAlt: string;
+}) {
+  try {
+    await requireAdminLesson(input.lessonId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "forbidden" };
+  }
+  const imageUrl = input.imageUrl.trim();
+  const imageAlt = input.imageAlt.trim();
+  if (!imageUrl) return { error: "imageUrl is required" };
+  if (!imageAlt) return { error: "imageAlt is required" };
+
+  const [t] = await db
+    .select()
+    .from(lessonTranslations)
+    .where(eq(lessonTranslations.id, input.translationId))
+    .limit(1);
+  if (!t || t.lessonId !== input.lessonId) {
+    return { error: "Translation does not belong to this lesson" };
+  }
+
+  const oldUrl = t.imageUrl;
+
+  await db
+    .update(lessonTranslations)
+    .set({ imageUrl, imageAlt })
+    .where(eq(lessonTranslations.id, input.translationId));
+
+  if (oldUrl && oldUrl !== imageUrl) {
+    await maybeGcImageUrl({
+      lessonId: input.lessonId,
+      oldUrl,
+      excludingTranslationId: input.translationId,
+    });
+  }
+
+  revalidatePath(`/admin/lessons/${input.lessonId}`);
+  revalidatePath("/admin/lessons");
+  return { ok: true };
+}
+
+/**
+ * Clear the image fields on an image-lesson translation so a new upload can
+ * begin from scratch. Garbage-collects the bucket key if no other translation
+ * on this lesson references it.
+ */
+export async function clearImage(input: {
+  translationId: string;
+  lessonId: string;
+}) {
+  try {
+    await requireAdminLesson(input.lessonId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "forbidden" };
+  }
+  const [t] = await db
+    .select()
+    .from(lessonTranslations)
+    .where(eq(lessonTranslations.id, input.translationId))
+    .limit(1);
+  if (!t || t.lessonId !== input.lessonId) {
+    return { error: "Translation does not belong to this lesson" };
+  }
+
+  const oldUrl = t.imageUrl;
+
+  await db
+    .update(lessonTranslations)
+    .set({ imageUrl: null, imageAlt: null })
+    .where(eq(lessonTranslations.id, input.translationId));
+
+  if (oldUrl) {
+    await maybeGcImageUrl({
+      lessonId: input.lessonId,
+      oldUrl,
+      excludingTranslationId: input.translationId,
+    });
+  }
+
+  revalidatePath(`/admin/lessons/${input.lessonId}`);
+  return { ok: true };
+}
+
+/**
+ * Point this translation's image at the English translation's image (same
+ * url + alt). Mirror of copyMuxFromEnglish — admin's escape hatch when the
+ * non-EN translation differs only in text.
+ */
+export async function copyImageFromEnglish(input: {
+  translationId: string;
+  lessonId: string;
+}) {
+  try {
+    await requireAdminLesson(input.lessonId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "forbidden" };
+  }
+  const [t] = await db
+    .select()
+    .from(lessonTranslations)
+    .where(eq(lessonTranslations.id, input.translationId))
+    .limit(1);
+  if (!t || t.lessonId !== input.lessonId) {
+    return { error: "Translation does not belong to this lesson" };
+  }
+  if (t.language === "en") {
+    return { error: "Cannot copy English onto itself" };
+  }
+  const [en] = await db
+    .select()
+    .from(lessonTranslations)
+    .where(
+      and(
+        eq(lessonTranslations.lessonId, input.lessonId),
+        eq(lessonTranslations.language, "en"),
+      ),
+    )
+    .limit(1);
+  if (!en || !en.imageUrl) {
+    return { error: "English image isn't set yet — upload it first" };
+  }
+
+  const oldUrl = t.imageUrl;
+
+  await db
+    .update(lessonTranslations)
+    .set({ imageUrl: en.imageUrl, imageAlt: en.imageAlt })
+    .where(eq(lessonTranslations.id, input.translationId));
+
+  if (oldUrl && oldUrl !== en.imageUrl) {
+    await maybeGcImageUrl({
+      lessonId: input.lessonId,
+      oldUrl,
+      excludingTranslationId: input.translationId,
+    });
+  }
+
+  revalidatePath(`/admin/lessons/${input.lessonId}`);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Carousel lesson translation surface
+// ---------------------------------------------------------------------------
+
+/**
+ * Replace the carousel slides on a translation with a new ordered list.
+ * Add/remove/reorder are all expressed via the final array — server diffs
+ * the URL set vs old to find orphans, then GCs bucket keys no other
+ * translation references.
+ */
+export async function updateCarouselLesson(input: {
+  translationId: string;
+  lessonId: string;
+  slides: CarouselSlide[];
+}) {
+  try {
+    await requireAdminLesson(input.lessonId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "forbidden" };
+  }
+  if (!Array.isArray(input.slides) || input.slides.length < 2) {
+    return {
+      error: "Carousel needs at least 2 slides — use an image lesson for 1.",
+    };
+  }
+  const slides: CarouselSlide[] = [];
+  for (const s of input.slides) {
+    const url = s.url?.trim();
+    const alt = s.alt?.trim();
+    if (!url || !alt) {
+      return { error: "Every slide needs both url and alt text" };
+    }
+    slides.push({ url, alt, ...(s.caption ? { caption: s.caption } : {}) });
+  }
+
+  const [t] = await db
+    .select()
+    .from(lessonTranslations)
+    .where(eq(lessonTranslations.id, input.translationId))
+    .limit(1);
+  if (!t || t.lessonId !== input.lessonId) {
+    return { error: "Translation does not belong to this lesson" };
+  }
+
+  const oldSlides = (t.carouselSlides ?? []) as CarouselSlide[];
+
+  await db
+    .update(lessonTranslations)
+    .set({ carouselSlides: slides })
+    .where(eq(lessonTranslations.id, input.translationId));
+
+  await maybeGcCarouselUrls({
+    lessonId: input.lessonId,
+    oldSlides,
+    newSlides: slides,
+    excludingTranslationId: input.translationId,
+  });
+
+  revalidatePath(`/admin/lessons/${input.lessonId}`);
+  revalidatePath("/admin/lessons");
+  return { ok: true };
+}
+
+/**
+ * Clear the carousel slides on a translation. GCs every previously-stored
+ * bucket key that no other translation on this lesson references.
+ */
+export async function clearCarousel(input: {
+  translationId: string;
+  lessonId: string;
+}) {
+  try {
+    await requireAdminLesson(input.lessonId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "forbidden" };
+  }
+  const [t] = await db
+    .select()
+    .from(lessonTranslations)
+    .where(eq(lessonTranslations.id, input.translationId))
+    .limit(1);
+  if (!t || t.lessonId !== input.lessonId) {
+    return { error: "Translation does not belong to this lesson" };
+  }
+
+  const oldSlides = (t.carouselSlides ?? []) as CarouselSlide[];
+
+  await db
+    .update(lessonTranslations)
+    .set({ carouselSlides: null })
+    .where(eq(lessonTranslations.id, input.translationId));
+
+  await maybeGcCarouselUrls({
+    lessonId: input.lessonId,
+    oldSlides,
+    newSlides: [],
+    excludingTranslationId: input.translationId,
+  });
+
+  revalidatePath(`/admin/lessons/${input.lessonId}`);
+  return { ok: true };
+}
+
+/**
+ * Point this translation's carousel at the English translation's slides
+ * (deep copy of the array). Mirror of copyMuxFromEnglish.
+ */
+export async function copyCarouselFromEnglish(input: {
+  translationId: string;
+  lessonId: string;
+}) {
+  try {
+    await requireAdminLesson(input.lessonId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "forbidden" };
+  }
+  const [t] = await db
+    .select()
+    .from(lessonTranslations)
+    .where(eq(lessonTranslations.id, input.translationId))
+    .limit(1);
+  if (!t || t.lessonId !== input.lessonId) {
+    return { error: "Translation does not belong to this lesson" };
+  }
+  if (t.language === "en") {
+    return { error: "Cannot copy English onto itself" };
+  }
+  const [en] = await db
+    .select()
+    .from(lessonTranslations)
+    .where(
+      and(
+        eq(lessonTranslations.lessonId, input.lessonId),
+        eq(lessonTranslations.language, "en"),
+      ),
+    )
+    .limit(1);
+  const enSlides = (en?.carouselSlides ?? null) as CarouselSlide[] | null;
+  if (!enSlides || enSlides.length < 2) {
+    return { error: "English carousel isn't set yet — build it first" };
+  }
+
+  const oldSlides = (t.carouselSlides ?? []) as CarouselSlide[];
+  const newSlides: CarouselSlide[] = enSlides.map((s) => ({
+    url: s.url,
+    alt: s.alt,
+    ...(s.caption ? { caption: s.caption } : {}),
+  }));
+
+  await db
+    .update(lessonTranslations)
+    .set({ carouselSlides: newSlides })
+    .where(eq(lessonTranslations.id, input.translationId));
+
+  await maybeGcCarouselUrls({
+    lessonId: input.lessonId,
+    oldSlides,
+    newSlides,
+    excludingTranslationId: input.translationId,
+  });
+
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   return { ok: true };
 }
