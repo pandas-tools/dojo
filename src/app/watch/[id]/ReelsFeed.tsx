@@ -6,35 +6,59 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
+import type { CarouselSlide } from "@/lib/db/schema";
+import VideoLessonViewer from "./VideoLessonViewer";
+import ImageLessonViewer from "./ImageLessonViewer";
+import CarouselLessonViewer from "./CarouselLessonViewer";
 
 const OVERLAY_AUTO_FADE_MS = 3000;
 
+export type FeedItemContent =
+  | {
+      type: "video";
+      playbackId: string;
+      aspectRatio: number | null;
+    }
+  | {
+      type: "image";
+      imageUrl: string;
+      imageAlt: string;
+      aspectRatio: number | null;
+    }
+  | {
+      type: "carousel";
+      slides: CarouselSlide[];
+      aspectRatio: number | null;
+    };
+
 export type FeedItem = {
-  /** Lesson id — drives the URL. */
+  /** Lesson id — drives URL sync. */
   id: string;
   title: string;
   description: string | null;
-  /** Rendered viewer for this lesson — pre-built server-side, accepts an `active` prop via cloneElement. */
-  node: ReactNode;
+  content: FeedItemContent;
 };
 
 export default function ReelsFeed({
   items,
   initialId,
   backHref,
-  buildHref,
+  urlPrefix,
+  disableTracking = false,
 }: {
   items: FeedItem[];
   initialId: string;
   backHref: string;
-  /** Maps a lesson id to its canonical URL (so /watch and /preview can share the feed). */
-  buildHref: (id: string) => string;
+  /** Per-lesson URL is built as `urlPrefix + id`. Use "/watch/" for the real
+   *  feed and "/preview/<token>/watch/" for the preview surface. */
+  urlPrefix: string;
+  /** True in preview mode — no tracking events fire. */
+  disableTracking?: boolean;
 }) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -54,8 +78,7 @@ export default function ReelsFeed({
     }, OVERLAY_AUTO_FADE_MS);
   }
 
-  // Scroll to the initial lesson on mount (no smooth so we don't visibly
-  // animate INTO the chosen one — it should just be there).
+  // Scroll to the initial lesson on mount.
   useEffect(() => {
     const el = sectionRefs.current.get(items[initialIndex]?.id ?? "");
     if (el) el.scrollIntoView({ behavior: "auto", block: "start" });
@@ -66,13 +89,12 @@ export default function ReelsFeed({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Track which section is in view via IntersectionObserver.
+  // Track which section is in view.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const obs = new IntersectionObserver(
       (entries) => {
-        // Pick the entry with the largest intersection ratio that's ≥ 0.6.
         let best: IntersectionObserverEntry | null = null;
         for (const e of entries) {
           if (e.intersectionRatio < 0.6) continue;
@@ -97,18 +119,29 @@ export default function ReelsFeed({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
-  // Sync URL with active lesson (replaceState — no history pollution as you
-  // scroll, but back-button still works because the initial entry stays).
+  // Sync URL with active lesson.
   useEffect(() => {
     const cur = items[activeIndex];
     if (!cur) return;
-    const url = buildHref(cur.id);
+    const url = urlPrefix + cur.id;
     if (typeof window !== "undefined" && window.location.pathname !== url) {
       window.history.replaceState(window.history.state, "", url);
     }
-  }, [activeIndex, items, buildHref]);
+  }, [activeIndex, items, urlPrefix]);
 
-  // Keyboard nav — same shape as before
+  const gotoIndex = useCallback(
+    (next: number) => {
+      const total = items.length;
+      if (total === 0) return;
+      const wrapped = ((next % total) + total) % total;
+      const target = items[wrapped];
+      if (!target) return;
+      const el = sectionRefs.current.get(target.id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    },
+    [items],
+  );
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ") {
@@ -123,21 +156,7 @@ export default function ReelsFeed({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIndex, items, router, backHref]);
-
-  const gotoIndex = useCallback(
-    (next: number) => {
-      const total = items.length;
-      if (total === 0) return;
-      const wrapped = ((next % total) + total) % total;
-      const target = items[wrapped];
-      if (!target) return;
-      const el = sectionRefs.current.get(target.id);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    },
-    [items],
-  );
+  }, [activeIndex, gotoIndex, router, backHref]);
 
   function onShellTap() {
     setOverlayVisible((v) => {
@@ -156,25 +175,53 @@ export default function ReelsFeed({
         className="absolute inset-0 overflow-y-scroll snap-y snap-mandatory overscroll-y-contain"
         style={{ touchAction: "pan-y", scrollbarWidth: "none" }}
       >
-        {items.map((it, i) => (
-          <section
-            key={it.id}
-            ref={(el) => {
-              if (el) sectionRefs.current.set(it.id, el);
-              else sectionRefs.current.delete(it.id);
-            }}
-            data-lesson-id={it.id}
-            onClick={onShellTap}
-            className="relative snap-start flex items-center justify-center bg-black"
-            style={{ height: "100dvh", width: "100%" }}
-          >
-            {/* Active flag is passed to the viewer node via data attribute; the
-                Active wrapper component below reads it and forwards as props. */}
-            <ActiveContext.Provider value={i === activeIndex}>
-              {it.node}
-            </ActiveContext.Provider>
-          </section>
-        ))}
+        {items.map((it, i) => {
+          const active = i === activeIndex;
+          return (
+            <section
+              key={it.id}
+              ref={(el) => {
+                if (el) sectionRefs.current.set(it.id, el);
+                else sectionRefs.current.delete(it.id);
+              }}
+              data-lesson-id={it.id}
+              onClick={onShellTap}
+              className="relative snap-start flex items-center justify-center bg-black"
+              style={{ height: "100dvh", width: "100%" }}
+            >
+              {it.content.type === "video" && (
+                <VideoLessonViewer
+                  lessonId={it.id}
+                  playbackId={it.content.playbackId}
+                  title={it.title}
+                  subtitlesEnabled
+                  aspectRatio={it.content.aspectRatio}
+                  active={active}
+                  disableTracking={disableTracking}
+                />
+              )}
+              {it.content.type === "image" && (
+                <ImageLessonViewer
+                  lessonId={it.id}
+                  imageUrl={it.content.imageUrl}
+                  imageAlt={it.content.imageAlt}
+                  aspectRatio={it.content.aspectRatio}
+                  active={active}
+                  disableTracking={disableTracking}
+                />
+              )}
+              {it.content.type === "carousel" && (
+                <CarouselLessonViewer
+                  lessonId={it.id}
+                  slides={it.content.slides}
+                  aspectRatio={it.content.aspectRatio}
+                  active={active}
+                  disableTracking={disableTracking}
+                />
+              )}
+            </section>
+          );
+        })}
       </div>
 
       {/* Bottom overlay — title + description for the currently active lesson */}
@@ -234,7 +281,7 @@ export default function ReelsFeed({
         </div>
       </div>
 
-      {/* Desktop-only vertical arrow controls — hidden on touch devices */}
+      {/* Desktop-only vertical arrow controls */}
       {items.length > 1 && (
         <div className="pointer-events-none fixed right-3 top-1/2 -translate-y-1/2 z-50 hidden sm:flex flex-col gap-2">
           <button
@@ -262,28 +309,7 @@ export default function ReelsFeed({
         </div>
       )}
 
-      <style>{`
-        main > div::-webkit-scrollbar { display: none; }
-      `}</style>
+      <style>{`main > div::-webkit-scrollbar { display: none; }`}</style>
     </main>
   );
-}
-
-// --------------------------- ActiveContext --------------------------------
-
-import { createContext, useContext } from "react";
-
-const ActiveContext = createContext<boolean>(false);
-
-/** Wrap a viewer in <ActiveAware> to receive the active flag and forward it
- *  via the `active` render-prop. Used by the page-level builders to thread
- *  the activeness down into video/image/carousel viewers without each
- *  viewer subscribing to the context directly. */
-export function ActiveAware({
-  children,
-}: {
-  children: (active: boolean) => ReactNode;
-}) {
-  const active = useContext(ActiveContext);
-  return <>{children(active)}</>;
 }

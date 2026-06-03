@@ -3,13 +3,7 @@ import Link from "next/link";
 import { verifyPreviewToken } from "@/lib/preview-tokens";
 import { loadPreviewBrowse, loadPreviewWatch } from "@/lib/preview-data";
 import type { CarouselSlide } from "@/lib/db/schema";
-import VideoLessonViewer from "@/app/watch/[id]/VideoLessonViewer";
-import ImageLessonViewer from "@/app/watch/[id]/ImageLessonViewer";
-import CarouselLessonViewer from "@/app/watch/[id]/CarouselLessonViewer";
-import ReelsFeed, {
-  ActiveAware,
-  type FeedItem,
-} from "@/app/watch/[id]/ReelsFeed";
+import ReelsFeed, { type FeedItem } from "@/app/watch/[id]/ReelsFeed";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Preview lesson · Dojo" };
@@ -26,67 +20,54 @@ export default async function PreviewWatchPage({
   const browse = await loadPreviewBrowse(payload.clientId);
   if (!browse || browse.lessons.length === 0) notFound();
 
-  // We need full lesson + translation rows per item for the viewers, which
-  // loadPreviewBrowse doesn't return — call loadPreviewWatch for each. The
-  // happy path is a handful of lessons so the fan-out is bounded.
   const fetched = await Promise.all(
     browse.lessons.map((b) => loadPreviewWatch(payload.clientId, b.lessonId)),
   );
   const ready = fetched.filter((x): x is NonNullable<typeof x> => x !== null);
   if (ready.length === 0) notFound();
 
-  const initialId = ready.some((r) => r.lesson.id === lessonId)
-    ? lessonId
-    : ready[0]!.lesson.id;
+  const items: FeedItem[] = [];
+  for (const { lesson, translation } of ready) {
+    if (lesson.contentType === "video" && translation.muxPlaybackId) {
+      items.push({
+        id: lesson.id,
+        title: translation.title,
+        description: translation.description,
+        content: {
+          type: "video",
+          playbackId: translation.muxPlaybackId,
+          aspectRatio: translation.aspectRatio,
+        },
+      });
+    } else if (lesson.contentType === "image" && translation.imageUrl) {
+      items.push({
+        id: lesson.id,
+        title: translation.title,
+        description: translation.description,
+        content: {
+          type: "image",
+          imageUrl: translation.imageUrl,
+          imageAlt: translation.imageAlt ?? translation.title,
+          aspectRatio: translation.aspectRatio,
+        },
+      });
+    } else if (lesson.contentType === "carousel") {
+      const slides = (translation.carouselSlides ?? []) as CarouselSlide[];
+      if (slides.length >= 2) {
+        items.push({
+          id: lesson.id,
+          title: translation.title,
+          description: translation.description,
+          content: { type: "carousel", slides, aspectRatio: translation.aspectRatio },
+        });
+      }
+    }
+  }
+  if (items.length === 0) notFound();
 
-  const items: FeedItem[] = ready.map(({ lesson, translation }) => ({
-    id: lesson.id,
-    title: translation.title,
-    description: translation.description,
-    node: (
-      <ActiveAware>
-        {(active) => {
-          if (lesson.contentType === "video" && translation.muxPlaybackId) {
-            return (
-              <VideoLessonViewer
-                lessonId={lesson.id}
-                playbackId={translation.muxPlaybackId}
-                title={translation.title}
-                subtitlesEnabled
-                disableTracking
-                aspectRatio={translation.aspectRatio}
-                active={active}
-              />
-            );
-          }
-          if (lesson.contentType === "image" && translation.imageUrl) {
-            return (
-              <ImageLessonViewer
-                lessonId={lesson.id}
-                imageUrl={translation.imageUrl}
-                imageAlt={translation.imageAlt ?? translation.title}
-                disableTracking
-                aspectRatio={translation.aspectRatio}
-                active={active}
-              />
-            );
-          }
-          if (lesson.contentType === "carousel" && translation.carouselSlides) {
-            return (
-              <CarouselLessonViewer
-                lessonId={lesson.id}
-                slides={translation.carouselSlides as CarouselSlide[]}
-                disableTracking
-                aspectRatio={translation.aspectRatio}
-                active={active}
-              />
-            );
-          }
-          return null;
-        }}
-      </ActiveAware>
-    ),
-  }));
+  const initialId = items.some((i) => i.id === lessonId)
+    ? lessonId
+    : items[0]!.id;
 
   return (
     <>
@@ -94,7 +75,8 @@ export default async function PreviewWatchPage({
         items={items}
         initialId={initialId}
         backHref={`/preview/${token}/browse`}
-        buildHref={(id) => `/preview/${token}/watch/${id}`}
+        urlPrefix={`/preview/${token}/watch/`}
+        disableTracking
       />
       <Link
         href={`/preview/${token}/browse`}

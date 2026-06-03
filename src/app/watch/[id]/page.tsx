@@ -3,10 +3,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
 import type { CarouselSlide } from "@/lib/db/schema";
-import VideoLessonViewer from "./VideoLessonViewer";
-import ImageLessonViewer from "./ImageLessonViewer";
-import CarouselLessonViewer from "./CarouselLessonViewer";
-import ReelsFeed, { ActiveAware, type FeedItem } from "./ReelsFeed";
+import ReelsFeed, { type FeedItem } from "./ReelsFeed";
 
 export const dynamic = "force-dynamic";
 
@@ -36,83 +33,56 @@ export default async function WatchPage({
     session.user.preferredLanguage,
   );
 
-  // Drop lessons whose translation/media isn't ready — same content-type-aware
-  // readiness check the standalone /watch page used.
-  const ready = allLessons.filter((l) => {
-    const t = translations.get(l.id);
-    if (!t) return false;
-    if (l.contentType === "video") return !!t.muxPlaybackId;
-    if (l.contentType === "image") return !!t.imageUrl;
-    if (l.contentType === "carousel") {
+  const items: FeedItem[] = [];
+  for (const lesson of allLessons) {
+    const t = translations.get(lesson.id);
+    if (!t) continue;
+    if (lesson.contentType === "video" && t.muxPlaybackId) {
+      items.push({
+        id: lesson.id,
+        title: t.title,
+        description: t.description,
+        content: {
+          type: "video",
+          playbackId: t.muxPlaybackId,
+          aspectRatio: t.aspectRatio,
+        },
+      });
+    } else if (lesson.contentType === "image" && t.imageUrl) {
+      items.push({
+        id: lesson.id,
+        title: t.title,
+        description: t.description,
+        content: {
+          type: "image",
+          imageUrl: t.imageUrl,
+          imageAlt: t.imageAlt ?? t.title,
+          aspectRatio: t.aspectRatio,
+        },
+      });
+    } else if (lesson.contentType === "carousel") {
       const slides = (t.carouselSlides ?? []) as CarouselSlide[];
-      return slides.length >= 2;
+      if (slides.length >= 2) {
+        items.push({
+          id: lesson.id,
+          title: t.title,
+          description: t.description,
+          content: { type: "carousel", slides, aspectRatio: t.aspectRatio },
+        });
+      }
     }
-    return false;
-  });
-
-  if (ready.length === 0) {
-    return <NotReadyBanner />;
   }
 
-  // Honor the requested lesson id when ready; otherwise land on the first
-  // ready lesson and let the user scroll through.
-  const initialId = ready.some((l) => l.id === id) ? id : ready[0]!.id;
+  if (items.length === 0) return <NotReadyBanner />;
 
-  const items: FeedItem[] = ready.map((lesson) => {
-    const t = translations.get(lesson.id)!;
-    return {
-      id: lesson.id,
-      title: t.title,
-      description: t.description,
-      node: (
-        <ActiveAware>
-          {(active) => {
-            if (lesson.contentType === "video" && t.muxPlaybackId) {
-              return (
-                <VideoLessonViewer
-                  lessonId={lesson.id}
-                  playbackId={t.muxPlaybackId}
-                  title={t.title}
-                  subtitlesEnabled
-                  aspectRatio={t.aspectRatio}
-                  active={active}
-                />
-              );
-            }
-            if (lesson.contentType === "image" && t.imageUrl) {
-              return (
-                <ImageLessonViewer
-                  lessonId={lesson.id}
-                  imageUrl={t.imageUrl}
-                  imageAlt={t.imageAlt ?? t.title}
-                  aspectRatio={t.aspectRatio}
-                  active={active}
-                />
-              );
-            }
-            if (lesson.contentType === "carousel" && t.carouselSlides) {
-              return (
-                <CarouselLessonViewer
-                  lessonId={lesson.id}
-                  slides={t.carouselSlides as CarouselSlide[]}
-                  aspectRatio={t.aspectRatio}
-                  active={active}
-                />
-              );
-            }
-            return null;
-          }}
-        </ActiveAware>
-      ),
-    };
-  });
+  const initialId = items.some((i) => i.id === id) ? id : items[0]!.id;
 
   return (
     <ReelsFeed
       items={items}
       initialId={initialId}
       backHref="/browse"
-      buildHref={(lessonId) => `/watch/${lessonId}`}
+      urlPrefix="/watch/"
     />
   );
 }
