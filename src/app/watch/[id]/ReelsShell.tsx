@@ -53,12 +53,13 @@ export default function ReelsShell({
         {children}
       </div>
 
-      {/* Bottom overlay — title + description inline. Explicit height +
-          flex-end so the text sits anchored to the bottom of the gradient,
-          not collapsing to the height of its content. */}
+      {/* Bottom overlay — title + description inline. Lives above the
+          mux-player web component (which creates its own stacking via the
+          shadow DOM); pinned to z-50 so it sits in the same band as the
+          persistent back button. */}
       <div
         className={cn(
-          "pointer-events-none absolute inset-x-0 bottom-0 z-40 flex items-end transition-opacity duration-300",
+          "pointer-events-none absolute inset-x-0 bottom-0 z-50 flex items-end transition-opacity duration-300",
           "h-56 px-5",
           overlayVisible ? "opacity-100" : "opacity-0",
         )}
@@ -68,17 +69,15 @@ export default function ReelsShell({
           className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent"
           aria-hidden
         />
-        <div className="relative max-w-2xl">
-          <p className="text-[15px] leading-snug drop-shadow-md">
-            <span className="font-semibold">{title}</span>
-            {description && (
-              <>
-                <span className="mx-1.5 text-white/70">·</span>
-                <span className="text-white/90">{description}</span>
-              </>
-            )}
-          </p>
-        </div>
+        <p className="relative z-10 max-w-2xl text-[15px] leading-snug drop-shadow-md">
+          <span className="font-semibold">{title}</span>
+          {description && (
+            <>
+              <span className="mx-1.5 text-white/70">·</span>
+              <span className="text-white/90">{description}</span>
+            </>
+          )}
+        </p>
       </div>
 
       {/* Persistent back button — never fades */}
