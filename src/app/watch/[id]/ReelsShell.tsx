@@ -53,25 +53,28 @@ export default function ReelsShell({
         {children}
       </div>
 
-      {/* Bottom overlay — title + description inline. Gradient lives on
-          the outer fixed element directly (no inner absolute child) so it
-          paints with the same compositor pass as the text — the previous
-          structure left the gradient + text painting BEHIND the mux-player
-          video layer despite z-50. */}
+      {/* Bottom overlay — title + description inline. Gradient + text both
+          live directly on the fixed outer container with INLINE-STYLE
+          gradient (Tailwind v4's bg-gradient-* classes were emitting in
+          the HTML but never painting — likely a build edge case). */}
       <div
         className={cn(
           "pointer-events-none fixed inset-x-0 bottom-0 z-50 transition-opacity duration-300",
-          "bg-gradient-to-t from-black via-black/70 to-transparent",
           "px-5 pt-16",
           overlayVisible ? "opacity-100" : "opacity-0",
         )}
         style={{
           paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)",
+          backgroundImage:
+            "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.65) 40%, rgba(0,0,0,0) 100%)",
           transform: "translateZ(0)",
           willChange: "opacity",
         }}
       >
-        <p className="max-w-2xl text-[15px] leading-snug drop-shadow-md">
+        <p
+          className="max-w-2xl text-[15px] leading-snug"
+          style={{ textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}
+        >
           <span className="font-semibold">{title}</span>
           {description && (
             <>
