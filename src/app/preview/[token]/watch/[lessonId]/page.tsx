@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { verifyPreviewToken } from "@/lib/preview-tokens";
-import { loadPreviewWatch } from "@/lib/preview-data";
+import { loadPreviewWatch, loadPreviewBrowse } from "@/lib/preview-data";
 import type { CarouselSlide } from "@/lib/db/schema";
 import VideoLessonViewer from "@/app/watch/[id]/VideoLessonViewer";
 import ImageLessonViewer from "@/app/watch/[id]/ImageLessonViewer";
@@ -20,9 +20,23 @@ export default async function PreviewWatchPage({
   const payload = verifyPreviewToken(token);
   if (!payload) notFound();
 
-  const data = await loadPreviewWatch(payload.clientId, lessonId);
+  const [data, browse] = await Promise.all([
+    loadPreviewWatch(payload.clientId, lessonId),
+    loadPreviewBrowse(payload.clientId),
+  ]);
   if (!data) notFound();
   const { header, lesson, translation } = data;
+
+  const ordered = browse?.lessons ?? [];
+  const idx = ordered.findIndex((l) => l.lessonId === lessonId);
+  const prevHref =
+    ordered.length > 1 && idx >= 0
+      ? `/preview/${token}/watch/${ordered[(idx - 1 + ordered.length) % ordered.length]!.lessonId}`
+      : null;
+  const nextHref =
+    ordered.length > 1 && idx >= 0
+      ? `/preview/${token}/watch/${ordered[(idx + 1) % ordered.length]!.lessonId}`
+      : null;
 
   return (
     <>
@@ -30,6 +44,8 @@ export default async function PreviewWatchPage({
         backHref={`/preview/${token}/browse`}
         title={translation.title}
         description={translation.description}
+        prevHref={prevHref}
+        nextHref={nextHref}
       >
         {lesson.contentType === "video" && translation.muxPlaybackId && (
           <VideoLessonViewer

@@ -28,7 +28,10 @@ export default async function WatchPage({
     role: "employee",
   });
 
-  const lesson = await sdb.lessons.getById(id);
+  const [lesson, allLessons] = await Promise.all([
+    sdb.lessons.getById(id),
+    sdb.lessons.list(),
+  ]);
   if (!lesson) notFound();
 
   const translation = await sdb.translations.forLesson(
@@ -36,6 +39,16 @@ export default async function WatchPage({
     session.user.preferredLanguage,
   );
   if (!translation) notFound();
+
+  const idx = allLessons.findIndex((l) => l.id === id);
+  const prevHref =
+    allLessons.length > 1
+      ? `/watch/${allLessons[(idx - 1 + allLessons.length) % allLessons.length]!.id}`
+      : null;
+  const nextHref =
+    allLessons.length > 1
+      ? `/watch/${allLessons[(idx + 1) % allLessons.length]!.id}`
+      : null;
 
   // Content-type-aware readiness — render the gentle "not ready" surface
   // if the translation is missing its media. The fallback resolution upstream
@@ -73,6 +86,8 @@ export default async function WatchPage({
       backHref="/browse"
       title={translation.title}
       description={translation.description}
+      prevHref={prevHref}
+      nextHref={nextHref}
     >
       {lesson.contentType === "video" && translation.muxPlaybackId && (
         <VideoLessonViewer
