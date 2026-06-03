@@ -32,7 +32,7 @@ If you've been dropped into Dojo with no prior context, do these in order:
 **Big lifts shipped in the 2026-06-03 session:**
 - **Reels view (Layout 1)** — `/watch/[id]` is now a full-bleed Instagram-Reels feed: all assigned lessons stacked in one CSS scroll-snap container, swipe-with-momentum between lessons, autoplay-muted with tap-for-sound, persistent back chevron top-left, fading bottom title-description overlay, object-contain everywhere so 9:16 / 1:1 / 16:9 all render at native aspect. Rating widget pulled entirely (placement TBD).
 - **Library view (Layout 2)** — `/browse` is **untouched** by this session. It's still the pre-Reels card layout. Real client employees would land on `/browse` first; this is the largest outstanding UI lift for the user-facing surface.
-- **Admin batch (10 items)** — full audit log, employee drill page, Mux error recovery, resend magic link, bulk ops, preview-as-employee, translation fallback rule, auto re-onboarding triggers, analytics-exclude-admins. See "Workflow inventory" below.
+- **Admin batch (8 items shipped, 5 skipped, 1 deferred — original 14 from 2026-06-02 list)** — full audit log, employee drill page, Mux error recovery, resend magic link, bulk ops, preview-as-employee, translation fallback rule, auto re-onboarding triggers. Analytics-exclude-admins shipped alongside as a write-time filter. See "Workflow inventory" below for the full resolution.
 - **Real content seed** — 7 placeholder lessons (3 videos at 9:16, 2 single images, 2 carousels) assigned to Orange Belgium. Old demo lessons deleted + seed.ts updated so they don't re-spawn on deploy.
 
 **Live URL:** https://web-s2cr-production.up.railway.app
@@ -255,7 +255,7 @@ Dex's smoke scripts live at `/tmp/dex-pw/` (separate from Iris's `/tmp/iris-pw/`
 
 The original 27-existing-13-missing list locked 2026-06-02 has been resolved by Dimi's call during the user-side pivot:
 
-**Shipped in this batch (10):**
+**Shipped in this batch (8):**
 - #1A Resend magic link (admin button on employee drill page)
 - #3 Auto re-onboarding triggers (jwt-callback rule, no admin button; fires when employee's store no longer exists or their language is no longer in the client's allowed list)
 - #4 Drill into individual employee history (`/admin/employees/[userId]` + `getEmployeeDetail` backend)
@@ -292,7 +292,7 @@ The original 27-existing-13-missing list locked 2026-06-02 has been resolved by 
 ### Reels-specific patterns (2026-06-03)
 - One scroll-snap container per feed — all lessons stacked vertically, snap-mandatory.
 - IntersectionObserver picks active section ≥60% visibility. Each viewer takes an `active` prop; only the active viewer autoplays + emits tracking.
-- Inline-style gradients + GPU-promoted overlays (`transform: translateZ(0)`) to clear the Mux player iframe's stacking context. Tailwind utility gradients silently lost the painting battle in headless playwright; inline `linear-gradient(...)` styles are the workaround.
+- Inline-style gradients + GPU-promoted overlays (`transform: translateZ(0)`) sit over the Mux player's stacking context. **Real browsers always rendered the overlay correctly** — the visible bug during build was a `chromium-headless-shell` screenshot quirk that fails to capture overlays painted above an HTML5 `<video>` element (mux-player wraps a video in a web component / shadow DOM). Tailwind utility gradients emit the right CSS (curl-verified against live HTML); inline `linear-gradient(...)` styles are defensive — kept for clarity, not strictly required for the bug. See `feedback-playwright-headless-shell-video-overlay` memory.
 - `object-fit: contain` everywhere — viewers letterbox rather than crop. Mux Player exposes `--media-object-fit` CSS var.
 
 ### Frontend ship pattern
