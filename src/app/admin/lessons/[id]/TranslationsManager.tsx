@@ -17,6 +17,7 @@ import {
   deleteTranslation,
   copyMuxFromEnglish,
   clearMux,
+  resyncMuxUpload,
   updateImageLesson,
   clearImage,
   copyImageFromEnglish,
@@ -24,6 +25,7 @@ import {
   clearCarousel,
   copyCarouselFromEnglish,
 } from "./translations-actions";
+import { toast } from "sonner";
 import type { CarouselSlide } from "@/lib/db/schema";
 import { cn } from "@/lib/cn";
 
@@ -38,6 +40,7 @@ type Translation = {
   // Video
   muxPlaybackId: string | null;
   muxUploadId: string | null;
+  muxErrorMessage: string | null;
   durationSeconds: number | null;
   thumbnailUrl: string | null;
   // Image
@@ -452,9 +455,64 @@ function VideoMedia({
     });
   }
 
+  function onResync() {
+    setError(null);
+    startTransition(async () => {
+      const res = await resyncMuxUpload({ translationId: t.id, lessonId });
+      if (res?.error) {
+        setError(res.error);
+        return;
+      }
+      switch (res?.status) {
+        case "ready":
+          toast.success("Synced — video is ready");
+          break;
+        case "preparing":
+          toast.info("Mux is still processing — try again in a minute");
+          break;
+        case "errored":
+          toast.error(`Upload errored: ${res.error ?? "Mux reported a failure"}`);
+          break;
+        case "unknown":
+          toast.error(
+            `Couldn't find the upload on Mux${res.error ? ` — ${res.error}` : ""}`,
+          );
+          break;
+      }
+      router.refresh();
+    });
+  }
+
   return (
     <div className="rounded-md bg-zinc-50 border border-zinc-200 p-3 text-sm">
-      {t.muxPlaybackId ? (
+      {t.muxErrorMessage ? (
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 flex-wrap">
+            <span className="text-red-700 font-medium">✗ Errored</span>
+            <span className="text-xs text-red-700 break-words">
+              {t.muxErrorMessage}
+            </span>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={onResync}
+              disabled={pending}
+              className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-700 hover:border-zinc-500 disabled:opacity-50 transition-colors"
+            >
+              Resync with Mux
+            </button>
+            <button
+              type="button"
+              onClick={onClearVideo}
+              disabled={pending}
+              className="text-xs text-red-700 hover:underline disabled:opacity-50"
+            >
+              Clear & re-upload
+            </button>
+          </div>
+        </div>
+      ) : t.muxPlaybackId ? (
         <div className="space-y-2">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-emerald-700 font-medium">✓ Ready</span>
@@ -487,9 +545,19 @@ function VideoMedia({
           )}
         </div>
       ) : t.muxUploadId ? (
-        <p className="text-amber-700">
-          ⏳ Upload in progress / Mux is processing. Refresh in a minute.
-        </p>
+        <div className="space-y-2">
+          <p className="text-amber-700">
+            ⏳ Upload in progress / Mux is processing. Refresh in a minute.
+          </p>
+          <button
+            type="button"
+            onClick={onResync}
+            disabled={pending}
+            className="text-xs text-zinc-700 hover:underline disabled:opacity-50"
+          >
+            Resync now if it&apos;s been stuck
+          </button>
+        </div>
       ) : (
         <div className="space-y-2">
           <p className="text-zinc-600 text-xs">No video uploaded yet.</p>

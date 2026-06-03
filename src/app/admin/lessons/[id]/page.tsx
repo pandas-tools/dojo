@@ -108,6 +108,7 @@ export default async function LessonDetailPage({
               notesMarkdown: t.notesMarkdown,
               muxPlaybackId: t.muxPlaybackId,
               muxUploadId: t.muxUploadId,
+              muxErrorMessage: t.muxErrorMessage,
               durationSeconds: t.durationSeconds,
               thumbnailUrl: t.thumbnailUrl,
               imageUrl: t.imageUrl,
