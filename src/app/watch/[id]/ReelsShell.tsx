@@ -53,15 +53,33 @@ export default function ReelsShell({
         {children}
       </div>
 
-      {/* TEMPORARY DEBUG: red bar at the bottom to prove the overlay
-          element is actually rendering visibly above the mux-player. */}
+      {/* Bottom overlay — title + description inline. Gradient lives on
+          the outer fixed element directly (no inner absolute child) so it
+          paints with the same compositor pass as the text — the previous
+          structure left the gradient + text painting BEHIND the mux-player
+          video layer despite z-50. */}
       <div
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-50"
-        style={{ transform: "translateZ(0)" }}
+        className={cn(
+          "pointer-events-none fixed inset-x-0 bottom-0 z-50 transition-opacity duration-300",
+          "bg-gradient-to-t from-black via-black/70 to-transparent",
+          "px-5 pt-16",
+          overlayVisible ? "opacity-100" : "opacity-0",
+        )}
+        style={{
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)",
+          transform: "translateZ(0)",
+          willChange: "opacity",
+        }}
       >
-        <div className="bg-red-600 px-4 py-3 text-white text-base font-bold">
-          DEBUG · {title}
-        </div>
+        <p className="max-w-2xl text-[15px] leading-snug drop-shadow-md">
+          <span className="font-semibold">{title}</span>
+          {description && (
+            <>
+              <span className="mx-1.5 text-white/70">·</span>
+              <span className="text-white/90">{description}</span>
+            </>
+          )}
+        </p>
       </div>
 
       {/* Persistent back button — never fades. Same GPU-layer trick as the
