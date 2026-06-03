@@ -54,16 +54,20 @@ export default function ReelsShell({
       </div>
 
       {/* Bottom overlay — title + description inline. Lives above the
-          mux-player web component (which creates its own stacking via the
-          shadow DOM); pinned to z-50 so it sits in the same band as the
-          persistent back button. */}
+          mux-player video stack — HTML5 video composites in its own GPU
+          layer that ignores DOM z-index unless siblings are also promoted
+          into a compositor layer. `transform: translateZ(0)` promotes us. */}
       <div
         className={cn(
-          "pointer-events-none absolute inset-x-0 bottom-0 z-50 flex items-end transition-opacity duration-300",
+          "pointer-events-none fixed inset-x-0 bottom-0 z-50 flex items-end transition-opacity duration-300",
           "h-56 px-5",
           overlayVisible ? "opacity-100" : "opacity-0",
         )}
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)" }}
+        style={{
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)",
+          transform: "translateZ(0)",
+          willChange: "opacity",
+        }}
       >
         <div
           className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent"
@@ -80,10 +84,14 @@ export default function ReelsShell({
         </p>
       </div>
 
-      {/* Persistent back button — never fades */}
+      {/* Persistent back button — never fades. Same GPU-layer trick as the
+          bottom overlay so it isn't drawn under the mux-player video stack. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-50"
-        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+        className="pointer-events-none fixed inset-x-0 top-0 z-50"
+        style={{
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          transform: "translateZ(0)",
+        }}
       >
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 to-transparent"
