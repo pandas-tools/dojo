@@ -395,3 +395,239 @@ export async function getClientDetailAnalytics(
     timeline,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Per-employee drill: everything a Pandas admin needs to investigate one user.
+// ---------------------------------------------------------------------------
+
+export type EmployeeLessonHistory = {
+  lessonId: string;
+  internalName: string;
+  title: string;
+  opened: boolean;
+  completed: boolean;
+  rating: number | null;
+  totalEngagedMs: number;
+  lastActivityAt: string | null; // ISO
+};
+
+export type EmployeeProfile = {
+  userId: string;
+  email: string;
+  name: string | null;
+  role: "employee" | "admin" | "client_admin";
+  clientId: string | null;
+  clientName: string | null;
+  clientSlug: string | null;
+  storeId: string | null;
+  storeName: string | null;
+  preferredLanguage: string;
+  onboardingCompleted: boolean;
+  storeConfirmedAt: string | null; // ISO
+  createdAt: string; // ISO
+  updatedAt: string; // ISO
+};
+
+export type EmployeeDetail = {
+  user: EmployeeProfile;
+  // Lessons currently assigned to the user's client, with this user's
+  // per-lesson activity merged in. Admins viewing themselves get an empty
+  // array (they don't have an assigned-lessons list).
+  lessons: EmployeeLessonHistory[];
+  // Coarse-grained totals across lessons.
+  totals: {
+    opened: number;
+    completed: number;
+    assigned: number;
+    avgRating: number | null;
+    totalEngagedMs: number;
+  };
+};
+
+/**
+ * Aggregate everything Pandas-team admins need to investigate a single user:
+ * profile + per-lesson timeline (open/complete/rate/engagement) + totals.
+ * Returns null if the user doesn't exist. One pass, four queries: user +
+ * lesson_events + lesson_completions + client_lessons join lessons join
+ * translations.
+ */
+export async function getEmployeeDetail(
+  userId: string,
+): Promise<EmployeeDetail | null> {
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user) return null;
+
+  const [clientRow, storeRow] = await Promise.all([
+    user.clientId
+      ? db
+          .select()
+          .from(clients)
+          .where(eq(clients.id, user.clientId))
+          .limit(1)
+          .then((r) => r[0] ?? null)
+      : Promise.resolve(null),
+    user.storeId
+      ? db
+          .select()
+          .from(stores)
+          .where(eq(stores.id, user.storeId))
+          .limit(1)
+          .then((r) => r[0] ?? null)
+      : Promise.resolve(null),
+  ]);
+
+  const profile: EmployeeProfile = {
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    clientId: user.clientId,
+    clientName: clientRow?.name ?? null,
+    clientSlug: clientRow?.slug ?? null,
+    storeId: user.storeId,
+    storeName: storeRow?.name ?? null,
+    preferredLanguage: user.preferredLanguage,
+    onboardingCompleted: user.onboardingCompleted,
+    storeConfirmedAt: user.storeConfirmedAt
+      ? user.storeConfirmedAt.toISOString()
+      : null,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
+  };
+
+  // No clientId → no lessons to merge in.
+  if (!user.clientId) {
+    return {
+      user: profile,
+      lessons: [],
+      totals: { opened: 0, completed: 0, assigned: 0, avgRating: null, totalEngagedMs: 0 },
+    };
+  }
+
+  // Pull assigned lessons + this user's activity + ratings in parallel.
+  const [assignmentRows, eventRows, completionRows] = await Promise.all([
+    db
+      .select()
+      .from(clientLessons)
+      .where(eq(clientLessons.clientId, user.clientId)),
+    db.select().from(lessonEvents).where(eq(lessonEvents.userId, userId)),
+    db
+      .select()
+      .from(lessonCompletions)
+      .where(eq(lessonCompletions.userId, userId)),
+  ]);
+
+  const assignedIds = assignmentRows.map((a) => a.lessonId);
+  if (assignedIds.length === 0) {
+    return {
+      user: profile,
+      lessons: [],
+      totals: {
+        opened: 0,
+        completed: 0,
+        assigned: 0,
+        avgRating: null,
+        totalEngagedMs: 0,
+      },
+    };
+  }
+
+  const [lessonRows, translationRows] = await Promise.all([
+    db
+      .select()
+      .from(lessons)
+      .where(inArray(lessons.id, assignedIds)),
+    db
+      .select()
+      .from(lessonTranslations)
+      .where(inArray(lessonTranslations.lessonId, assignedIds)),
+  ]);
+
+  // Pick translation title by preferred lang with EN fallback.
+  const titleFor = (lessonId: string): string => {
+    const candidates = translationRows.filter((t) => t.lessonId === lessonId);
+    const pref = candidates.find((t) => t.language === user.preferredLanguage);
+    const en = candidates.find((t) => t.language === "en");
+    return (pref ?? en)?.title ?? "(no title)";
+  };
+
+  // Build per-lesson activity buckets from this user's events.
+  type Bucket = {
+    opened: boolean;
+    completed: boolean;
+    engagedMs: number;
+    lastActivity: Date | null;
+  };
+  const buckets = new Map<string, Bucket>();
+  const getBucket = (lid: string): Bucket => {
+    let b = buckets.get(lid);
+    if (!b) {
+      b = { opened: false, completed: false, engagedMs: 0, lastActivity: null };
+      buckets.set(lid, b);
+    }
+    return b;
+  };
+  for (const ev of eventRows) {
+    const b = getBucket(ev.lessonId);
+    if (ev.eventType === "lesson_opened") b.opened = true;
+    else if (ev.eventType === "lesson_completed") b.completed = true;
+    else if (ev.eventType === "lesson_engagement") {
+      const p = (ev.payload ?? {}) as { engagedMs?: number };
+      if (typeof p.engagedMs === "number" && Number.isFinite(p.engagedMs)) {
+        // engagement payloads carry CUMULATIVE engagedMs per session; take
+        // the running max we've seen, not the sum, so heartbeats don't
+        // double-count.
+        if (p.engagedMs > b.engagedMs) b.engagedMs = p.engagedMs;
+      }
+    }
+    if (!b.lastActivity || ev.createdAt > b.lastActivity) {
+      b.lastActivity = ev.createdAt;
+    }
+  }
+
+  const ratingByLesson = new Map<string, number>();
+  for (const c of completionRows) {
+    ratingByLesson.set(c.lessonId, c.rating);
+  }
+
+  const lessonsOut: EmployeeLessonHistory[] = lessonRows
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((l) => {
+      const b = buckets.get(l.id);
+      return {
+        lessonId: l.id,
+        internalName: l.internalName,
+        title: titleFor(l.id),
+        opened: !!b?.opened,
+        completed: !!b?.completed,
+        rating: ratingByLesson.get(l.id) ?? null,
+        totalEngagedMs: b?.engagedMs ?? 0,
+        lastActivityAt: b?.lastActivity?.toISOString() ?? null,
+      };
+    });
+
+  const completedCount = lessonsOut.filter((l) => l.completed).length;
+  const openedCount = lessonsOut.filter((l) => l.opened).length;
+  const ratings = lessonsOut.map((l) => l.rating).filter((r): r is number => r !== null);
+  const avgRating =
+    ratings.length === 0
+      ? null
+      : ratings.reduce((a, b) => a + b, 0) / ratings.length;
+  const totalEngagedMs = lessonsOut.reduce((a, l) => a + l.totalEngagedMs, 0);
+
+  return {
+    user: profile,
+    lessons: lessonsOut,
+    totals: {
+      opened: openedCount,
+      completed: completedCount,
+      assigned: lessonsOut.length,
+      avgRating,
+      totalEngagedMs,
+    },
+  };
+}

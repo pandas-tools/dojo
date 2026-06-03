@@ -38,6 +38,12 @@ export async function POST(
   if (!session?.user || !session.user.clientId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  // Admins viewing a lesson don't count in analytics — silently no-op so
+  // their dwell + ratings don't pollute employee metrics. Pandas team
+  // shouldn't be a row in any client's funnel.
+  if (session.user.role === "admin") {
+    return NextResponse.json({ ok: true, skipped: "admin" });
+  }
 
   const { id } = await ctx.params;
   const json = await req.json().catch(() => null);
