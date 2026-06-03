@@ -103,7 +103,7 @@ export default function VideoLessonViewer({
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
       {showSoundHint && muted && (
-        <div className="absolute bottom-24 right-16 z-30 rounded-full bg-black/60 backdrop-blur px-3 py-1.5 text-xs text-white pointer-events-none animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="absolute bottom-24 right-16 z-30 rounded-full bg-black/60 backdrop-blur px-3 py-1.5 text-xs text-white pointer-events-none">
           Tap for sound
         </div>
       )}
