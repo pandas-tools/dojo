@@ -11,17 +11,20 @@ export default function CarouselLessonViewer({
   slides,
   disableTracking = false,
   aspectRatio,
+  active = true,
 }: {
   lessonId: string;
   slides: Slide[];
   disableTracking?: boolean;
   /** width/height of the slides. All slides assumed consistent. Default 9:16. */
   aspectRatio?: number | null;
+  /** Reels-feed mode: only the active carousel emits completion. */
+  active?: boolean;
 }) {
   const { emitCompleted } = useLessonTracking({
     lessonId,
     contentType: "carousel",
-    enabled: !disableTracking,
+    enabled: !disableTracking && active,
   });
 
   const [index, setIndex] = useState(0);

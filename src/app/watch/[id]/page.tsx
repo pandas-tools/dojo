@@ -6,7 +6,7 @@ import type { CarouselSlide } from "@/lib/db/schema";
 import VideoLessonViewer from "./VideoLessonViewer";
 import ImageLessonViewer from "./ImageLessonViewer";
 import CarouselLessonViewer from "./CarouselLessonViewer";
-import ReelsShell from "./ReelsShell";
+import ReelsFeed, { ActiveAware, type FeedItem } from "./ReelsFeed";
 
 export const dynamic = "force-dynamic";
 
@@ -28,111 +28,105 @@ export default async function WatchPage({
     role: "employee",
   });
 
-  const [lesson, allLessons] = await Promise.all([
-    sdb.lessons.getById(id),
-    sdb.lessons.list(),
-  ]);
-  if (!lesson) notFound();
+  const allLessons = await sdb.lessons.list();
+  if (allLessons.length === 0) redirect("/browse");
 
-  const translation = await sdb.translations.forLesson(
-    id,
+  const translations = await sdb.translations.forLessons(
+    allLessons.map((l) => l.id),
     session.user.preferredLanguage,
   );
-  if (!translation) notFound();
 
-  const idx = allLessons.findIndex((l) => l.id === id);
-  const prevHref =
-    allLessons.length > 1
-      ? `/watch/${allLessons[(idx - 1 + allLessons.length) % allLessons.length]!.id}`
-      : null;
-  const nextHref =
-    allLessons.length > 1
-      ? `/watch/${allLessons[(idx + 1) % allLessons.length]!.id}`
-      : null;
+  // Drop lessons whose translation/media isn't ready — same content-type-aware
+  // readiness check the standalone /watch page used.
+  const ready = allLessons.filter((l) => {
+    const t = translations.get(l.id);
+    if (!t) return false;
+    if (l.contentType === "video") return !!t.muxPlaybackId;
+    if (l.contentType === "image") return !!t.imageUrl;
+    if (l.contentType === "carousel") {
+      const slides = (t.carouselSlides ?? []) as CarouselSlide[];
+      return slides.length >= 2;
+    }
+    return false;
+  });
 
-  // Content-type-aware readiness — render the gentle "not ready" surface
-  // if the translation is missing its media. The fallback resolution upstream
-  // already prefers EN whenever the user's language is media-incomplete, so
-  // this trips only when EN itself isn't ready.
-  const notReady = (() => {
-    if (lesson.contentType === "video" && !translation.muxPlaybackId) {
-      return {
-        title: "Video still processing",
-        detail: "This lesson's video isn't ready yet. Try again in a few minutes.",
-      };
-    }
-    if (lesson.contentType === "image" && !translation.imageUrl) {
-      return {
-        title: "Image missing",
-        detail: "This image lesson hasn't been set up yet.",
-      };
-    }
-    if (lesson.contentType === "carousel") {
-      const slides = (translation.carouselSlides ?? []) as CarouselSlide[];
-      if (slides.length < 2) {
-        return {
-          title: "Carousel incomplete",
-          detail: "This carousel lesson needs at least 2 slides.",
-        };
-      }
-    }
-    return null;
-  })();
+  if (ready.length === 0) {
+    return <NotReadyBanner />;
+  }
 
-  if (notReady) return <NotReadyBanner {...notReady} />;
+  // Honor the requested lesson id when ready; otherwise land on the first
+  // ready lesson and let the user scroll through.
+  const initialId = ready.some((l) => l.id === id) ? id : ready[0]!.id;
+
+  const items: FeedItem[] = ready.map((lesson) => {
+    const t = translations.get(lesson.id)!;
+    return {
+      id: lesson.id,
+      title: t.title,
+      description: t.description,
+      node: (
+        <ActiveAware>
+          {(active) => {
+            if (lesson.contentType === "video" && t.muxPlaybackId) {
+              return (
+                <VideoLessonViewer
+                  lessonId={lesson.id}
+                  playbackId={t.muxPlaybackId}
+                  title={t.title}
+                  subtitlesEnabled
+                  aspectRatio={t.aspectRatio}
+                  active={active}
+                />
+              );
+            }
+            if (lesson.contentType === "image" && t.imageUrl) {
+              return (
+                <ImageLessonViewer
+                  lessonId={lesson.id}
+                  imageUrl={t.imageUrl}
+                  imageAlt={t.imageAlt ?? t.title}
+                  aspectRatio={t.aspectRatio}
+                  active={active}
+                />
+              );
+            }
+            if (lesson.contentType === "carousel" && t.carouselSlides) {
+              return (
+                <CarouselLessonViewer
+                  lessonId={lesson.id}
+                  slides={t.carouselSlides as CarouselSlide[]}
+                  aspectRatio={t.aspectRatio}
+                  active={active}
+                />
+              );
+            }
+            return null;
+          }}
+        </ActiveAware>
+      ),
+    };
+  });
 
   return (
-    <ReelsShell
+    <ReelsFeed
+      items={items}
+      initialId={initialId}
       backHref="/browse"
-      title={translation.title}
-      description={translation.description}
-      prevHref={prevHref}
-      nextHref={nextHref}
-    >
-      {lesson.contentType === "video" && translation.muxPlaybackId && (
-        <VideoLessonViewer
-          lessonId={id}
-          playbackId={translation.muxPlaybackId}
-          title={translation.title}
-          subtitlesEnabled
-          aspectRatio={translation.aspectRatio}
-        />
-      )}
-      {lesson.contentType === "image" && translation.imageUrl && (
-        <ImageLessonViewer
-          lessonId={id}
-          imageUrl={translation.imageUrl}
-          imageAlt={translation.imageAlt ?? translation.title}
-          aspectRatio={translation.aspectRatio}
-        />
-      )}
-      {lesson.contentType === "carousel" && translation.carouselSlides && (
-        <CarouselLessonViewer
-          lessonId={id}
-          slides={translation.carouselSlides as CarouselSlide[]}
-          aspectRatio={translation.aspectRatio}
-        />
-      )}
-    </ReelsShell>
+      buildHref={(lessonId) => `/watch/${lessonId}`}
+    />
   );
 }
 
-function NotReadyBanner({
-  title,
-  detail,
-}: {
-  title: string;
-  detail: string;
-}) {
+function NotReadyBanner() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-zinc-50">
       <div className="rounded-md border border-amber-200 bg-amber-50 p-6 text-amber-900 max-w-md text-sm">
-        <p className="font-medium">{title}</p>
-        <p className="mt-1">{detail}</p>
-        <Link
-          href="/browse"
-          className="mt-3 inline-block text-amber-900 underline"
-        >
+        <p className="font-medium">No lessons ready yet</p>
+        <p className="mt-1">
+          The lessons assigned to your client are still processing or missing
+          media. Check back in a few minutes.
+        </p>
+        <Link href="/browse" className="mt-3 inline-block text-amber-900 underline">
           ← Back to lessons
         </Link>
       </div>

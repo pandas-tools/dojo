@@ -11,6 +11,7 @@ export default function ImageLessonViewer({
   imageAlt,
   disableTracking = false,
   aspectRatio,
+  active = true,
 }: {
   lessonId: string;
   imageUrl: string;
@@ -18,15 +19,17 @@ export default function ImageLessonViewer({
   disableTracking?: boolean;
   /** width/height. Used to reserve correct layout space before the image loads. */
   aspectRatio?: number | null;
+  /** Reels-feed mode: only the active lesson runs the dwell-completion timer. */
+  active?: boolean;
 }) {
   const { emitCompleted } = useLessonTracking({
     lessonId,
     contentType: "image",
-    enabled: !disableTracking,
+    enabled: !disableTracking && active,
   });
 
   useEffect(() => {
-    if (disableTracking) return;
+    if (disableTracking || !active) return;
     let elapsed = 0;
     let lastTick = Date.now();
     const interval = window.setInterval(() => {
@@ -41,7 +44,7 @@ export default function ImageLessonViewer({
       }
     }, 250);
     return () => window.clearInterval(interval);
-  }, [emitCompleted, disableTracking]);
+  }, [emitCompleted, disableTracking, active]);
 
   const ar = aspectRatio && aspectRatio > 0 ? aspectRatio : 9 / 16;
 
