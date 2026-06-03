@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, max } from "drizzle-orm";
+import { and, eq, inArray, max } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
@@ -625,4 +625,144 @@ export async function deleteLesson(lessonId: string) {
   });
   revalidatePath("/admin/lessons");
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Bulk operations on lessons (#8 from the admin batch)
+//
+// Each takes a `lessonIds` array, runs the operation in a transaction so
+// the table is never half-mutated, and writes ONE audit-log row carrying
+// the full id list. Server-side caps at 200 ids per call to keep an
+// accidental click-the-checkbox-on-everything from spawning a runaway
+// query — well above any realistic dojo admin workflow.
+// ---------------------------------------------------------------------------
+
+const BULK_MAX = 200;
+
+function dedupeIds(ids: string[]): string[] {
+  return Array.from(new Set(ids.filter((id) => typeof id === "string" && id.length > 0)));
+}
+
+export async function bulkSetPublish(input: {
+  lessonIds: string[];
+  isPublished: boolean;
+}) {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "forbidden" };
+  }
+  const ids = dedupeIds(input.lessonIds);
+  if (ids.length === 0) return { error: "Pick at least one lesson" };
+  if (ids.length > BULK_MAX) {
+    return { error: `Too many lessons in one batch (max ${BULK_MAX})` };
+  }
+  const result = await db
+    .update(lessons)
+    .set({ isPublished: input.isPublished })
+    .where(inArray(lessons.id, ids))
+    .returning({ id: lessons.id });
+  await writeAuditEntry({
+    action: input.isPublished ? "lesson.bulk_publish" : "lesson.bulk_unpublish",
+    targetType: "lesson_set",
+    targetId: `${result.length}_lessons`,
+    payload: { lessonIds: result.map((r) => r.id), isPublished: input.isPublished },
+  });
+  revalidatePath("/admin/lessons");
+  return { ok: true as const, count: result.length };
+}
+
+export async function bulkDelete(input: { lessonIds: string[] }) {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "forbidden" };
+  }
+  const ids = dedupeIds(input.lessonIds);
+  if (ids.length === 0) return { error: "Pick at least one lesson" };
+  if (ids.length > BULK_MAX) {
+    return { error: `Too many lessons in one batch (max ${BULK_MAX})` };
+  }
+  // Snapshot internal names for the audit log so we can identify what got
+  // deleted even after the rows are gone.
+  const snapshot = await db
+    .select({ id: lessons.id, internalName: lessons.internalName })
+    .from(lessons)
+    .where(inArray(lessons.id, ids));
+  const result = await db
+    .delete(lessons)
+    .where(inArray(lessons.id, ids))
+    .returning({ id: lessons.id });
+  await writeAuditEntry({
+    action: "lesson.bulk_delete",
+    targetType: "lesson_set",
+    targetId: `${result.length}_lessons`,
+    payload: { lessonIds: result.map((r) => r.id), snapshot },
+  });
+  revalidatePath("/admin/lessons");
+  return { ok: true as const, count: result.length };
+}
+
+export async function bulkAssignToClient(input: {
+  lessonIds: string[];
+  clientId: string;
+}) {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "forbidden" };
+  }
+  const ids = dedupeIds(input.lessonIds);
+  if (ids.length === 0) return { error: "Pick at least one lesson" };
+  if (ids.length > BULK_MAX) {
+    return { error: `Too many lessons in one batch (max ${BULK_MAX})` };
+  }
+  const result = await db
+    .insert(clientLessons)
+    .values(ids.map((lessonId) => ({ lessonId, clientId: input.clientId })))
+    .onConflictDoNothing()
+    .returning({ lessonId: clientLessons.lessonId });
+  await writeAuditEntry({
+    action: "lesson.bulk_assign",
+    targetType: "lesson_set",
+    targetId: `${result.length}_lessons`,
+    payload: { lessonIds: result.map((r) => r.lessonId), clientId: input.clientId },
+  });
+  revalidatePath("/admin/lessons");
+  revalidatePath(`/admin/clients/${input.clientId}`);
+  return { ok: true as const, count: result.length };
+}
+
+export async function bulkUnassignFromClient(input: {
+  lessonIds: string[];
+  clientId: string;
+}) {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "forbidden" };
+  }
+  const ids = dedupeIds(input.lessonIds);
+  if (ids.length === 0) return { error: "Pick at least one lesson" };
+  if (ids.length > BULK_MAX) {
+    return { error: `Too many lessons in one batch (max ${BULK_MAX})` };
+  }
+  const result = await db
+    .delete(clientLessons)
+    .where(
+      and(
+        eq(clientLessons.clientId, input.clientId),
+        inArray(clientLessons.lessonId, ids),
+      ),
+    )
+    .returning({ lessonId: clientLessons.lessonId });
+  await writeAuditEntry({
+    action: "lesson.bulk_unassign",
+    targetType: "lesson_set",
+    targetId: `${result.length}_lessons`,
+    payload: { lessonIds: result.map((r) => r.lessonId), clientId: input.clientId },
+  });
+  revalidatePath("/admin/lessons");
+  revalidatePath(`/admin/clients/${input.clientId}`);
+  return { ok: true as const, count: result.length };
 }
