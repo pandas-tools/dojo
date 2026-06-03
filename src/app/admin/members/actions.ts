@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
+import { writeAuditEntry } from "@/lib/audit-log";
 
 async function requireAdmin() {
   const session = await auth();
@@ -45,12 +46,27 @@ export async function addAdmin(input: { email: string }) {
       .update(users)
       .set({ role: "admin", clientId: null, updatedAt: new Date() })
       .where(eq(users.id, existing.id));
+    await writeAuditEntry({
+      action: "admin_member.add",
+      targetType: "user",
+      targetId: existing.id,
+      payload: { email, mode: "promoted_existing" },
+    });
   } else {
-    await db.insert(users).values({
-      email,
-      role: "admin",
-      clientId: null,
-      onboardingCompleted: true,
+    const [created] = await db
+      .insert(users)
+      .values({
+        email,
+        role: "admin",
+        clientId: null,
+        onboardingCompleted: true,
+      })
+      .returning();
+    await writeAuditEntry({
+      action: "admin_member.add",
+      targetType: "user",
+      targetId: created.id,
+      payload: { email, mode: "created" },
     });
   }
 
@@ -71,8 +87,19 @@ export async function removeAdmin(input: { userId: string }) {
   // re-created as admin on next sign-in — that's the bootstrap path and
   // is documented behaviour. To fully remove a bootstrap admin, also
   // edit ADMIN_ALLOWLIST on Railway.
+  const [snapshot] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, input.userId))
+    .limit(1);
   await db.delete(users).where(eq(users.id, input.userId));
 
+  await writeAuditEntry({
+    action: "admin_member.remove",
+    targetType: "user",
+    targetId: input.userId,
+    payload: { email: snapshot?.email ?? null },
+  });
   revalidatePath("/admin/members");
   return { ok: true };
 }

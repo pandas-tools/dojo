@@ -10,6 +10,7 @@ import {
   clientAllowedDomains,
   clientLanguages,
 } from "@/lib/db/schema";
+import { writeAuditEntry } from "@/lib/audit-log";
 
 async function requireAdmin() {
   const session = await auth();
@@ -51,6 +52,12 @@ export async function createClient(input: { name: string; slug?: string }) {
     .insert(clients)
     .values({ name, slug })
     .returning();
+  await writeAuditEntry({
+    action: "client.create",
+    targetType: "client",
+    targetId: created.id,
+    payload: { name, slug },
+  });
   revalidatePath("/admin/clients");
   revalidatePath("/admin");
   return { ok: true, clientId: created.id };
@@ -89,6 +96,12 @@ export async function updateClient(input: {
   if (input.isActive !== undefined) patch.isActive = input.isActive;
 
   await db.update(clients).set(patch).where(eq(clients.id, input.id));
+  await writeAuditEntry({
+    action: "client.update",
+    targetType: "client",
+    targetId: input.id,
+    payload: patch,
+  });
   revalidatePath("/admin/clients");
   revalidatePath(`/admin/clients/${input.id}`);
   revalidatePath("/admin");
@@ -104,7 +117,18 @@ export async function deleteClient(clientId: string) {
   // Cascade is set on FKs (allowed_domains, languages, stores, etc.) so
   // a single delete is sufficient. lesson_completions belong to users —
   // those are also FK'd to users.client_id so they go with the users.
+  const [snapshot] = await db
+    .select({ name: clients.name, slug: clients.slug })
+    .from(clients)
+    .where(eq(clients.id, clientId))
+    .limit(1);
   await db.delete(clients).where(eq(clients.id, clientId));
+  await writeAuditEntry({
+    action: "client.delete",
+    targetType: "client",
+    targetId: clientId,
+    payload: snapshot ?? null,
+  });
   revalidatePath("/admin/clients");
   revalidatePath("/admin");
   redirect("/admin/clients");
@@ -142,6 +166,12 @@ export async function addAllowedDomain(input: {
   await db
     .insert(clientAllowedDomains)
     .values({ clientId: input.clientId, domain });
+  await writeAuditEntry({
+    action: "client.domain.add",
+    targetType: "client",
+    targetId: input.clientId,
+    payload: { domain },
+  });
   revalidatePath(`/admin/clients/${input.clientId}`);
   return { ok: true };
 }
@@ -163,6 +193,12 @@ export async function removeAllowedDomain(input: {
         eq(clientAllowedDomains.domain, input.domain),
       ),
     );
+  await writeAuditEntry({
+    action: "client.domain.remove",
+    targetType: "client",
+    targetId: input.clientId,
+    payload: { domain: input.domain },
+  });
   revalidatePath(`/admin/clients/${input.clientId}`);
   return { ok: true };
 }
@@ -186,6 +222,12 @@ export async function addLanguage(input: {
     .insert(clientLanguages)
     .values({ clientId: input.clientId, language: lang })
     .onConflictDoNothing();
+  await writeAuditEntry({
+    action: "client.language.add",
+    targetType: "client",
+    targetId: input.clientId,
+    payload: { language: lang },
+  });
   revalidatePath(`/admin/clients/${input.clientId}`);
   return { ok: true };
 }
@@ -207,6 +249,12 @@ export async function removeLanguage(input: {
         eq(clientLanguages.language, input.language),
       ),
     );
+  await writeAuditEntry({
+    action: "client.language.remove",
+    targetType: "client",
+    targetId: input.clientId,
+    payload: { language: input.language },
+  });
   revalidatePath(`/admin/clients/${input.clientId}`);
   return { ok: true };
 }

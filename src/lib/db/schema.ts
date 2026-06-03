@@ -49,6 +49,15 @@ export const lessonEventTypeEnum = pgEnum("lesson_event_type", [
   "rating_submitted",
 ]);
 
+// Admin audit log — append-only record of every admin write action. Reads
+// never touch this table. Action strings are namespaced verbs ("lesson.
+// publish", "translation.delete", "employee.resend_magic_link") so we can
+// filter cheaply without an enum. Target type+id is also free-text so the
+// log doesn't constrain what we can log against. Payload jsonb carries
+// shape-specific context (e.g. old/new values for an update, the ids list
+// for a bulk action). Actor is nullable because we keep the log even if
+// the admin's user row is later deleted.
+
 export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
@@ -313,6 +322,38 @@ export const lessonEvents = pgTable(
   }),
 );
 
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorUserId: uuid("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    action: text("action").notNull(),
+    targetType: text("target_type").notNull(),
+    targetId: text("target_id").notNull(),
+    payload: jsonb("payload"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    actorCreatedIdx: index("idx_admin_audit_log_actor_created").on(
+      t.actorUserId,
+      t.createdAt,
+    ),
+    targetCreatedIdx: index("idx_admin_audit_log_target_created").on(
+      t.targetType,
+      t.targetId,
+      t.createdAt,
+    ),
+    actionCreatedIdx: index("idx_admin_audit_log_action_created").on(
+      t.action,
+      t.createdAt,
+    ),
+  }),
+);
+
 // Type helpers for use across the app
 export type Client = typeof clients.$inferSelect;
 export type NewClient = typeof clients.$inferInsert;
@@ -324,3 +365,5 @@ export type Store = typeof stores.$inferSelect;
 export type LessonCompletion = typeof lessonCompletions.$inferSelect;
 export type LessonEvent = typeof lessonEvents.$inferSelect;
 export type NewLessonEvent = typeof lessonEvents.$inferInsert;
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+export type NewAdminAuditLog = typeof adminAuditLog.$inferInsert;

@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { clients, stores } from "@/lib/db/schema";
+import { writeAuditEntry } from "@/lib/audit-log";
 
 async function requireAdminClient(clientId: string) {
   const session = await auth();
@@ -46,6 +47,12 @@ export async function addStore(input: {
       externalId: input.externalId?.trim() || null,
     })
     .returning();
+  await writeAuditEntry({
+    action: "store.create",
+    targetType: "store",
+    targetId: created.id,
+    payload: { clientId: input.clientId, name },
+  });
   revalidatePath(`/admin/clients/${input.clientId}`);
   revalidatePath("/admin");
   return { ok: true, storeId: created.id };
@@ -90,6 +97,12 @@ export async function updateStore(input: {
   if (input.isActive !== undefined) patch.isActive = input.isActive;
 
   await db.update(stores).set(patch).where(eq(stores.id, input.storeId));
+  await writeAuditEntry({
+    action: "store.update",
+    targetType: "store",
+    targetId: input.storeId,
+    payload: { clientId: input.clientId, patch },
+  });
   revalidatePath(`/admin/clients/${input.clientId}`);
   return { ok: true };
 }
@@ -100,11 +113,22 @@ export async function deleteStore(input: { storeId: string; clientId: string }) 
   } catch (err) {
     return { error: err instanceof Error ? err.message : "forbidden" };
   }
+  const [snapshot] = await db
+    .select({ name: stores.name })
+    .from(stores)
+    .where(eq(stores.id, input.storeId))
+    .limit(1);
   await db
     .delete(stores)
     .where(
       and(eq(stores.id, input.storeId), eq(stores.clientId, input.clientId)),
     );
+  await writeAuditEntry({
+    action: "store.delete",
+    targetType: "store",
+    targetId: input.storeId,
+    payload: { clientId: input.clientId, name: snapshot?.name ?? null },
+  });
   revalidatePath(`/admin/clients/${input.clientId}`);
   revalidatePath("/admin");
   return { ok: true };
@@ -287,6 +311,12 @@ export async function importStoresCsv(input: {
     const result = await db.insert(stores).values(toInsert).returning();
     inserted = result.length;
   }
+  await writeAuditEntry({
+    action: "store.bulk_import",
+    targetType: "client",
+    targetId: input.clientId,
+    payload: { inserted, skipped, parseErrors: errors.length },
+  });
   revalidatePath(`/admin/clients/${input.clientId}`);
   revalidatePath("/admin");
   return { ok: true, inserted, skipped, errors };

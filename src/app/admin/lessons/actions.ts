@@ -11,6 +11,7 @@ import {
   type CarouselSlide,
 } from "@/lib/db/schema";
 import { createDirectUpload } from "@/lib/mux";
+import { writeAuditEntry } from "@/lib/audit-log";
 
 async function requireAdmin() {
   const session = await auth();
@@ -142,6 +143,20 @@ export async function createLessonFromUpload(input: {
     return lesson.id;
   });
 
+  await writeAuditEntry({
+    action: "lesson.create",
+    targetType: "lesson",
+    targetId: lessonId,
+    payload: {
+      contentType: "video",
+      internalName,
+      title,
+      type,
+      published: !!input.publish,
+      uploadId: input.uploadId ?? null,
+      clientIds: input.clientIds ?? [],
+    },
+  });
   revalidatePath("/admin/lessons");
   return { ok: true as const, lessonId };
 }
@@ -149,8 +164,8 @@ export async function createLessonFromUpload(input: {
 /**
  * Create a single-image lesson. Same shape as createLessonFromUpload but
  * for the 'image' content type — the caller has already uploaded the
- * image to ImageKit via /api/admin/lessons/upload-image and is passing
- * the resulting public URL + alt text.
+ * image to /api/admin/lessons/upload-image and is passing the resulting
+ * proxy URL + alt text.
  *
  * Image lessons follow the 5-second-dwell completion rule on the client
  * tracker (decided 2026-06-02). The server doesn't need to know about
@@ -243,6 +258,20 @@ export async function createImageLesson(input: {
     return lesson.id;
   });
 
+  await writeAuditEntry({
+    action: "lesson.create",
+    targetType: "lesson",
+    targetId: lessonId,
+    payload: {
+      contentType: "image",
+      internalName,
+      title,
+      type,
+      published: !!input.publish,
+      imageUrl,
+      clientIds: input.clientIds ?? [],
+    },
+  });
   revalidatePath("/admin/lessons");
   return { ok: true as const, lessonId };
 }
@@ -348,6 +377,20 @@ export async function createCarouselLesson(input: {
     return lesson.id;
   });
 
+  await writeAuditEntry({
+    action: "lesson.create",
+    targetType: "lesson",
+    targetId: lessonId,
+    payload: {
+      contentType: "carousel",
+      internalName,
+      title,
+      type,
+      published: !!input.publish,
+      slideCount: slides.length,
+      clientIds: input.clientIds ?? [],
+    },
+  });
   revalidatePath("/admin/lessons");
   return { ok: true as const, lessonId };
 }
@@ -432,6 +475,12 @@ export async function updateLesson(input: {
     return { error: "no fields to update" };
   }
   await db.update(lessons).set(patch).where(eq(lessons.id, input.lessonId));
+  await writeAuditEntry({
+    action: "lesson.update",
+    targetType: "lesson",
+    targetId: input.lessonId,
+    payload: patch,
+  });
   revalidatePath("/admin/lessons");
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   return { ok: true };
@@ -480,6 +529,12 @@ export async function reorderLesson(input: {
       .where(eq(lessons.id, neighbour.id));
   });
 
+  await writeAuditEntry({
+    action: "lesson.reorder",
+    targetType: "lesson",
+    targetId: current.id,
+    payload: { direction: input.direction, swappedWith: neighbour.id },
+  });
   revalidatePath("/admin/lessons");
   return { ok: true };
 }
@@ -494,6 +549,11 @@ export async function togglePublish(lessonId: string, isPublished: boolean) {
     .update(lessons)
     .set({ isPublished })
     .where(eq(lessons.id, lessonId));
+  await writeAuditEntry({
+    action: isPublished ? "lesson.publish" : "lesson.unpublish",
+    targetType: "lesson",
+    targetId: lessonId,
+  });
   revalidatePath("/admin/lessons");
   revalidatePath(`/admin/lessons/${lessonId}`);
   return { ok: true };
@@ -509,6 +569,12 @@ export async function assignToClient(lessonId: string, clientId: string) {
     .insert(clientLessons)
     .values({ lessonId, clientId })
     .onConflictDoNothing();
+  await writeAuditEntry({
+    action: "lesson.assign",
+    targetType: "lesson",
+    targetId: lessonId,
+    payload: { clientId },
+  });
   revalidatePath("/admin/lessons");
   revalidatePath(`/admin/lessons/${lessonId}`);
   return { ok: true };
@@ -528,6 +594,12 @@ export async function unassignFromClient(lessonId: string, clientId: string) {
         eq(clientLessons.clientId, clientId),
       ),
     );
+  await writeAuditEntry({
+    action: "lesson.unassign",
+    targetType: "lesson",
+    targetId: lessonId,
+    payload: { clientId },
+  });
   revalidatePath("/admin/lessons");
   revalidatePath(`/admin/lessons/${lessonId}`);
   return { ok: true };
@@ -539,7 +611,18 @@ export async function deleteLesson(lessonId: string) {
   } catch {
     return { error: "forbidden" };
   }
+  const [snapshot] = await db
+    .select({ internalName: lessons.internalName, contentType: lessons.contentType })
+    .from(lessons)
+    .where(eq(lessons.id, lessonId))
+    .limit(1);
   await db.delete(lessons).where(eq(lessons.id, lessonId));
+  await writeAuditEntry({
+    action: "lesson.delete",
+    targetType: "lesson",
+    targetId: lessonId,
+    payload: snapshot ?? null,
+  });
   revalidatePath("/admin/lessons");
   return { ok: true };
 }

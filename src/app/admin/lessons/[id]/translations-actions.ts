@@ -13,6 +13,7 @@ import {
   deleteLessonImage,
   isValidLessonMediaKey,
 } from "@/lib/media-storage";
+import { writeAuditEntry } from "@/lib/audit-log";
 
 // Convert a stored media URL back into its bucket key, or null if the URL
 // isn't one we own (defends against trying to delete external/legacy URLs).
@@ -173,6 +174,12 @@ export async function addTranslation(input: {
       notesMarkdown: input.notesMarkdown?.trim() || null,
     })
     .returning();
+  await writeAuditEntry({
+    action: "translation.add",
+    targetType: "translation",
+    targetId: created.id,
+    payload: { lessonId: input.lessonId, language: input.language, title },
+  });
   revalidatePath("/admin/lessons");
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   return { ok: true, translationId: created.id };
@@ -213,6 +220,12 @@ export async function updateTranslation(input: {
     .update(lessonTranslations)
     .set(patch)
     .where(eq(lessonTranslations.id, input.translationId));
+  await writeAuditEntry({
+    action: "translation.update",
+    targetType: "translation",
+    targetId: input.translationId,
+    payload: { lessonId: input.lessonId, language: t.language, patch },
+  });
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   return { ok: true };
 }
@@ -243,6 +256,12 @@ export async function deleteTranslation(input: {
   await db
     .delete(lessonTranslations)
     .where(eq(lessonTranslations.id, input.translationId));
+  await writeAuditEntry({
+    action: "translation.delete",
+    targetType: "translation",
+    targetId: input.translationId,
+    payload: { lessonId: input.lessonId, language: t.language, title: t.title },
+  });
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   revalidatePath("/admin/lessons");
   return { ok: true };
@@ -298,6 +317,12 @@ export async function copyMuxFromEnglish(input: {
       thumbnailUrl: en.thumbnailUrl,
     })
     .where(eq(lessonTranslations.id, input.translationId));
+  await writeAuditEntry({
+    action: "translation.video.copy_from_en",
+    targetType: "translation",
+    targetId: input.translationId,
+    payload: { lessonId: input.lessonId, language: t.language },
+  });
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   revalidatePath("/admin/lessons");
   return { ok: true };
@@ -335,6 +360,12 @@ export async function clearMux(input: {
       thumbnailUrl: null,
     })
     .where(eq(lessonTranslations.id, input.translationId));
+  await writeAuditEntry({
+    action: "translation.video.clear",
+    targetType: "translation",
+    targetId: input.translationId,
+    payload: { lessonId: input.lessonId, language: t.language },
+  });
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   return { ok: true };
 }
@@ -390,6 +421,12 @@ export async function updateImageLesson(input: {
     });
   }
 
+  await writeAuditEntry({
+    action: "translation.image.update",
+    targetType: "translation",
+    targetId: input.translationId,
+    payload: { lessonId: input.lessonId, language: t.language, oldUrl, newUrl: imageUrl },
+  });
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   revalidatePath("/admin/lessons");
   return { ok: true };
@@ -433,6 +470,12 @@ export async function clearImage(input: {
     });
   }
 
+  await writeAuditEntry({
+    action: "translation.image.clear",
+    targetType: "translation",
+    targetId: input.translationId,
+    payload: { lessonId: input.lessonId, language: t.language, oldUrl },
+  });
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   return { ok: true };
 }
@@ -491,6 +534,12 @@ export async function copyImageFromEnglish(input: {
     });
   }
 
+  await writeAuditEntry({
+    action: "translation.image.copy_from_en",
+    targetType: "translation",
+    targetId: input.translationId,
+    payload: { lessonId: input.lessonId, language: t.language },
+  });
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   return { ok: true };
 }
@@ -553,6 +602,17 @@ export async function updateCarouselLesson(input: {
     excludingTranslationId: input.translationId,
   });
 
+  await writeAuditEntry({
+    action: "translation.carousel.update",
+    targetType: "translation",
+    targetId: input.translationId,
+    payload: {
+      lessonId: input.lessonId,
+      language: t.language,
+      oldSlideCount: oldSlides.length,
+      newSlideCount: slides.length,
+    },
+  });
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   revalidatePath("/admin/lessons");
   return { ok: true };
@@ -594,6 +654,12 @@ export async function clearCarousel(input: {
     excludingTranslationId: input.translationId,
   });
 
+  await writeAuditEntry({
+    action: "translation.carousel.clear",
+    targetType: "translation",
+    targetId: input.translationId,
+    payload: { lessonId: input.lessonId, language: t.language, oldSlideCount: oldSlides.length },
+  });
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   return { ok: true };
 }
@@ -656,6 +722,12 @@ export async function copyCarouselFromEnglish(input: {
     excludingTranslationId: input.translationId,
   });
 
+  await writeAuditEntry({
+    action: "translation.carousel.copy_from_en",
+    targetType: "translation",
+    targetId: input.translationId,
+    payload: { lessonId: input.lessonId, language: t.language, slideCount: newSlides.length },
+  });
   revalidatePath(`/admin/lessons/${input.lessonId}`);
   return { ok: true };
 }
