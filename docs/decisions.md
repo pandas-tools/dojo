@@ -4,6 +4,24 @@ Running ADR for `dojo`. New decisions go at the top with a date and status. See 
 
 ---
 
+## 2026-06-23 — Lesson groups (editorial sections) + bookmarks for the /browse redesign
+
+**Status:** Decided.
+
+**Decision:** Back the redesigned employee `/browse` (dark, Reels-style rails) with two additions:
+
+1. **Lesson groups** — global editorial sections (`lesson_groups`: `id, name, sort_order`), like `lessons` themselves. A lesson belongs to at most one group via a nullable `lessons.group_id` FK (`ON DELETE SET NULL` — deleting a group orphans its lessons, never deletes them). Within-group order lives in a **dedicated `lessons.group_sort_order` column**, kept separate from the global `lessons.sort_order` that drives the `/admin/lessons` master list. A client sees its assigned+published lessons bucketed under each group; empty groups are dropped, and ungrouped lessons fall into a trailing "More lessons" bucket ordered by global `sort_order`.
+
+2. **Lesson bookmarks** — per-user "save for later" (`lesson_bookmarks`: PK `(user_id, lesson_id)`). `toggleBookmark(lessonId)` server action returns `{ bookmarked }`; the assignment guard + tenant scoping live in `scopedDb.bookmarks`.
+
+The employee read is `getBrowseData(user)` in `src/lib/browse.ts` → returns `groups[] { id, name, sortOrder, cards[] }`, each card carrying `isBookmarked`. The pure grouping/ordering logic is split into `src/lib/browse-shape.ts` (no DB import) so it's unit-tested in isolation. Admin management lives at `/admin/lesson-groups` (create/rename/delete/reorder groups; assign + reorder lessons within a group), audit-logged under `lesson_group.*`.
+
+**Why:** Groups are global because the editorial taxonomy ("Managing the store", "Customer flows") is Pandas-defined, like the lessons it organises — mirroring the existing global-lessons + per-client `client_lessons` assignment model. A separate `group_sort_order` column (vs. reusing `sort_order`) is the key call: sharing one column would mean assigning a lesson to a group silently reshuffles the global `/admin/lessons` list and the two reorder surfaces fight over one column. Two columns keep both orderings independent and stable.
+
+**Trade-off:** A lesson can be in only one group (matches the mock; no polymorphic over-engineering). Reorder UI uses up/down arrows (no drag-and-drop library in the stack yet), consistent with the existing `/admin/lessons` reorder. Migration `0005` is purely additive.
+
+---
+
 ## 2026-05-14 — Postgres on Railway, no Row-Level Security
 
 **Status:** Decided.

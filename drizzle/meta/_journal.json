@@ -36,6 +36,13 @@
       "when": 1780471389123,
       "tag": "0004_aspect_ratio",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782213003319,
+      "tag": "0005_lesson_groups_and_bookmarks",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   LayoutGrid,
   GraduationCap,
+  Layers,
   Building2,
   BarChart3,
   Users,
@@ -49,6 +50,12 @@ export default async function AdminLayout({
             icon={<GraduationCap className="h-4 w-4" />}
           >
             Lessons
+          </AdminNavLink>
+          <AdminNavLink
+            href="/admin/lesson-groups"
+            icon={<Layers className="h-4 w-4" />}
+          >
+            Lesson groups
           </AdminNavLink>
           <AdminNavLink
             href="/admin/clients"

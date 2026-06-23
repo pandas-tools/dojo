@@ -16,6 +16,7 @@ import { db } from "./client";
 import {
   clientLessons,
   lessons,
+  lessonBookmarks,
   lessonTranslations,
   lessonCompletions,
   lessonEvents,
@@ -114,6 +115,85 @@ export function scopedDb(user: ScopedUser) {
         return db.query.lessons.findFirst({
           where: and(eq(lessons.id, lessonId), eq(lessons.isPublished, true)),
         });
+      },
+    },
+
+    groups: {
+      // All editorial sections, ordered for display. Groups are global
+      // reference data (no client_id) so there's nothing tenant-specific to
+      // filter here — the browse read drops any group that ends up with no
+      // visible lessons for this client after lessons.list() scoping.
+      list: () =>
+        db.query.lessonGroups.findMany({
+          orderBy: (g, { asc }) => [asc(g.sortOrder), asc(g.createdAt)],
+        }),
+    },
+
+    bookmarks: {
+      // Set of lesson IDs this user has bookmarked, restricted to lessons
+      // currently assigned to their client so a bookmark on a since-
+      // unassigned lesson never resurfaces on /browse.
+      forUser: async (): Promise<Set<string>> => {
+        const assignments = await db
+          .select({ lessonId: clientLessons.lessonId })
+          .from(clientLessons)
+          .where(eq(clientLessons.clientId, cid));
+        const assignedIds = assignments.map((a) => a.lessonId);
+        if (assignedIds.length === 0) return new Set();
+        const rows = await db
+          .select({ lessonId: lessonBookmarks.lessonId })
+          .from(lessonBookmarks)
+          .where(
+            and(
+              eq(lessonBookmarks.userId, user.id),
+              inArray(lessonBookmarks.lessonId, assignedIds),
+            ),
+          );
+        return new Set(rows.map((r) => r.lessonId));
+      },
+
+      // Toggle the bookmark for a lesson the user can actually see. Verifies
+      // the lesson is assigned to this client first (defence-in-depth, mirrors
+      // events.write / completions.upsert). Returns the resulting state.
+      toggle: async (lessonId: string): Promise<{ bookmarked: boolean }> => {
+        const [assignment] = await db
+          .select()
+          .from(clientLessons)
+          .where(
+            and(
+              eq(clientLessons.clientId, cid),
+              eq(clientLessons.lessonId, lessonId),
+            ),
+          );
+        if (!assignment) {
+          throw new Error("Lesson not assigned to user's client");
+        }
+        const [existing] = await db
+          .select({ userId: lessonBookmarks.userId })
+          .from(lessonBookmarks)
+          .where(
+            and(
+              eq(lessonBookmarks.userId, user.id),
+              eq(lessonBookmarks.lessonId, lessonId),
+            ),
+          )
+          .limit(1);
+        if (existing) {
+          await db
+            .delete(lessonBookmarks)
+            .where(
+              and(
+                eq(lessonBookmarks.userId, user.id),
+                eq(lessonBookmarks.lessonId, lessonId),
+              ),
+            );
+          return { bookmarked: false };
+        }
+        await db
+          .insert(lessonBookmarks)
+          .values({ userId: user.id, lessonId })
+          .onConflictDoNothing();
+        return { bookmarked: true };
       },
     },
 

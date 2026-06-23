@@ -109,10 +109,11 @@ export default async function EmployeeDetailPage({
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 sm:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Assigned" value={String(totals.assigned)} />
         <Stat label="Opened" value={String(totals.opened)} />
         <Stat label="Completed" value={String(totals.completed)} />
+        <Stat label="Saved" value={String(totals.bookmarked)} />
         <Stat
           label="Avg rating"
           value={

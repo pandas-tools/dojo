@@ -190,19 +190,65 @@ export const verificationTokens = pgTable(
   }),
 );
 
-export const lessons = pgTable("lessons", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  internalName: text("internal_name").notNull(),
-  type: lessonTypeEnum("type").notNull().default("training"),
-  contentType: lessonContentTypeEnum("content_type")
-    .notNull()
-    .default("video"),
-  sortOrder: integer("sort_order").notNull().default(0),
-  isPublished: boolean("is_published").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+// Editorial sections for the employee /browse experience ("Managing the
+// store", "Customer flows", …). Global, not tenant-scoped — like `lessons`,
+// a group is defined once by Pandas admins. A client simply sees whichever of
+// its assigned+published lessons fall under each group; groups with no
+// visible lessons for that client are dropped from its /browse read. The
+// sections themselves order by `sortOrder` asc. Defined before `lessons`
+// because `lessons.groupId` references it.
+export const lessonGroups = pgTable(
+  "lesson_groups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    sortOrderIdx: index("idx_lesson_groups_sort_order").on(t.sortOrder),
+  }),
+);
+
+export const lessons = pgTable(
+  "lessons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    internalName: text("internal_name").notNull(),
+    type: lessonTypeEnum("type").notNull().default("training"),
+    contentType: lessonContentTypeEnum("content_type")
+      .notNull()
+      .default("video"),
+    // Global display order for the admin /admin/lessons master list. Kept
+    // independent of group ordering (see `groupSortOrder`) so assigning a
+    // lesson to a group never reshuffles the master list and the two reorder
+    // surfaces don't fight over one column.
+    sortOrder: integer("sort_order").notNull().default(0),
+    // Editorial section this lesson belongs to (nullable = ungrouped). FK is
+    // ON DELETE SET NULL so deleting a group orphans its lessons rather than
+    // cascading them away.
+    groupId: uuid("group_id").references(() => lessonGroups.id, {
+      onDelete: "set null",
+    }),
+    // Display order *within* the lesson's group — what employees see on the
+    // /browse rail. Meaningful only when groupId is set; ungrouped lessons fall
+    // back to `sortOrder`. Separate from `sortOrder` so admins can order a
+    // section without disturbing the global list.
+    groupSortOrder: integer("group_sort_order").notNull().default(0),
+    isPublished: boolean("is_published").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    groupIdx: index("idx_lessons_group_id").on(t.groupId, t.groupSortOrder),
+  }),
+);
 
 export const lessonTranslations = pgTable(
   "lesson_translations",
@@ -294,6 +340,31 @@ export const lessonCompletions = pgTable(
   }),
 );
 
+// Per-user lesson bookmarks ("save for later"). One row per (user, lesson);
+// row present = bookmarked. Toggled by the employee from /browse. Not tenant-
+// scoped at the table level — the toggle path verifies the lesson is assigned
+// to the user's client before inserting (see scopedDb.bookmarks). Rows are
+// cleaned up by cascade if the user or the lesson is deleted.
+export const lessonBookmarks = pgTable(
+  "lesson_bookmarks",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lessonId: uuid("lesson_id")
+      .notNull()
+      .references(() => lessons.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.lessonId] }),
+    userIdx: index("idx_lesson_bookmarks_user_id").on(t.userId),
+    lessonIdx: index("idx_lesson_bookmarks_lesson_id").on(t.lessonId),
+  }),
+);
+
 export const lessonEvents = pgTable(
   "lesson_events",
   {
@@ -375,6 +446,10 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Lesson = typeof lessons.$inferSelect;
 export type LessonTranslation = typeof lessonTranslations.$inferSelect;
+export type LessonGroup = typeof lessonGroups.$inferSelect;
+export type NewLessonGroup = typeof lessonGroups.$inferInsert;
+export type LessonBookmark = typeof lessonBookmarks.$inferSelect;
+export type NewLessonBookmark = typeof lessonBookmarks.$inferInsert;
 export type Store = typeof stores.$inferSelect;
 export type LessonCompletion = typeof lessonCompletions.$inferSelect;
 export type LessonEvent = typeof lessonEvents.$inferSelect;

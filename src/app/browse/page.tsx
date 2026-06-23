@@ -1,12 +1,17 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { scopedDb } from "@/lib/db/scoped";
+import { getBrowseData, type BrowseGroup } from "@/lib/browse";
 import { signOutAction } from "../actions";
+import BookmarkButton from "./BookmarkButton";
 
 export const metadata = { title: "Lessons · Dojo" };
 export const dynamic = "force-dynamic";
 
+// NOTE: this is the functional, light-theme consumer of the grouped /browse
+// read shape (groups[] → cards[], each card carrying isBookmarked). The dark,
+// Reels-style rail redesign is built on top of this same `getBrowseData`
+// contract — see src/lib/browse.ts for the shape.
 export default async function BrowsePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -14,60 +19,14 @@ export default async function BrowsePage() {
   if (!session.user.onboardingCompleted) redirect("/onboarding");
   if (!session.user.clientId) redirect("/login");
 
-  const sdb = scopedDb({
-    id: session.user.id,
-    clientId: session.user.clientId,
-    role: "employee",
-  });
-
-  const [lessons, completedIds, client] = await Promise.all([
-    sdb.lessons.list(),
-    sdb.events.completedLessonIds(),
-    sdb.client.get(),
-  ]);
-
-  // Hydrate each lesson with a translation in the user's preferred language.
-  // Single batched fetch — `forLessons` resolves the preferred-or-English
-  // fallback in memory after one query for all assignment rows + one query
-  // for all translations.
-  const translationsByLesson = await sdb.translations.forLessons(
-    lessons.map((l) => l.id),
+  const data = await getBrowseData(
+    {
+      id: session.user.id,
+      clientId: session.user.clientId,
+      role: "employee",
+    },
     session.user.preferredLanguage,
   );
-  const cards = lessons.map((lesson) => {
-    const translation = translationsByLesson.get(lesson.id) ?? null;
-    // Thumbnail source depends on the lesson's content type:
-    //   video    → Mux-generated thumbnail (null until processing finishes)
-    //   image    → the image itself
-    //   carousel → the first slide
-    let thumbnail: string | null = null;
-    let ready = false;
-    if (lesson.contentType === "video") {
-      thumbnail = translation?.thumbnailUrl ?? null;
-      ready = !!translation?.muxPlaybackId;
-    } else if (lesson.contentType === "image") {
-      thumbnail = translation?.imageUrl ?? null;
-      ready = !!translation?.imageUrl;
-    } else if (lesson.contentType === "carousel") {
-      const slides = translation?.carouselSlides ?? null;
-      thumbnail = slides && slides.length > 0 ? slides[0].url : null;
-      ready = !!(slides && slides.length >= 2);
-    }
-    return {
-      id: lesson.id,
-      title: translation?.title ?? lesson.internalName,
-      description: translation?.description ?? null,
-      contentType: lesson.contentType,
-      thumbnail,
-      ready,
-      durationSeconds: translation?.durationSeconds ?? null,
-      completed: completedIds.has(lesson.id),
-      language: translation?.language ?? null,
-    };
-  });
-
-  const ready = cards.filter((c) => c.ready);
-  const processing = cards.filter((c) => !c.ready);
 
   return (
     <main className="min-h-screen bg-zinc-50">
@@ -76,7 +35,7 @@ export default async function BrowsePage() {
           <div>
             <h1 className="text-lg font-semibold">Dojo</h1>
             <p className="text-xs text-zinc-500">
-              {client?.name ?? "Your client"} · {session.user.email}
+              {data.client?.name ?? "Your client"} · {session.user.email}
             </p>
           </div>
           <form action={signOutAction}>
@@ -91,88 +50,116 @@ export default async function BrowsePage() {
       </header>
 
       <section className="mx-auto max-w-6xl px-6 py-10">
-        <h2 className="text-xl font-semibold mb-2">Training lessons</h2>
-        <p className="text-sm text-zinc-600 mb-8">
-          {ready.length === 0
-            ? "No lessons available yet. Check back soon."
-            : `${ready.length} lesson${ready.length === 1 ? "" : "s"} ready · ${completedIds.size} completed`}
-        </p>
-
-        {ready.length > 0 && (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {ready.map((card) => (
-              <Link
-                key={card.id}
-                href={`/watch/${card.id}`}
-                className="group block overflow-hidden rounded-md border border-zinc-200 bg-white hover:shadow-md transition-shadow"
-              >
-                <div className="aspect-video bg-zinc-100 relative">
-                  {card.thumbnail ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={card.thumbnail}
-                      alt={card.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-zinc-400 text-sm">
-                      Processing…
-                    </div>
-                  )}
-                  {card.completed && (
-                    <div className="absolute top-2 right-2 rounded-full bg-emerald-600 text-white text-xs px-2 py-1">
-                      ✓ Done
-                    </div>
-                  )}
-                </div>
-                <div className="p-4">
-                  <h3 className="font-medium text-zinc-900 group-hover:text-zinc-700">
-                    {card.title}
-                  </h3>
-                  {card.description && (
-                    <p className="mt-1 text-sm text-zinc-600 line-clamp-2">
-                      {card.description}
-                    </p>
-                  )}
-                  <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
-                    {card.durationSeconds && (
-                      <span>
-                        {card.durationSeconds < 60
-                          ? `${card.durationSeconds}s`
-                          : `${Math.ceil(card.durationSeconds / 60)} min`}
-                      </span>
-                    )}
-                    {card.language &&
-                      card.language !== session.user.preferredLanguage && (
-                        <span className="rounded bg-zinc-100 px-1.5 py-0.5 uppercase">
-                          {card.language}
-                        </span>
-                      )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-
-        {processing.length > 0 && (
-          <div className="mt-10">
-            <h3 className="text-sm font-medium text-zinc-700 mb-3">
-              Coming soon ({processing.length})
-            </h3>
-            <ul className="space-y-2">
-              {processing.map((c) => (
-                <li
-                  key={c.id}
-                  className="rounded-md border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-500"
-                >
-                  {c.title} — video still processing
-                </li>
+        {data.totals.lessons === 0 ? (
+          <>
+            <h2 className="text-xl font-semibold mb-2">Training lessons</h2>
+            <p className="text-sm text-zinc-600">
+              No lessons available yet. Check back soon.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-zinc-600 mb-8">
+              {data.totals.ready} ready · {data.totals.completed} completed ·{" "}
+              {data.totals.bookmarked} saved
+            </p>
+            <div className="space-y-10">
+              {data.groups.map((group) => (
+                <GroupRail
+                  key={group.id ?? "__ungrouped"}
+                  group={group}
+                  preferredLanguage={session.user.preferredLanguage}
+                />
               ))}
-            </ul>
-          </div>
+            </div>
+          </>
         )}
       </section>
     </main>
+  );
+}
+
+function GroupRail({
+  group,
+  preferredLanguage,
+}: {
+  group: BrowseGroup;
+  preferredLanguage: string;
+}) {
+  return (
+    <div>
+      <h2 className="text-base font-semibold text-zinc-900 mb-3">
+        {group.name}
+      </h2>
+      <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+        {group.cards.map((card) => {
+          const inner = (
+            <>
+              <div className="aspect-[4/5] bg-zinc-100 relative">
+                {card.ready && card.thumbnail ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={card.thumbnail}
+                    alt={card.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-400 text-xs">
+                    {card.ready ? "No preview" : "Processing…"}
+                  </div>
+                )}
+                <div className="absolute top-2 right-2">
+                  <BookmarkButton
+                    lessonId={card.id}
+                    initialBookmarked={card.isBookmarked}
+                  />
+                </div>
+                {card.completed && (
+                  <div className="absolute top-2 left-2 rounded-full bg-emerald-600 text-white text-xs px-2 py-1">
+                    ✓ Done
+                  </div>
+                )}
+              </div>
+              <div className="p-3">
+                <h3 className="text-sm font-medium text-zinc-900 line-clamp-2">
+                  {card.title}
+                </h3>
+                <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500">
+                  {card.durationSeconds && (
+                    <span>
+                      {card.durationSeconds < 60
+                        ? `${card.durationSeconds}s`
+                        : `${Math.ceil(card.durationSeconds / 60)} min`}
+                    </span>
+                  )}
+                  {card.language && card.language !== preferredLanguage && (
+                    <span className="rounded bg-zinc-100 px-1.5 py-0.5 uppercase">
+                      {card.language}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </>
+          );
+
+          const cardClass =
+            "group block w-44 shrink-0 overflow-hidden rounded-md border border-zinc-200 bg-white";
+
+          return card.ready ? (
+            <Link
+              key={card.id}
+              href={`/watch/${card.id}`}
+              className={`${cardClass} hover:shadow-md transition-shadow`}
+            >
+              {inner}
+            </Link>
+          ) : (
+            <div key={card.id} className={`${cardClass} opacity-70`}>
+              {inner}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

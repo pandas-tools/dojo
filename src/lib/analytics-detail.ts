@@ -13,6 +13,7 @@ import {
   lessonTranslations,
   lessonCompletions,
   lessonEvents,
+  lessonBookmarks,
 } from "./db/schema";
 
 export type FunnelStage = {
@@ -441,6 +442,7 @@ export type EmployeeDetail = {
     assigned: number;
     avgRating: number | null;
     totalEngagedMs: number;
+    bookmarked: number;
   };
 };
 
@@ -504,22 +506,35 @@ export async function getEmployeeDetail(
     return {
       user: profile,
       lessons: [],
-      totals: { opened: 0, completed: 0, assigned: 0, avgRating: null, totalEngagedMs: 0 },
+      totals: {
+        opened: 0,
+        completed: 0,
+        assigned: 0,
+        avgRating: null,
+        totalEngagedMs: 0,
+        bookmarked: 0,
+      },
     };
   }
 
-  // Pull assigned lessons + this user's activity + ratings in parallel.
-  const [assignmentRows, eventRows, completionRows] = await Promise.all([
-    db
-      .select()
-      .from(clientLessons)
-      .where(eq(clientLessons.clientId, user.clientId)),
-    db.select().from(lessonEvents).where(eq(lessonEvents.userId, userId)),
-    db
-      .select()
-      .from(lessonCompletions)
-      .where(eq(lessonCompletions.userId, userId)),
-  ]);
+  // Pull assigned lessons + this user's activity + ratings + bookmarks in
+  // parallel.
+  const [assignmentRows, eventRows, completionRows, bookmarkRows] =
+    await Promise.all([
+      db
+        .select()
+        .from(clientLessons)
+        .where(eq(clientLessons.clientId, user.clientId)),
+      db.select().from(lessonEvents).where(eq(lessonEvents.userId, userId)),
+      db
+        .select()
+        .from(lessonCompletions)
+        .where(eq(lessonCompletions.userId, userId)),
+      db
+        .select({ lessonId: lessonBookmarks.lessonId })
+        .from(lessonBookmarks)
+        .where(eq(lessonBookmarks.userId, userId)),
+    ]);
 
   const assignedIds = assignmentRows.map((a) => a.lessonId);
   if (assignedIds.length === 0) {
@@ -532,9 +547,16 @@ export async function getEmployeeDetail(
         assigned: 0,
         avgRating: null,
         totalEngagedMs: 0,
+        bookmarked: 0,
       },
     };
   }
+
+  // Bookmarks on lessons still assigned to this user's client.
+  const assignedSet = new Set(assignedIds);
+  const bookmarkedCount = bookmarkRows.filter((b) =>
+    assignedSet.has(b.lessonId),
+  ).length;
 
   const [lessonRows, translationRows] = await Promise.all([
     db
@@ -628,6 +650,7 @@ export async function getEmployeeDetail(
       assigned: lessonsOut.length,
       avgRating,
       totalEngagedMs,
+      bookmarked: bookmarkedCount,
     },
   };
 }
