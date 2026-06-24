@@ -7,8 +7,16 @@ import {
   type BrowseCard,
   type BrowseGroup,
 } from "@/lib/browse";
+import type { Tier } from "@/lib/tier";
 import { signOutAction } from "../actions";
 import BookmarkButton from "./BookmarkButton";
+import TierHeroCard from "./TierHeroCard";
+
+const MOCKED_TIER_COUNTS: Record<Tier, number> = {
+  apprentice: 14,
+  specialist: 7,
+  expert: 3,
+};
 
 export const metadata = { title: "Lessons · Dojo" };
 export const dynamic = "force-dynamic";
@@ -29,9 +37,19 @@ export default async function BrowsePage() {
     session.user.preferredLanguage,
   );
 
+  const groupProgress = data.groups
+    .filter((g) => g.cards.length > 0)
+    .map((g) => ({
+      name: g.name,
+      completed: g.cards.filter((c) => c.completed).length,
+      total: g.cards.length,
+    }));
+
+  const userInitial = (session.user.email ?? "?").charAt(0).toUpperCase();
+
   return (
     <main className="min-h-dvh bg-black text-white selection:bg-white/20">
-      <header className="relative px-5 pt-10 pb-10 text-center sm:pt-14 sm:pb-14">
+      <div className="relative px-5 pt-8 sm:px-8 sm:pt-10">
         <form action={signOutAction} className="absolute right-4 top-4 sm:right-6 sm:top-6">
           <button
             type="submit"
@@ -40,12 +58,24 @@ export default async function BrowsePage() {
             Sign out
           </button>
         </form>
+
+        {data.totals.lessons > 0 && (
+          <div className="mx-auto max-w-2xl">
+            <TierHeroCard
+              completed={data.totals.completed}
+              total={data.totals.lessons}
+              userInitial={userInitial}
+              groupProgress={groupProgress}
+              mockedCounts={MOCKED_TIER_COUNTS}
+            />
+          </div>
+        )}
+      </div>
+
+      <header className="px-5 pt-8 pb-8 text-center sm:pt-10 sm:pb-10">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
           Lesson library
         </h1>
-        <p className="mt-3 text-sm text-white/55 sm:text-base">
-          {headerSubtitle(data.totals)}
-        </p>
       </header>
 
       {data.totals.lessons === 0 ? (
@@ -59,19 +89,6 @@ export default async function BrowsePage() {
       )}
     </main>
   );
-}
-
-function headerSubtitle(totals: {
-  lessons: number;
-  ready: number;
-  completed: number;
-  bookmarked: number;
-}): string {
-  const parts: string[] = [];
-  parts.push(`${totals.lessons} ${totals.lessons === 1 ? "lesson" : "lessons"}`);
-  if (totals.completed > 0) parts.push(`${totals.completed} completed`);
-  if (totals.bookmarked > 0) parts.push(`${totals.bookmarked} saved`);
-  return parts.join(" · ");
 }
 
 function GroupRail({ group }: { group: BrowseGroup }) {
