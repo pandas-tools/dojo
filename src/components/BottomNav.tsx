@@ -1,0 +1,109 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Bookmark, Home, Play } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/cn";
+
+type Item = {
+  href: string;
+  /** Active when the current pathname starts with this prefix. */
+  matchPrefix: string;
+  label: string;
+  icon: LucideIcon;
+};
+
+const ITEMS: Item[] = [
+  { href: "/browse", matchPrefix: "/browse", label: "Library", icon: Home },
+  { href: "/watch", matchPrefix: "/watch", label: "Reels", icon: Play },
+  { href: "/saved", matchPrefix: "/saved", label: "Saved", icon: Bookmark },
+];
+
+export default function BottomNav({
+  userInitial,
+  overlay = false,
+}: {
+  userInitial: string;
+  /** When true, render with a heavier backdrop so the bar reads against video. */
+  overlay?: boolean;
+}) {
+  const pathname = usePathname();
+
+  return (
+    <nav
+      aria-label="Primary"
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-40 pointer-events-none",
+        "pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2",
+      )}
+    >
+      <div className="mx-auto flex max-w-sm justify-center px-4">
+        <div
+          className={cn(
+            "pointer-events-auto inline-flex items-center gap-1 rounded-full",
+            "px-2 py-2",
+            overlay
+              ? "bg-zinc-900/80 backdrop-blur-md ring-1 ring-white/10"
+              : "bg-zinc-900/95 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]",
+          )}
+        >
+          {ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active = pathname.startsWith(item.matchPrefix);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex h-11 w-11 items-center justify-center rounded-full",
+                  "transition-colors",
+                  active
+                    ? "bg-white/10 text-white"
+                    : "text-white/70 hover:text-white",
+                )}
+              >
+                <Icon
+                  className="h-5 w-5"
+                  strokeWidth={active ? 2.25 : 1.85}
+                  fill={active && item.label === "Saved" ? "currentColor" : "none"}
+                />
+              </Link>
+            );
+          })}
+
+          <ProfileSlot
+            active={pathname.startsWith("/profile")}
+            initial={userInitial}
+          />
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+function ProfileSlot({
+  active,
+  initial,
+}: {
+  active: boolean;
+  initial: string;
+}) {
+  return (
+    <Link
+      href="/profile"
+      aria-label="Profile"
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "relative flex h-11 w-11 items-center justify-center rounded-full",
+        active ? "ring-2 ring-white" : "ring-1 ring-white/20",
+        "bg-white text-black text-sm font-semibold",
+        "transition-shadow",
+      )}
+    >
+      <span>{initial}</span>
+    </Link>
+  );
+}

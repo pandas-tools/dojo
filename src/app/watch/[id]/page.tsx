@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
 import type { CarouselSlide } from "@/lib/db/schema";
+import BottomNav from "@/components/BottomNav";
 import ReelsFeed, { type FeedItem } from "./ReelsFeed";
 
 export const dynamic = "force-dynamic";
@@ -76,14 +77,18 @@ export default async function WatchPage({
   if (items.length === 0) return <NotReadyBanner />;
 
   const initialId = items.some((i) => i.id === id) ? id : items[0]!.id;
+  const userInitial = (session.user.email ?? "?").charAt(0).toUpperCase();
 
   return (
-    <ReelsFeed
-      items={items}
-      initialId={initialId}
-      backHref="/browse"
-      urlPrefix="/watch/"
-    />
+    <>
+      <ReelsFeed
+        items={items}
+        initialId={initialId}
+        backHref="/browse"
+        urlPrefix="/watch/"
+      />
+      <BottomNav userInitial={userInitial} overlay />
+    </>
   );
 }
 

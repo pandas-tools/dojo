@@ -1,81 +1,81 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Play } from "lucide-react";
+import { Bookmark, Play } from "lucide-react";
 import { auth } from "@/lib/auth";
-import {
-  getBrowseData,
-  type BrowseCard,
-  type BrowseGroup,
-} from "@/lib/browse";
-import type { Tier } from "@/lib/tier";
-import BookmarkButton from "./BookmarkButton";
-import TierHeroCard from "./TierHeroCard";
+import { scopedDb } from "@/lib/db/scoped";
+import { shapeBrowseData, type BrowseCard } from "@/lib/browse-shape";
+import BookmarkButton from "../browse/BookmarkButton";
 import BottomNav from "@/components/BottomNav";
 
-const MOCKED_TIER_COUNTS: Record<Tier, number> = {
-  apprentice: 14,
-  specialist: 7,
-  expert: 3,
-};
-
-export const metadata = { title: "Lessons · Dojo" };
+export const metadata = { title: "Saved · Dojo" };
 export const dynamic = "force-dynamic";
 
-export default async function BrowsePage() {
+export default async function SavedPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
   if (session.user.role === "admin") redirect("/admin");
   if (!session.user.onboardingCompleted) redirect("/onboarding");
   if (!session.user.clientId) redirect("/login");
 
-  const data = await getBrowseData(
-    {
-      id: session.user.id,
-      clientId: session.user.clientId,
-      role: "employee",
-    },
+  const sdb = scopedDb({
+    id: session.user.id,
+    clientId: session.user.clientId,
+    role: "employee",
+  });
+
+  const [lessons, groupRows, completedIds, bookmarkedIds] = await Promise.all([
+    sdb.lessons.list(),
+    sdb.groups.list(),
+    sdb.events.completedLessonIds(),
+    sdb.bookmarks.forUser(),
+  ]);
+
+  const translations = await sdb.translations.forLessons(
+    lessons.map((l) => l.id),
     session.user.preferredLanguage,
   );
 
-  const groupProgress = data.groups
-    .filter((g) => g.cards.length > 0)
-    .map((g) => ({
+  // Reuse the same shaping the /browse page consumes so the cards are
+  // identical in shape; then flatten and filter to bookmarked.
+  const groups = shapeBrowseData({
+    lessons,
+    groups: groupRows.map((g) => ({
+      id: g.id,
       name: g.name,
-      completed: g.cards.filter((c) => c.completed).length,
-      total: g.cards.length,
-    }));
+      sortOrder: g.sortOrder,
+    })),
+    translationsByLesson: translations,
+    completedIds,
+    bookmarkedIds,
+  });
+  const savedCards = groups
+    .flatMap((g) => g.cards)
+    .filter((c) => c.isBookmarked);
 
   const userInitial = (session.user.email ?? "?").charAt(0).toUpperCase();
 
   return (
     <main className="min-h-dvh bg-black text-white selection:bg-white/20">
-      <div className="px-5 pt-8 sm:px-8 sm:pt-10">
-        {data.totals.lessons > 0 && (
-          <div className="mx-auto max-w-2xl">
-            <TierHeroCard
-              completed={data.totals.completed}
-              total={data.totals.lessons}
-              userInitial={userInitial}
-              groupProgress={groupProgress}
-              mockedCounts={MOCKED_TIER_COUNTS}
-            />
-          </div>
-        )}
-      </div>
-
-      <header className="px-5 pt-8 pb-8 text-center sm:pt-10 sm:pb-10">
+      <header className="px-5 pt-10 pb-6 text-center sm:pt-14">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          Lesson library
+          Saved
         </h1>
+        <p className="mt-2 text-sm text-white/55">
+          {savedCards.length === 0
+            ? "Nothing saved yet"
+            : `${savedCards.length} ${savedCards.length === 1 ? "lesson" : "lessons"}`}
+        </p>
       </header>
 
-      {data.totals.lessons === 0 ? (
+      {savedCards.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="pb-36 space-y-10 sm:space-y-14">
-          {data.groups.map((group) => (
-            <GroupRail key={group.id ?? "__ungrouped"} group={group} />
-          ))}
+        <div className="px-5 pb-36 sm:px-8">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {savedCards.map((card) => (
+              <SavedCard key={card.id} card={card} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -84,34 +84,7 @@ export default async function BrowsePage() {
   );
 }
 
-function GroupRail({ group }: { group: BrowseGroup }) {
-  return (
-    <section>
-      <h2 className="px-5 mb-4 text-base font-semibold text-white sm:text-lg sm:mb-5 sm:px-8">
-        {group.name}
-      </h2>
-      <div
-        className="
-          flex gap-3 overflow-x-auto pb-2
-          px-5 sm:px-8 sm:gap-4
-          snap-x snap-mandatory
-          scroll-pl-5 sm:scroll-pl-8
-          [scrollbar-width:none] [-ms-overflow-style:none]
-          [&::-webkit-scrollbar]:hidden
-        "
-      >
-        {group.cards.map((card) => (
-          <LessonCard key={card.id} card={card} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function LessonCard({ card }: { card: BrowseCard }) {
-  const cardShell =
-    "snap-start shrink-0 block w-[38vw] max-w-[200px] sm:w-44 md:w-48 lg:w-52";
-
+function SavedCard({ card }: { card: BrowseCard }) {
   const inner = (
     <>
       <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-zinc-900">
@@ -147,10 +120,7 @@ function LessonCard({ card }: { card: BrowseCard }) {
         )}
 
         <div className="absolute bottom-1.5 right-1.5">
-          <BookmarkButton
-            lessonId={card.id}
-            initialBookmarked={card.isBookmarked}
-          />
+          <BookmarkButton lessonId={card.id} initialBookmarked={card.isBookmarked} />
         </div>
       </div>
 
@@ -161,19 +131,22 @@ function LessonCard({ card }: { card: BrowseCard }) {
   );
 
   return card.ready ? (
-    <Link href={`/watch/${card.id}`} className={`${cardShell} group`}>
+    <Link href={`/watch/${card.id}`} className="group block">
       {inner}
     </Link>
   ) : (
-    <div className={`${cardShell} opacity-60`}>{inner}</div>
+    <div className="opacity-60">{inner}</div>
   );
 }
 
 function EmptyState() {
   return (
     <div className="mx-auto max-w-md px-6 py-20 text-center">
-      <p className="text-sm text-white/60">
-        No lessons available yet. Check back soon.
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white/5">
+        <Bookmark className="h-5 w-5 text-white/40" />
+      </div>
+      <p className="mt-4 text-sm text-white/55">
+        Tap the bookmark on any lesson to save it here for later.
       </p>
     </div>
   );
