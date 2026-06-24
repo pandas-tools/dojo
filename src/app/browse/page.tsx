@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Play, Image as ImageIcon, Images, type LucideIcon } from "lucide-react";
+import { Play } from "lucide-react";
 import { auth } from "@/lib/auth";
 import {
   getBrowseData,
@@ -98,24 +98,9 @@ function GroupRail({ group }: { group: BrowseGroup }) {
   );
 }
 
-const CONTENT_TYPE_ICON: Record<BrowseCard["contentType"], LucideIcon> = {
-  video: Play,
-  image: ImageIcon,
-  carousel: Images,
-};
-
-const CONTENT_TYPE_LABEL: Record<BrowseCard["contentType"], string> = {
-  video: "Video",
-  image: "Image",
-  carousel: "Carousel",
-};
-
 function LessonCard({ card }: { card: BrowseCard }) {
-  const Icon = CONTENT_TYPE_ICON[card.contentType];
-  const duration = formatDuration(card.durationSeconds);
-
   const cardShell =
-    "snap-start shrink-0 block w-[68vw] max-w-[300px] sm:w-44 md:w-48 lg:w-52";
+    "snap-start shrink-0 block w-[34vw] max-w-[180px] sm:w-40 md:w-44 lg:w-48";
 
   const inner = (
     <>
@@ -137,6 +122,14 @@ function LessonCard({ card }: { card: BrowseCard }) {
 
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
 
+        {card.contentType === "video" && card.ready && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 backdrop-blur-md ring-1 ring-white/20 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]">
+              <Play className="h-5 w-5 fill-white text-white translate-x-[1px]" />
+            </div>
+          </div>
+        )}
+
         {card.completed && (
           <div className="absolute left-3 top-3 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-black">
             Done
@@ -151,18 +144,9 @@ function LessonCard({ card }: { card: BrowseCard }) {
         </div>
       </div>
 
-      <div className="pt-3">
-        <h3 className="text-sm font-medium text-white line-clamp-2 leading-snug">
-          {card.title}
-        </h3>
-        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-white/50">
-          <Icon
-            className="h-3.5 w-3.5 shrink-0"
-            aria-label={CONTENT_TYPE_LABEL[card.contentType]}
-          />
-          {duration && <span>{duration}</span>}
-        </div>
-      </div>
+      <h3 className="pt-3 text-sm font-medium text-white line-clamp-2 leading-snug">
+        {card.title}
+      </h3>
     </>
   );
 
@@ -173,13 +157,6 @@ function LessonCard({ card }: { card: BrowseCard }) {
   ) : (
     <div className={`${cardShell} opacity-60`}>{inner}</div>
   );
-}
-
-function formatDuration(seconds: number | null): string | null {
-  if (!seconds) return null;
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.round(seconds / 60);
-  return `${minutes} min`;
 }
 
 function EmptyState() {
