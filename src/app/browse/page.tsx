@@ -46,6 +46,13 @@ export default async function BrowsePage() {
     }));
 
   const userInitial = (session.user.email ?? "?").charAt(0).toUpperCase();
+  const allCards = data.groups.flatMap((g) => g.cards);
+  const reelsTarget =
+    allCards.find((c) => !c.completed && c.ready) ??
+    allCards.find((c) => c.ready) ??
+    allCards[0] ??
+    null;
+  const reelsHref = reelsTarget ? `/watch/${reelsTarget.id}` : undefined;
 
   return (
     <main className="min-h-dvh bg-black text-white selection:bg-white/20">
@@ -79,7 +86,7 @@ export default async function BrowsePage() {
         </div>
       )}
 
-      <BottomNav userInitial={userInitial} />
+      <BottomNav userInitial={userInitial} reelsHref={reelsHref} />
     </main>
   );
 }

@@ -53,6 +53,13 @@ export default async function SavedPage() {
     .filter((c) => c.isBookmarked);
 
   const userInitial = (session.user.email ?? "?").charAt(0).toUpperCase();
+  const allCards = groups.flatMap((g) => g.cards);
+  const reelsTarget =
+    allCards.find((c) => !c.completed && c.ready) ??
+    allCards.find((c) => c.ready) ??
+    allCards[0] ??
+    null;
+  const reelsHref = reelsTarget ? `/watch/${reelsTarget.id}` : undefined;
 
   return (
     <main className="min-h-dvh bg-black text-white selection:bg-white/20">
@@ -79,7 +86,7 @@ export default async function SavedPage() {
         </div>
       )}
 
-      <BottomNav userInitial={userInitial} />
+      <BottomNav userInitial={userInitial} reelsHref={reelsHref} />
     </main>
   );
 }

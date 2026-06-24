@@ -14,21 +14,30 @@ type Item = {
   icon: LucideIcon;
 };
 
-const ITEMS: Item[] = [
+const STATIC_ITEMS: Item[] = [
   { href: "/browse", matchPrefix: "/browse", label: "Library", icon: Home },
+  // Reels href is injected per-page so the link goes straight to /watch/[id]
+  // and skips the /watch redirect — that's what was causing the white flash
+  // (double-navigation revealed body bg between transitions).
   { href: "/watch", matchPrefix: "/watch", label: "Reels", icon: Play },
   { href: "/saved", matchPrefix: "/saved", label: "Saved", icon: Bookmark },
 ];
 
 export default function BottomNav({
   userInitial,
+  reelsHref,
   overlay = false,
 }: {
   userInitial: string;
+  /** Direct /watch/[id] link to skip the redirect hop; falls back to /watch. */
+  reelsHref?: string;
   /** When true, render with a heavier backdrop so the bar reads against video. */
   overlay?: boolean;
 }) {
   const pathname = usePathname();
+  const items = STATIC_ITEMS.map((item) =>
+    item.label === "Reels" && reelsHref ? { ...item, href: reelsHref } : item,
+  );
 
   return (
     <nav
@@ -48,7 +57,7 @@ export default function BottomNav({
               : "bg-zinc-900/95 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]",
           )}
         >
-          {ITEMS.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             const active = pathname.startsWith(item.matchPrefix);
             return (

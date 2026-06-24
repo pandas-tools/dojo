@@ -34,10 +34,16 @@ export default async function ProfilePage() {
     role: "employee",
   });
 
-  const [langs, storeRows] = await Promise.all([
+  const [langs, storeRows, lessons, completedIds] = await Promise.all([
     sdb.languages.list(),
     sdb.stores.list(),
+    sdb.lessons.list(),
+    sdb.events.completedLessonIds(),
   ]);
+
+  const firstIncomplete =
+    lessons.find((l) => !completedIds.has(l.id)) ?? lessons[0];
+  const reelsHref = firstIncomplete ? `/watch/${firstIncomplete.id}` : undefined;
 
   const languages = langs.map((l) => ({
     language: l.language,
@@ -74,7 +80,7 @@ export default async function ProfilePage() {
         />
       </div>
 
-      <BottomNav userInitial={userInitial} />
+      <BottomNav userInitial={userInitial} reelsHref={reelsHref} />
     </main>
   );
 }
