@@ -41,8 +41,8 @@ export default function BottomNav({
       <div className="mx-auto flex max-w-sm justify-center px-4">
         <div
           className={cn(
-            "pointer-events-auto inline-flex items-center gap-1 rounded-full",
-            "px-2 py-2",
+            "pointer-events-auto inline-flex items-center gap-2.5 rounded-full",
+            "px-2.5 py-2",
             overlay
               ? "bg-zinc-900/80 backdrop-blur-md ring-1 ring-white/10"
               : "bg-zinc-900/95 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]",
@@ -58,7 +58,7 @@ export default function BottomNav({
                 aria-label={item.label}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-full",
+                  "flex h-11 w-16 items-center justify-center rounded-full",
                   "transition-colors",
                   active
                     ? "bg-white/10 text-white"
