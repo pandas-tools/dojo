@@ -56,20 +56,22 @@ export default function TierHeroCard({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        // Layered bg: arctic-haze radial bleed from the left edge over a
+        // quiet white wash. Inline-style instead of an absolute child span
+        // so the button structure stays flat — earlier attempt with an
+        // absolute glow + overflow-hidden killed taps on iOS.
+        style={{
+          backgroundImage:
+            "radial-gradient(70% 140% at 0% 50%, rgba(193,232,251,0.14), transparent 55%), linear-gradient(rgba(255,255,255,0.04), rgba(255,255,255,0.04))",
+        }}
         className={cn(
-          "group relative block w-full overflow-hidden text-left",
-          "rounded-2xl bg-white/[0.04] ring-1 ring-white/8",
-          "px-4 py-3.5 sm:px-5 sm:py-4",
-          "transition-[background,box-shadow] duration-200 hover:bg-white/[0.07] hover:ring-arctic-haze/25",
+          "group block w-full text-left",
+          "rounded-2xl ring-1 ring-white/8",
+          "px-4 py-3 sm:px-5 sm:py-3.5",
+          "transition-shadow duration-200 hover:ring-arctic-haze/25",
         )}
       >
-        {/* Inner glow — arctic-haze bleeds in from the left edge, gives the
-            row a premium luminosity without competing with content. */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-[radial-gradient(80%_120%_at_0%_50%,rgba(193,232,251,0.16),transparent_65%)]"
-        />
-        <div className="relative flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <p className="min-w-0 flex-1 text-sm text-white/90">
             You are <span className="text-base">{currentTier.emoji}</span>{" "}
             <span className="font-medium text-white">{currentTier.name}</span>
