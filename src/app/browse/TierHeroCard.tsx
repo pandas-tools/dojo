@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Check, ChevronRight, X } from "lucide-react";
 import {
   Dialog,
@@ -9,34 +9,47 @@ import {
 } from "@/components/ui/dialog";
 import {
   classifyTier,
-  TIER_META,
-  TIER_ORDER,
-  type Tier,
-  type TierState,
-} from "@/lib/tier";
+  type BrowseTierData,
+  type TierConfig,
+} from "@/lib/tiers";
 import { cn } from "@/lib/cn";
 
 type GroupProgress = { name: string; completed: number; total: number };
 
 type Props = {
-  completed: number;
-  total: number;
+  tierData: BrowseTierData;
   userInitial: string;
   groupProgress: GroupProgress[];
-  /** Mocked until Dex ships the store rollup query — colleague count per tier. */
-  mockedCounts: Record<Tier, number>;
 };
 
 export default function TierHeroCard({
-  completed,
-  total,
+  tierData,
   userInitial,
   groupProgress,
-  mockedCounts,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const state = classifyTier(completed, total);
-  const meta = TIER_META[state.tier];
+
+  // Progression order (low → high) drives "above/below me" math; admin display
+  // order would let a re-sort silently move people between tiers.
+  const ladder = useMemo(
+    () => [...tierData.tiers].sort((a, b) => a.minPct - b.minPct),
+    [tierData.tiers],
+  );
+
+  const standing = useMemo(
+    () =>
+      classifyTier(
+        tierData.me.completed,
+        tierData.me.total,
+        tierData.tiers,
+      ),
+    [tierData.tiers, tierData.me.completed, tierData.me.total],
+  );
+
+  const currentTier = ladder.find((t) => t.id === standing.tierId) ?? ladder[0];
+  const nextTier = standing.nextTierId
+    ? ladder.find((t) => t.id === standing.nextTierId) ?? null
+    : null;
 
   return (
     <>
@@ -52,14 +65,14 @@ export default function TierHeroCard({
       >
         <div className="flex items-center justify-between gap-3">
           <p className="min-w-0 flex-1 text-sm text-white/90">
-            You are <span className="text-base">{meta.emoji}</span>{" "}
-            <span className="font-semibold text-white">{meta.name}</span>
-            {state.nextTier ? (
+            You are <span className="text-base">{currentTier.emoji}</span>{" "}
+            <span className="font-semibold text-white">{currentTier.name}</span>
+            {nextTier ? (
               <span className="text-white/55">
                 {" · "}
-                {state.lessonsToNextTier}{" "}
-                {state.lessonsToNextTier === 1 ? "lesson" : "lessons"} to{" "}
-                {TIER_META[state.nextTier].name}
+                {standing.lessonsToNextTier}{" "}
+                {standing.lessonsToNextTier === 1 ? "lesson" : "lessons"} to{" "}
+                {nextTier.name}
               </span>
             ) : null}
           </p>
@@ -70,56 +83,80 @@ export default function TierHeroCard({
       <TierModal
         open={open}
         onOpenChange={setOpen}
-        state={state}
+        ladder={ladder}
+        currentTierId={standing.tierId}
+        nextTierName={nextTier?.name ?? null}
+        lessonsToNextTier={standing.lessonsToNextTier}
+        completed={standing.completed}
+        total={standing.total}
+        counts={tierData.counts}
         userInitial={userInitial}
         groupProgress={groupProgress}
-        mockedCounts={mockedCounts}
       />
     </>
   );
 }
 
-const TIER_STYLES: Record<
-  Tier,
-  { ring: string; bg: string; accent: string; text: string }
-> = {
-  apprentice: {
-    ring: "ring-amber-400/30",
-    bg: "bg-amber-950/30",
-    accent: "text-amber-200",
-    text: "text-amber-50",
-  },
-  specialist: {
+// Color treatment is POSITIONAL — first tier = warm/amber, top tier = emerald
+// (Pandas brand), everything in between = sky. Works for N=3 today and any
+// N≥2 if admin adds tiers later.
+function tierStyle(index: number, total: number): {
+  ring: string;
+  bg: string;
+  accent: string;
+  text: string;
+} {
+  if (total <= 1 || index === total - 1) {
+    return {
+      ring: "ring-emerald-400/30",
+      bg: "bg-emerald-950/30",
+      accent: "text-emerald-200",
+      text: "text-emerald-50",
+    };
+  }
+  if (index === 0) {
+    return {
+      ring: "ring-amber-400/30",
+      bg: "bg-amber-950/30",
+      accent: "text-amber-200",
+      text: "text-amber-50",
+    };
+  }
+  return {
     ring: "ring-sky-400/30",
     bg: "bg-sky-950/30",
     accent: "text-sky-200",
     text: "text-sky-50",
-  },
-  expert: {
-    ring: "ring-emerald-400/30",
-    bg: "bg-emerald-950/30",
-    accent: "text-emerald-200",
-    text: "text-emerald-50",
-  },
-};
+  };
+}
 
 function TierModal({
   open,
   onOpenChange,
-  state,
+  ladder,
+  currentTierId,
+  nextTierName,
+  lessonsToNextTier,
+  completed,
+  total,
+  counts,
   userInitial,
   groupProgress,
-  mockedCounts,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  state: TierState;
+  ladder: TierConfig[];
+  currentTierId: string;
+  nextTierName: string | null;
+  lessonsToNextTier: number;
+  completed: number;
+  total: number;
+  counts: Record<string, number>;
   userInitial: string;
   groupProgress: GroupProgress[];
-  mockedCounts: Record<Tier, number>;
 }) {
-  const currentTierIndex = TIER_ORDER.indexOf(state.tier);
-  const stackOrder: Tier[] = [...TIER_ORDER].reverse();
+  const currentIndex = ladder.findIndex((t) => t.id === currentTierId);
+  const stackOrder = [...ladder].reverse();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -144,17 +181,16 @@ function TierModal({
 
         <div className="mt-1 flex flex-col gap-2.5">
           {stackOrder.map((tier) => {
-            const meta = TIER_META[tier];
-            const tIndex = TIER_ORDER.indexOf(tier);
-            const isYou = tier === state.tier;
-            const isAboveYou = tIndex > currentTierIndex;
-            const isBelowYou = tIndex < currentTierIndex;
-            const styles = TIER_STYLES[tier];
-            const count = mockedCounts[tier] ?? 0;
+            const ladderIndex = ladder.findIndex((t) => t.id === tier.id);
+            const isYou = tier.id === currentTierId;
+            const isAboveYou = ladderIndex > currentIndex;
+            const isBelowYou = ladderIndex < currentIndex;
+            const styles = tierStyle(ladderIndex, ladder.length);
+            const count = counts[tier.id] ?? 0;
 
             return (
               <div
-                key={tier}
+                key={tier.id}
                 className={cn(
                   "relative rounded-2xl px-4 py-4 ring-1",
                   styles.bg,
@@ -163,12 +199,12 @@ function TierModal({
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/30 text-xl">
-                    {meta.emoji}
+                    {tier.emoji}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className={cn("text-base font-semibold", styles.text)}>
-                        {meta.name}
+                        {tier.name}
                       </span>
                       {isYou && (
                         <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/90">
@@ -176,17 +212,16 @@ function TierModal({
                         </span>
                       )}
                     </div>
-                    {isYou && state.nextTier && (
+                    {isYou && nextTierName && (
                       <p className="mt-0.5 text-xs text-white/60">
-                        {state.lessonsToNextTier}{" "}
-                        {state.lessonsToNextTier === 1 ? "lesson" : "lessons"} to{" "}
-                        {TIER_META[state.nextTier].name}
+                        {lessonsToNextTier}{" "}
+                        {lessonsToNextTier === 1 ? "lesson" : "lessons"} to{" "}
+                        {nextTierName}
                       </p>
                     )}
-                    {isYou && !state.nextTier && (
+                    {isYou && !nextTierName && (
                       <p className="mt-0.5 text-xs text-white/60">
-                        Top tier reached — {state.completed} of {state.total}{" "}
-                        complete
+                        Top tier reached — {completed} of {total} complete
                       </p>
                     )}
                   </div>
@@ -246,10 +281,6 @@ function TierModal({
             </div>
           </div>
         )}
-
-        <p className="mt-4 text-[10px] uppercase tracking-wider text-white/30">
-          Colleague counts are mocked until the live rollup ships
-        </p>
       </DialogContent>
     </Dialog>
   );

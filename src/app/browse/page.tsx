@@ -7,16 +7,10 @@ import {
   type BrowseCard,
   type BrowseGroup,
 } from "@/lib/browse";
-import type { Tier } from "@/lib/tier";
+import { getBrowseTierData } from "@/lib/tiers-data";
 import BookmarkButton from "./BookmarkButton";
 import TierHeroCard from "./TierHeroCard";
 import BottomNav from "@/components/BottomNav";
-
-const MOCKED_TIER_COUNTS: Record<Tier, number> = {
-  apprentice: 14,
-  specialist: 7,
-  expert: 3,
-};
 
 export const metadata = { title: "Lessons · Dojo" };
 export const dynamic = "force-dynamic";
@@ -36,6 +30,11 @@ export default async function BrowsePage() {
     },
     session.user.preferredLanguage,
   );
+
+  const tierData = await getBrowseTierData({
+    clientId: session.user.clientId,
+    completed: data.totals.completed,
+  });
 
   const groupProgress = data.groups
     .filter((g) => g.cards.length > 0)
@@ -60,11 +59,9 @@ export default async function BrowsePage() {
         {data.totals.lessons > 0 && (
           <div className="mx-auto max-w-2xl">
             <TierHeroCard
-              completed={data.totals.completed}
-              total={data.totals.lessons}
+              tierData={tierData}
               userInitial={userInitial}
               groupProgress={groupProgress}
-              mockedCounts={MOCKED_TIER_COUNTS}
             />
           </div>
         )}
