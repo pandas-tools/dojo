@@ -96,8 +96,8 @@ function GroupRail({ group }: { group: BrowseGroup }) {
       </h2>
       <div
         className="
-          flex gap-3 overflow-x-auto pb-2
-          px-5 sm:px-8 sm:gap-4
+          flex gap-2 overflow-x-auto pb-2
+          px-5 sm:px-8 sm:gap-3
           snap-x snap-mandatory
           scroll-pl-5 sm:scroll-pl-8
           [scrollbar-width:none] [-ms-overflow-style:none]
