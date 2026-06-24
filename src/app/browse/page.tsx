@@ -100,7 +100,7 @@ function GroupRail({ group }: { group: BrowseGroup }) {
 
 function LessonCard({ card }: { card: BrowseCard }) {
   const cardShell =
-    "snap-start shrink-0 block w-[34vw] max-w-[180px] sm:w-40 md:w-44 lg:w-48";
+    "snap-start shrink-0 block w-[38vw] max-w-[200px] sm:w-44 md:w-48 lg:w-52";
 
   const inner = (
     <>
