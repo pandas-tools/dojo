@@ -4,6 +4,7 @@ import {
   LayoutGrid,
   GraduationCap,
   Layers,
+  Trophy,
   Building2,
   BarChart3,
   Users,
@@ -56,6 +57,12 @@ export default async function AdminLayout({
             icon={<Layers className="h-4 w-4" />}
           >
             Lesson groups
+          </AdminNavLink>
+          <AdminNavLink
+            href="/admin/tiers"
+            icon={<Trophy className="h-4 w-4" />}
+          >
+            Tiers
           </AdminNavLink>
           <AdminNavLink
             href="/admin/clients"

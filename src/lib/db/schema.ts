@@ -439,6 +439,41 @@ export const adminAuditLog = pgTable(
   }),
 );
 
+// Lesson tiers — the data-driven gamification ladder shown on /browse.
+// Replaces the previously code-defined Apprentice/Specialist/Expert constants.
+// A tier is "reached" when the employee's completed-fraction of their client's
+// assigned, published lessons crosses min_pct (0..1). client_id is NULLABLE:
+// NULL = the global default ladder used by every client; a non-null client_id
+// is a per-client override (not exposed in admin v1 — the column lets us add
+// per-client ladders later with no schema change). sort_order is the display
+// order and is intentionally NOT unique (reorder swaps two rows' sort_order in
+// one txn; a unique constraint would transiently violate mid-swap — mirrors
+// the lessons table). Classification orders by min_pct, so display order and
+// threshold order stay decoupled.
+export const lessonTiers = pgTable(
+  "lesson_tiers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id").references(() => clients.id, {
+      onDelete: "cascade",
+    }),
+    name: text("name").notNull(),
+    emoji: text("emoji").notNull(),
+    minPct: real("min_pct").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    clientIdx: index("idx_lesson_tiers_client_id").on(t.clientId, t.sortOrder),
+  }),
+);
+
 // Type helpers for use across the app
 export type Client = typeof clients.$inferSelect;
 export type NewClient = typeof clients.$inferInsert;
@@ -456,3 +491,5 @@ export type LessonEvent = typeof lessonEvents.$inferSelect;
 export type NewLessonEvent = typeof lessonEvents.$inferInsert;
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 export type NewAdminAuditLog = typeof adminAuditLog.$inferInsert;
+export type LessonTier = typeof lessonTiers.$inferSelect;
+export type NewLessonTier = typeof lessonTiers.$inferInsert;
