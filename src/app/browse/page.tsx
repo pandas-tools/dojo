@@ -1,17 +1,18 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Play, Image as ImageIcon, Images, type LucideIcon } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { getBrowseData, type BrowseGroup } from "@/lib/browse";
+import {
+  getBrowseData,
+  type BrowseCard,
+  type BrowseGroup,
+} from "@/lib/browse";
 import { signOutAction } from "../actions";
 import BookmarkButton from "./BookmarkButton";
 
 export const metadata = { title: "Lessons · Dojo" };
 export const dynamic = "force-dynamic";
 
-// NOTE: this is the functional, light-theme consumer of the grouped /browse
-// read shape (groups[] → cards[], each card carrying isBookmarked). The dark,
-// Reels-style rail redesign is built on top of this same `getBrowseData`
-// contract — see src/lib/browse.ts for the shape.
 export default async function BrowsePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -29,137 +30,164 @@ export default async function BrowsePage() {
   );
 
   return (
-    <main className="min-h-screen bg-zinc-50">
-      <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold">Dojo</h1>
-            <p className="text-xs text-zinc-500">
-              {data.client?.name ?? "Your client"} · {session.user.email}
-            </p>
-          </div>
-          <form action={signOutAction}>
-            <button
-              type="submit"
-              className="text-sm text-zinc-600 hover:text-zinc-900"
-            >
-              Sign out
-            </button>
-          </form>
-        </div>
+    <main className="min-h-dvh bg-black text-white selection:bg-white/20">
+      <header className="relative px-5 pt-10 pb-10 text-center sm:pt-14 sm:pb-14">
+        <form action={signOutAction} className="absolute right-4 top-4 sm:right-6 sm:top-6">
+          <button
+            type="submit"
+            className="text-xs font-medium text-white/50 hover:text-white/90 transition-colors"
+          >
+            Sign out
+          </button>
+        </form>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          Lesson library
+        </h1>
+        <p className="mt-3 text-sm text-white/55 sm:text-base">
+          {headerSubtitle(data.totals)}
+        </p>
       </header>
 
-      <section className="mx-auto max-w-6xl px-6 py-10">
-        {data.totals.lessons === 0 ? (
-          <>
-            <h2 className="text-xl font-semibold mb-2">Training lessons</h2>
-            <p className="text-sm text-zinc-600">
-              No lessons available yet. Check back soon.
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="text-sm text-zinc-600 mb-8">
-              {data.totals.ready} ready · {data.totals.completed} completed ·{" "}
-              {data.totals.bookmarked} saved
-            </p>
-            <div className="space-y-10">
-              {data.groups.map((group) => (
-                <GroupRail
-                  key={group.id ?? "__ungrouped"}
-                  group={group}
-                  preferredLanguage={session.user.preferredLanguage}
-                />
-              ))}
-            </div>
-          </>
-        )}
-      </section>
+      {data.totals.lessons === 0 ? (
+        <EmptyState />
+      ) : (
+        <div className="pb-20 space-y-10 sm:space-y-14">
+          {data.groups.map((group) => (
+            <GroupRail key={group.id ?? "__ungrouped"} group={group} />
+          ))}
+        </div>
+      )}
     </main>
   );
 }
 
-function GroupRail({
-  group,
-  preferredLanguage,
-}: {
-  group: BrowseGroup;
-  preferredLanguage: string;
-}) {
+function headerSubtitle(totals: {
+  lessons: number;
+  ready: number;
+  completed: number;
+  bookmarked: number;
+}): string {
+  const parts: string[] = [];
+  parts.push(`${totals.lessons} ${totals.lessons === 1 ? "lesson" : "lessons"}`);
+  if (totals.completed > 0) parts.push(`${totals.completed} completed`);
+  if (totals.bookmarked > 0) parts.push(`${totals.bookmarked} saved`);
+  return parts.join(" · ");
+}
+
+function GroupRail({ group }: { group: BrowseGroup }) {
   return (
-    <div>
-      <h2 className="text-base font-semibold text-zinc-900 mb-3">
+    <section>
+      <h2 className="px-5 mb-4 text-base font-semibold text-white sm:text-lg sm:mb-5 sm:px-8">
         {group.name}
       </h2>
-      <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
-        {group.cards.map((card) => {
-          const inner = (
-            <>
-              <div className="aspect-[4/5] bg-zinc-100 relative">
-                {card.ready && card.thumbnail ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={card.thumbnail}
-                    alt={card.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-zinc-400 text-xs">
-                    {card.ready ? "No preview" : "Processing…"}
-                  </div>
-                )}
-                <div className="absolute top-2 right-2">
-                  <BookmarkButton
-                    lessonId={card.id}
-                    initialBookmarked={card.isBookmarked}
-                  />
-                </div>
-                {card.completed && (
-                  <div className="absolute top-2 left-2 rounded-full bg-emerald-600 text-white text-xs px-2 py-1">
-                    ✓ Done
-                  </div>
-                )}
-              </div>
-              <div className="p-3">
-                <h3 className="text-sm font-medium text-zinc-900 line-clamp-2">
-                  {card.title}
-                </h3>
-                <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500">
-                  {card.durationSeconds && (
-                    <span>
-                      {card.durationSeconds < 60
-                        ? `${card.durationSeconds}s`
-                        : `${Math.ceil(card.durationSeconds / 60)} min`}
-                    </span>
-                  )}
-                  {card.language && card.language !== preferredLanguage && (
-                    <span className="rounded bg-zinc-100 px-1.5 py-0.5 uppercase">
-                      {card.language}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </>
-          );
-
-          const cardClass =
-            "group block w-44 shrink-0 overflow-hidden rounded-md border border-zinc-200 bg-white";
-
-          return card.ready ? (
-            <Link
-              key={card.id}
-              href={`/watch/${card.id}`}
-              className={`${cardClass} hover:shadow-md transition-shadow`}
-            >
-              {inner}
-            </Link>
-          ) : (
-            <div key={card.id} className={`${cardClass} opacity-70`}>
-              {inner}
-            </div>
-          );
-        })}
+      <div
+        className="
+          flex gap-3 overflow-x-auto pb-2
+          px-5 sm:px-8 sm:gap-4
+          snap-x snap-mandatory
+          scroll-pl-5 sm:scroll-pl-8
+          [scrollbar-width:none] [-ms-overflow-style:none]
+          [&::-webkit-scrollbar]:hidden
+        "
+      >
+        {group.cards.map((card) => (
+          <LessonCard key={card.id} card={card} />
+        ))}
       </div>
+    </section>
+  );
+}
+
+const CONTENT_TYPE_ICON: Record<BrowseCard["contentType"], LucideIcon> = {
+  video: Play,
+  image: ImageIcon,
+  carousel: Images,
+};
+
+const CONTENT_TYPE_LABEL: Record<BrowseCard["contentType"], string> = {
+  video: "Video",
+  image: "Image",
+  carousel: "Carousel",
+};
+
+function LessonCard({ card }: { card: BrowseCard }) {
+  const Icon = CONTENT_TYPE_ICON[card.contentType];
+  const duration = formatDuration(card.durationSeconds);
+
+  const cardShell =
+    "snap-start shrink-0 block w-[68vw] max-w-[300px] sm:w-44 md:w-48 lg:w-52";
+
+  const inner = (
+    <>
+      <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-zinc-900">
+        {card.ready && card.thumbnail ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={card.thumbnail}
+            alt=""
+            className="h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-xs text-white/30">
+            {card.ready ? "No preview" : "Processing"}
+          </div>
+        )}
+
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+
+        {card.completed && (
+          <div className="absolute left-3 top-3 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-black">
+            Done
+          </div>
+        )}
+
+        <div className="absolute bottom-1.5 right-1.5">
+          <BookmarkButton
+            lessonId={card.id}
+            initialBookmarked={card.isBookmarked}
+          />
+        </div>
+      </div>
+
+      <div className="pt-3">
+        <h3 className="text-sm font-medium text-white line-clamp-2 leading-snug">
+          {card.title}
+        </h3>
+        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-white/50">
+          <Icon
+            className="h-3.5 w-3.5 shrink-0"
+            aria-label={CONTENT_TYPE_LABEL[card.contentType]}
+          />
+          {duration && <span>{duration}</span>}
+        </div>
+      </div>
+    </>
+  );
+
+  return card.ready ? (
+    <Link href={`/watch/${card.id}`} className={`${cardShell} group`}>
+      {inner}
+    </Link>
+  ) : (
+    <div className={`${cardShell} opacity-60`}>{inner}</div>
+  );
+}
+
+function formatDuration(seconds: number | null): string | null {
+  if (!seconds) return null;
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  return `${minutes} min`;
+}
+
+function EmptyState() {
+  return (
+    <div className="mx-auto max-w-md px-6 py-20 text-center">
+      <p className="text-sm text-white/60">
+        No lessons available yet. Check back soon.
+      </p>
     </div>
   );
 }
