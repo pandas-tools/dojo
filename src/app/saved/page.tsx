@@ -94,7 +94,7 @@ export default async function SavedPage() {
 function SavedCard({ card }: { card: BrowseCard }) {
   const inner = (
     <>
-      <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-zinc-900">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-zinc-900">
         {card.ready && card.thumbnail ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
