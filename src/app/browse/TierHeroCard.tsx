@@ -226,7 +226,7 @@ function TierModal({
                     )}
                   </div>
 
-                  {isAboveYou && (
+                  {isAboveYou && count > 0 && (
                     <div className={cn("text-right text-sm leading-tight", styles.accent)}>
                       <div className="font-semibold">{count} ahead</div>
                       <div className="text-[10px] uppercase tracking-wider text-white/45">
