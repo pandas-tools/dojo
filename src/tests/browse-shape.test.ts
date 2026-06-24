@@ -4,7 +4,11 @@
 // needs is passed in.
 
 import { describe, expect, it } from "vitest";
-import { shapeBrowseData, UNGROUPED_LABEL } from "@/lib/browse-shape";
+import {
+  shapeBrowseData,
+  selectNewLessonIds,
+  UNGROUPED_LABEL,
+} from "@/lib/browse-shape";
 import type { Lesson, LessonTranslation } from "@/lib/db/schema";
 
 function lesson(over: Partial<Lesson> & { id: string }): Lesson {
@@ -203,5 +207,46 @@ describe("shapeBrowseData", () => {
       ready: false,
       thumbnail: null,
     });
+  });
+});
+
+describe("selectNewLessonIds", () => {
+  const D = (iso: string) => new Date(iso);
+
+  it("first visit (null threshold) treats every published lesson as new, newest first", () => {
+    const lessons = [
+      { id: "a", publishedAt: D("2026-06-01T00:00:00Z"), createdAt: D("2026-05-01T00:00:00Z") },
+      { id: "b", publishedAt: D("2026-06-10T00:00:00Z"), createdAt: D("2026-05-01T00:00:00Z") },
+      { id: "c", publishedAt: D("2026-06-05T00:00:00Z"), createdAt: D("2026-05-01T00:00:00Z") },
+    ];
+    expect(selectNewLessonIds(lessons, null)).toEqual(["b", "c", "a"]);
+  });
+
+  it("returns only lessons published strictly after the threshold", () => {
+    const threshold = D("2026-06-05T00:00:00Z");
+    const lessons = [
+      { id: "old", publishedAt: D("2026-06-01T00:00:00Z"), createdAt: D("2026-01-01T00:00:00Z") },
+      { id: "edge", publishedAt: D("2026-06-05T00:00:00Z"), createdAt: D("2026-01-01T00:00:00Z") }, // equal → excluded
+      { id: "new", publishedAt: D("2026-06-09T00:00:00Z"), createdAt: D("2026-01-01T00:00:00Z") },
+    ];
+    expect(selectNewLessonIds(lessons, threshold)).toEqual(["new"]);
+  });
+
+  it("returns empty on a second load when nothing was published after the bump", () => {
+    const lessons = [
+      { id: "a", publishedAt: D("2026-06-01T00:00:00Z"), createdAt: D("2026-01-01T00:00:00Z") },
+      { id: "b", publishedAt: D("2026-06-02T00:00:00Z"), createdAt: D("2026-01-01T00:00:00Z") },
+    ];
+    // threshold bumped to "now", after the latest publish → nothing new
+    expect(selectNewLessonIds(lessons, D("2026-06-20T00:00:00Z"))).toEqual([]);
+  });
+
+  it("falls back to createdAt when publishedAt is null (legacy rows)", () => {
+    const threshold = D("2026-06-05T00:00:00Z");
+    const lessons = [
+      { id: "legacy-old", publishedAt: null, createdAt: D("2026-06-01T00:00:00Z") }, // before → excluded
+      { id: "legacy-new", publishedAt: null, createdAt: D("2026-06-09T00:00:00Z") }, // after → included
+    ];
+    expect(selectNewLessonIds(lessons, threshold)).toEqual(["legacy-new"]);
   });
 });

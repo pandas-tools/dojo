@@ -41,6 +41,17 @@ export type BrowseGroup = {
 export type BrowseData = {
   /** Non-empty sections only, ordered by group sortOrder; ungrouped bucket last. */
   groups: BrowseGroup[];
+  /**
+   * Synthetic "New lessons" rail to render ABOVE `groups`, present only when the
+   * current user has ≥1 lesson published since their last /browse check. Its
+   * cards are duplicates of lessons that also live in `groups` (a "new" lesson
+   * is never removed from its editorial section) — so it is intentionally a
+   * separate field, NOT an entry in `groups`: keeping it out preserves the
+   * invariant that every lesson appears in `groups` exactly once, which the
+   * totals / tier-progress / reels aggregations all rely on. Cards are newest-
+   * published first. `id` is the NEW_LESSONS_GROUP_ID sentinel.
+   */
+  newRail?: BrowseGroup;
   client: { name: string } | null;
   totals: {
     lessons: number;
@@ -52,6 +63,37 @@ export type BrowseData = {
 
 /** Label for the synthetic bucket holding lessons not assigned to any group. */
 export const UNGROUPED_LABEL = "More lessons";
+
+/** Title of the synthetic "New lessons" rail (exact, surfaced to employees). */
+export const NEW_LESSONS_LABEL = "New lessons";
+/** Sentinel group id for the synthetic "New lessons" rail. */
+export const NEW_LESSONS_GROUP_ID = "__new__";
+
+/**
+ * Picks which lessons count as "new" for a user, newest first.
+ *
+ * A lesson's publish moment is `publishedAt`, falling back to `createdAt` for
+ * legacy rows that pre-date the column (the migration backfills these, so the
+ * fallback is just belt-and-braces). A lesson is new when that moment is
+ * strictly after the user's last check; a NULL threshold means the user has
+ * never been checked, so on that first visit every published lesson is new.
+ *
+ * Pure + DB-free so it's unit-tested in isolation; getBrowseData feeds it the
+ * already-scoped (assigned + published) lesson rows and maps the result back to
+ * render-ready cards.
+ */
+export function selectNewLessonIds(
+  lessons: { id: string; publishedAt: Date | null; createdAt: Date }[],
+  threshold: Date | null,
+): string[] {
+  const moment = (l: { publishedAt: Date | null; createdAt: Date }) =>
+    (l.publishedAt ?? l.createdAt).getTime();
+  const t = threshold ? threshold.getTime() : null;
+  return lessons
+    .filter((l) => t === null || moment(l) > t)
+    .sort((a, b) => moment(b) - moment(a))
+    .map((l) => l.id);
+}
 
 export type GroupInput = { id: string; name: string; sortOrder: number };
 

@@ -23,6 +23,7 @@ import {
   stores,
   clients,
   clientLanguages,
+  users,
 } from "./schema";
 
 type LessonEventType =
@@ -70,6 +71,31 @@ export function scopedDb(user: ScopedUser) {
         db.query.clients.findFirst({
           where: eq(clients.id, cid),
         }),
+    },
+
+    // The current user's own profile bits. Keyed by user.id (not tenant-scoped
+    // by client_id — it's the caller's own row), used by /browse for the
+    // "New lessons" rail high-water mark.
+    me: {
+      // Last time the new-lessons check ran for this user; null = never (first
+      // visit → every published lesson counts as new that one time).
+      getNewLessonsCheckpoint: async (): Promise<Date | null> => {
+        const [row] = await db
+          .select({ at: users.lastNewLessonsCheckedAt })
+          .from(users)
+          .where(eq(users.id, user.id))
+          .limit(1);
+        return row?.at ?? null;
+      },
+      // Bump the high-water mark to `now`. Best-effort: callers swallow errors
+      // so a failed bump never breaks the page (the user just sees the same
+      // rail again next load).
+      bumpNewLessonsCheckpoint: async (now: Date): Promise<void> => {
+        await db
+          .update(users)
+          .set({ lastNewLessonsCheckedAt: now })
+          .where(eq(users.id, user.id));
+      },
     },
 
     languages: {

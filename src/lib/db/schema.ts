@@ -138,6 +138,14 @@ export const users = pgTable(
       .notNull()
       .default(false),
     storeConfirmedAt: timestamp("store_confirmed_at", { withTimezone: true }),
+    // High-water mark for the /browse "New lessons" rail: the last time this
+    // user loaded /browse and had the new-lessons check run. Lessons published
+    // after this instant surface in the synthetic "New lessons" rail; the
+    // column is bumped to now() on each /browse render. NULL = never checked
+    // (first visit) → every published lesson counts as new that one time.
+    lastNewLessonsCheckedAt: timestamp("last_new_lessons_checked_at", {
+      withTimezone: true,
+    }),
     role: userRoleEnum("role").notNull().default("employee"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -241,12 +249,19 @@ export const lessons = pgTable(
     // section without disturbing the global list.
     groupSortOrder: integer("group_sort_order").notNull().default(0),
     isPublished: boolean("is_published").notNull().default(false),
+    // The instant this lesson first became visible to employees — set the
+    // moment is_published transitions false→true (COALESCE-guarded so a later
+    // republish never overwrites the original go-live moment). Drives the
+    // /browse "New lessons" rail. NULL only for never-published lessons;
+    // backfilled to created_at for rows published before this column existed.
+    publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => ({
     groupIdx: index("idx_lessons_group_id").on(t.groupId, t.groupSortOrder),
+    publishedAtIdx: index("idx_lessons_published_at").on(t.publishedAt),
   }),
 );
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray, max } from "drizzle-orm";
+import { and, eq, inArray, max, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/client";
@@ -111,6 +111,10 @@ export async function createLessonFromUpload(input: {
         type,
         sortOrder: nextSort,
         isPublished: !!input.publish,
+        // Fresh row: stamp the go-live moment iff it's created already-published
+        // (drives the /browse "New lessons" rail). Left NULL otherwise; it gets
+        // stamped later when the admin publishes via togglePublish/bulk.
+        publishedAt: input.publish ? new Date() : null,
       })
       .returning();
 
@@ -232,6 +236,10 @@ export async function createImageLesson(input: {
         contentType: "image",
         sortOrder: nextSort,
         isPublished: !!input.publish,
+        // Fresh row: stamp the go-live moment iff it's created already-published
+        // (drives the /browse "New lessons" rail). Left NULL otherwise; it gets
+        // stamped later when the admin publishes via togglePublish/bulk.
+        publishedAt: input.publish ? new Date() : null,
       })
       .returning();
 
@@ -368,6 +376,10 @@ export async function createCarouselLesson(input: {
         contentType: "carousel",
         sortOrder: nextSort,
         isPublished: !!input.publish,
+        // Fresh row: stamp the go-live moment iff it's created already-published
+        // (drives the /browse "New lessons" rail). Left NULL otherwise; it gets
+        // stamped later when the admin publishes via togglePublish/bulk.
+        publishedAt: input.publish ? new Date() : null,
       })
       .returning();
 
@@ -572,7 +584,15 @@ export async function togglePublish(lessonId: string, isPublished: boolean) {
   }
   await db
     .update(lessons)
-    .set({ isPublished })
+    .set({
+      isPublished,
+      // Stamp the go-live moment on the false→true transition; COALESCE keeps
+      // the original moment if the lesson was ever published before (an
+      // unpublish→republish never re-surfaces it in the "New lessons" rail).
+      ...(isPublished
+        ? { publishedAt: sql`COALESCE(${lessons.publishedAt}, now())` }
+        : {}),
+    })
     .where(eq(lessons.id, lessonId));
   await writeAuditEntry({
     action: isPublished ? "lesson.publish" : "lesson.unpublish",
@@ -684,7 +704,15 @@ export async function bulkSetPublish(input: {
   }
   const result = await db
     .update(lessons)
-    .set({ isPublished: input.isPublished })
+    .set({
+      isPublished: input.isPublished,
+      // Same COALESCE-guarded go-live stamp as togglePublish — only the rows
+      // crossing into published get a fresh moment; already-published rows in
+      // the batch keep theirs.
+      ...(input.isPublished
+        ? { publishedAt: sql`COALESCE(${lessons.publishedAt}, now())` }
+        : {}),
+    })
     .where(inArray(lessons.id, ids))
     .returning({ id: lessons.id });
   await writeAuditEntry({

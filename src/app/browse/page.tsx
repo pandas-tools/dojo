@@ -77,6 +77,7 @@ export default async function BrowsePage() {
         <EmptyState />
       ) : (
         <div className="pb-36 space-y-10 sm:space-y-14">
+          {data.newRail && <GroupRail key="__new" group={data.newRail} />}
           {data.groups.map((group) => (
             <GroupRail key={group.id ?? "__ungrouped"} group={group} />
           ))}
