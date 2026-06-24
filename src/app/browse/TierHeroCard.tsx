@@ -57,13 +57,19 @@ export default function TierHeroCard({
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          "group block w-full text-left",
-          "rounded-2xl bg-white/[0.04] ring-1 ring-white/5",
-          "px-4 py-3 sm:px-5 sm:py-3.5",
-          "transition-colors hover:bg-white/[0.07] hover:ring-arctic-haze/20",
+          "group relative block w-full overflow-hidden text-left",
+          "rounded-2xl bg-white/[0.04] ring-1 ring-white/8",
+          "px-4 py-3.5 sm:px-5 sm:py-4",
+          "transition-[background,box-shadow] duration-200 hover:bg-white/[0.07] hover:ring-arctic-haze/25",
         )}
       >
-        <div className="flex items-center justify-between gap-3">
+        {/* Inner glow — arctic-haze bleeds in from the left edge, gives the
+            row a premium luminosity without competing with content. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-[radial-gradient(80%_120%_at_0%_50%,rgba(193,232,251,0.16),transparent_65%)]"
+        />
+        <div className="relative flex items-center justify-between gap-3">
           <p className="min-w-0 flex-1 text-sm text-white/90">
             You are <span className="text-base">{currentTier.emoji}</span>{" "}
             <span className="font-medium text-white">{currentTier.name}</span>
@@ -142,9 +148,14 @@ function TierModal({
       <DialogContent
         size="sm"
         hideClose
-        className="border-white/10 bg-near-black text-white shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]"
+        className="relative overflow-hidden border-white/10 bg-near-black text-white shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]"
       >
-        <div className="flex items-center justify-between">
+        {/* Internal arctic-haze glow at the top of the modal */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(80%_100%_at_50%_0%,rgba(193,232,251,0.18),transparent_70%)]"
+        />
+        <div className="relative flex items-center justify-between">
           <DialogTitle className="text-lg font-medium text-white">
             Your training
           </DialogTitle>
@@ -158,7 +169,7 @@ function TierModal({
           </button>
         </div>
 
-        <div className="mt-1 flex flex-col gap-2.5">
+        <div className="relative mt-1 flex flex-col gap-2.5">
           {stackOrder.map((tier) => {
             const ladderIndex = ladder.findIndex((t) => t.id === tier.id);
             const isYou = tier.id === currentTierId;
@@ -243,7 +254,7 @@ function TierModal({
         </div>
 
         {groupProgress.length > 0 && (
-          <div className="mt-5 border-t border-white/5 pt-5">
+          <div className="relative mt-5 border-t border-white/5 pt-5">
             <div className="font-mono text-xs font-medium uppercase tracking-wider text-white/45">
               Progress by group
             </div>

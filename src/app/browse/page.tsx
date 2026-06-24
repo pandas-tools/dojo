@@ -12,6 +12,7 @@ import BookmarkButton from "./BookmarkButton";
 import TierHeroCard from "./TierHeroCard";
 import BottomNav from "@/components/BottomNav";
 import DojoMark from "@/components/DojoMark";
+import BrandAtmosphere from "@/components/BrandAtmosphere";
 
 export const metadata = { title: "Lessons · Dojo" };
 export const dynamic = "force-dynamic";
@@ -55,8 +56,10 @@ export default async function BrowsePage() {
   const reelsHref = reelsTarget ? `/watch/${reelsTarget.id}` : undefined;
 
   return (
-    <main className="min-h-dvh bg-near-black text-white selection:bg-arctic-haze/30">
-      <header className="flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
+    <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white selection:bg-arctic-haze/30">
+      <BrandAtmosphere variant="halo" />
+
+      <header className="relative z-10 flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
         <Link
           href="/browse"
           aria-label="Dojo home"
@@ -66,7 +69,7 @@ export default async function BrowsePage() {
         </Link>
       </header>
 
-      <div className="px-5 pt-6 sm:px-8 sm:pt-8">
+      <div className="relative z-10 px-5 pt-6 sm:px-8 sm:pt-8">
         {data.totals.lessons > 0 && (
           <div className="mx-auto max-w-2xl">
             <TierHeroCard

@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
 import BottomNav from "@/components/BottomNav";
 import DojoMark from "@/components/DojoMark";
+import BrandAtmosphere from "@/components/BrandAtmosphere";
 import ProfileForm from "./ProfileForm";
 
 export const metadata = { title: "Profile · Dojo" };
@@ -58,8 +59,10 @@ export default async function ProfilePage() {
   const userInitial = (session.user.email ?? "?").charAt(0).toUpperCase();
 
   return (
-    <main className="min-h-dvh bg-near-black text-white selection:bg-arctic-haze/30">
-      <header className="flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
+    <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white selection:bg-arctic-haze/30">
+      <BrandAtmosphere variant="halo" />
+
+      <header className="relative z-10 flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
         <Link
           href="/browse"
           aria-label="Dojo home"
@@ -68,8 +71,8 @@ export default async function ProfilePage() {
           <DojoMark variant="wordmark" className="h-7 w-auto sm:h-8" />
         </Link>
       </header>
-      <div className="px-5 pt-10 pb-8 text-center sm:pt-12">
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-arctic-haze text-2xl font-medium text-near-black">
+      <div className="relative z-10 px-5 pt-10 pb-8 text-center sm:pt-12">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-arctic-haze text-2xl font-medium text-near-black shadow-[0_0_50px_-8px_rgba(193,232,251,0.45)]">
           {userInitial}
         </div>
         <h1 className="text-2xl font-medium tracking-tight sm:text-3xl">
@@ -77,7 +80,7 @@ export default async function ProfilePage() {
         </h1>
       </div>
 
-      <div className="mx-auto max-w-md px-5 pb-36">
+      <div className="relative z-10 mx-auto max-w-md px-5 pb-36">
         <ProfileForm
           email={session.user.email ?? ""}
           initialLanguage={session.user.preferredLanguage}

@@ -7,6 +7,7 @@ import { shapeBrowseData, type BrowseCard } from "@/lib/browse-shape";
 import BookmarkButton from "../browse/BookmarkButton";
 import BottomNav from "@/components/BottomNav";
 import DojoMark from "@/components/DojoMark";
+import BrandAtmosphere from "@/components/BrandAtmosphere";
 
 export const metadata = { title: "Saved · Dojo" };
 export const dynamic = "force-dynamic";
@@ -63,8 +64,10 @@ export default async function SavedPage() {
   const reelsHref = reelsTarget ? `/watch/${reelsTarget.id}` : undefined;
 
   return (
-    <main className="min-h-dvh bg-near-black text-white selection:bg-arctic-haze/30">
-      <header className="flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
+    <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white selection:bg-arctic-haze/30">
+      <BrandAtmosphere variant="halo" />
+
+      <header className="relative z-10 flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
         <Link
           href="/browse"
           aria-label="Dojo home"
@@ -73,7 +76,7 @@ export default async function SavedPage() {
           <DojoMark variant="wordmark" className="h-7 w-auto sm:h-8" />
         </Link>
       </header>
-      <div className="px-5 pt-10 pb-8 text-center sm:pt-12">
+      <div className="relative z-10 px-5 pt-10 pb-8 text-center sm:pt-12">
         <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">
           Saved
         </h1>
@@ -87,7 +90,7 @@ export default async function SavedPage() {
       {savedCards.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="px-5 pb-36 sm:px-8">
+        <div className="relative z-10 px-5 pb-36 sm:px-8">
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {savedCards.map((card) => (
               <SavedCard key={card.id} card={card} />
