@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Bookmark, Play } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
 import { shapeBrowseData, type BrowseCard } from "@/lib/browse-shape";
@@ -8,6 +8,7 @@ import BookmarkButton from "../browse/BookmarkButton";
 import BottomNav from "@/components/BottomNav";
 import DojoMark from "@/components/DojoMark";
 import BrandAtmosphere from "@/components/BrandAtmosphere";
+import LessonTypeChip from "@/components/LessonTypeChip";
 
 export const metadata = { title: "Saved · Dojo" };
 export const dynamic = "force-dynamic";
@@ -123,19 +124,20 @@ function SavedCard({ card }: { card: BrowseCard }) {
           </div>
         )}
 
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
 
-        {card.contentType === "video" && card.ready && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 backdrop-blur-md ring-1 ring-white/20 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]">
-              <Play className="h-5 w-5 fill-white text-white translate-x-[1px]" />
-            </div>
+        {card.completed && (
+          <div className="absolute left-2 top-2 rounded-full bg-arctic-haze px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-near-black">
+            Done
           </div>
         )}
 
-        {card.completed && (
-          <div className="absolute left-3 top-3 rounded-full bg-arctic-haze px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-near-black">
-            Done
+        {card.ready && (
+          <div className="absolute bottom-2 left-2">
+            <LessonTypeChip
+              contentType={card.contentType}
+              durationSeconds={card.durationSeconds}
+            />
           </div>
         )}
 
@@ -144,7 +146,7 @@ function SavedCard({ card }: { card: BrowseCard }) {
         </div>
       </div>
 
-      <h3 className="pt-3 text-sm font-medium text-white line-clamp-2 leading-snug">
+      <h3 className="pt-3 text-[13px] font-medium text-white line-clamp-2 leading-snug">
         {card.title}
       </h3>
     </>
