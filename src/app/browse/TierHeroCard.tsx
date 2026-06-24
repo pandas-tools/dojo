@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, X } from "lucide-react";
+import { Check, ChevronRight, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -154,6 +154,7 @@ function TierModal({
             const tIndex = TIER_ORDER.indexOf(tier);
             const isYou = tier === state.tier;
             const isAboveYou = tIndex > currentTierIndex;
+            const isBelowYou = tIndex < currentTierIndex;
             const styles = TIER_STYLES[tier];
             const count = mockedCounts[tier] ?? 0;
 
@@ -197,11 +198,18 @@ function TierModal({
                   </div>
 
                   {isAboveYou && (
-                    <div className={cn("text-right text-sm", styles.accent)}>
-                      <div className="font-semibold">{count}</div>
+                    <div className={cn("text-right text-sm leading-tight", styles.accent)}>
+                      <div className="font-semibold">{count} ahead</div>
                       <div className="text-[10px] uppercase tracking-wider text-white/45">
-                        {count === 1 ? "person" : "people"}
+                        of you
                       </div>
+                    </div>
+                  )}
+
+                  {isBelowYou && (
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300 ring-1 ring-emerald-400/20">
+                      <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      <span>Completed</span>
                     </div>
                   )}
 
