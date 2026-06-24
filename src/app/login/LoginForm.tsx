@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Check } from "lucide-react";
 import { signInWithEmail } from "./actions";
 
 export default function LoginForm() {
@@ -36,11 +37,17 @@ export default function LoginForm() {
 
   if (sent) {
     return (
-      <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-        <p className="font-medium">Check your inbox.</p>
-        <p className="mt-1 text-emerald-800">
-          We sent a sign-in link to <span className="font-mono">{email}</span>.
-          The link is valid for 24 hours.
+      <div className="rounded-2xl border border-arctic-haze/30 bg-arctic-haze/[0.07] p-5 text-sm text-white">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-arctic-haze text-near-black">
+            <Check className="h-4 w-4" strokeWidth={2.5} />
+          </div>
+          <p className="font-medium">Check your inbox</p>
+        </div>
+        <p className="mt-3 text-white/70">
+          We sent a sign-in link to{" "}
+          <span className="font-mono text-arctic-haze">{email}</span>. The link is valid
+          for 24 hours.
         </p>
       </div>
     );
@@ -51,7 +58,7 @@ export default function LoginForm() {
       <div>
         <label
           htmlFor="email"
-          className="block text-sm font-medium text-zinc-700 mb-1"
+          className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider text-white/55"
         >
           Work email
         </label>
@@ -65,12 +72,12 @@ export default function LoginForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@orange.be"
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder:text-white/30 transition-shadow focus:border-arctic-haze/60 focus:outline-none focus:ring-2 focus:ring-arctic-haze/40"
         />
       </div>
 
       {error && (
-        <p className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </p>
       )}
@@ -78,9 +85,9 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={pending || !email}
-        className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:bg-zinc-300 disabled:cursor-not-allowed transition-colors"
+        className="inline-flex w-full items-center justify-center rounded-xl bg-arctic-haze px-4 py-3 font-mono text-sm font-medium uppercase tracking-wider text-near-black transition-opacity hover:opacity-90 disabled:opacity-40"
       >
-        {pending ? "Sending…" : "Send magic link"}
+        {pending ? "Sending…" : "Send sign-in link"}
       </button>
     </form>
   );

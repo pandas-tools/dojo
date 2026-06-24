@@ -1,7 +1,26 @@
 @import "tailwindcss";
 
+/* ──────────── Pandas brand tokens ────────────
+ * Surfaces  cool neutrals (snowglint, paper-dusk, fogbound, near-black)
+ * Brand     arctic-haze blue family + near-black
+ * Type      Sharp Grotesk (display + body) + Silka Mono (CTAs, labels, mono)
+ * Source    /shared/wiki/mkt/design-system/tokens.md
+ */
+
 @theme inline {
-  /* Surface colors */
+  /* === Color: primitives (cool neutrals + blues) === */
+  --color-snowglint: #F8F8F8;
+  --color-paper-dusk: #EDEDED;
+  --color-fogbound: #E8E8E8;
+  --color-moon-ash: #D8D8D8;
+  --color-glacier-whisper: #DBF3FF;
+  --color-arctic-haze: #C1E8FB;
+  --color-frosted-fjord: #9FBFCF;
+  --color-blue-quarry: #849EAB;
+  --color-steel-harbor: #54646C;
+  --color-near-black: #0E0E0E;
+
+  /* === Color: semantic === */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
@@ -9,48 +28,56 @@
   --color-border: var(--border);
   --color-card: var(--card);
 
-  /* Brand + signal */
-  --color-brand: #10B981;            /* Pandas brand green — reserve for "active" / "published" affirmative */
-  --color-brand-foreground: #ffffff;
-  --color-destructive: #dc2626;      /* red-600 */
+  /* === Brand === */
+  --color-brand: #C1E8FB;              /* arctic-haze — primary */
+  --color-brand-light: #DBF3FF;        /* glacier-whisper — hover/wash */
+  --color-brand-deep: #54646C;         /* steel-harbor — deep accents */
+  --color-brand-foreground: #0E0E0E;   /* text on brand bg */
+
+  /* === Signal (functional only; kept muted to respect cool palette) === */
+  --color-success: #5e9c8d;
+  --color-success-foreground: #ffffff;
+  --color-destructive: #b85e5e;
   --color-destructive-foreground: #ffffff;
-  --color-warning: #d97706;          /* amber-600 */
+  --color-warning: #b8915e;
 
-  /* Typography */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* === Typography === */
+  --font-sans: var(--font-sharp-grotesk), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-silka-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: var(--font-sans);
 
-  /* Radii */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  /* === Radii (Pandas scale) === */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 22px;
+  --radius-xl: 30px;
+  --radius-full: 9999px;
 
-  /* Motion */
+  /* === Font weights — Sharp Grotesk only ships Book (400) and Medium (500),
+   * so cap heavier classes at 500 to avoid the browser synthetic-bolding the OTF.
+   * The brand explicitly has no bold weight. */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 500;
+  --font-weight-bold: 500;
+
+  /* === Motion === */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   --duration-fast: 150ms;
   --duration-base: 200ms;
+  --duration-slow: 300ms;
 }
 
 :root {
-  --background: #fafafa;             /* zinc-50 */
-  --foreground: #18181b;             /* zinc-900 */
-  --muted: #f4f4f5;                  /* zinc-100 */
-  --muted-foreground: #71717a;       /* zinc-500 */
-  --border: #e4e4e7;                 /* zinc-200 */
-  --card: #ffffff;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Dark mode reserved — admin stays light for v1; tokens placeholder only */
-    --background: #fafafa;
-    --foreground: #18181b;
-    --muted: #f4f4f5;
-    --muted-foreground: #71717a;
-    --border: #e4e4e7;
-    --card: #ffffff;
-  }
+  /* Light surfaces (admin, login, onboarding default) */
+  --background: #F8F8F8;             /* snowglint */
+  --foreground: #0E0E0E;             /* near-black */
+  --muted: #EDEDED;                  /* paper-dusk */
+  --muted-foreground: #54646C;       /* steel-harbor */
+  --border: #E8E8E8;                 /* fogbound */
+  --card: #FFFFFF;
 }
 
 html, body {
@@ -61,9 +88,31 @@ html, body {
   text-rendering: optimizeLegibility;
 }
 
-/* Sane focus ring — visible only on keyboard nav */
+/* Sharp Grotesk reads better with a touch of negative tracking at heading sizes */
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.015em;
+}
+
+/* === Brand gradients (utility classes for hero moments) === */
+.bg-brand-gradient {
+  background: linear-gradient(227deg, #758c97 -13%, #bfe6f9 16%, #f9fdff 44%);
+}
+.bg-brand-gradient-dark {
+  background: linear-gradient(26.5deg, #C1E8FB 0%, #9FBFCF 12%, #849EAB 24%, #54646C 38%, #333D41 50%, #242A2D 62%, #151819 74%, #070707 90%);
+}
+.bg-brand-fade-dark {
+  background: linear-gradient(to bottom, rgba(14,14,14,0) 32%, #0E0E0E 78%);
+}
+.text-brand-gradient {
+  background: linear-gradient(128deg, #C1E8FB 0%, #BFE6F9 14%, #ABCDDE 32%, #9FBFCF 44%, #849EAB 58%, #54646C 78%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Focus ring — uses deep brand so it's visible on light backgrounds */
 :focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid var(--color-brand-deep);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -75,7 +124,7 @@ textarea:focus-visible,
 select:focus-visible,
 [role="button"]:focus-visible,
 [role="menuitem"]:focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid var(--color-brand-deep);
   outline-offset: 2px;
 }
 
@@ -84,7 +133,7 @@ select:focus-visible,
   z-index: 50;
 }
 
-/* Reduced motion: kill all transitions/animations */
+/* Reduced motion — kill all transitions/animations */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

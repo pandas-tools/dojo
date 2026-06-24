@@ -61,10 +61,10 @@ export default function ProfileForm({
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
           disabled={pending}
-          className="w-full appearance-none rounded-xl bg-zinc-900 px-4 py-3 text-sm text-white ring-1 ring-white/10 focus:ring-2 focus:ring-white/30 focus:outline-none"
+          className="w-full appearance-none rounded-xl bg-white/[0.04] px-4 py-3 text-sm text-white ring-1 ring-white/10 transition-shadow focus:ring-2 focus:ring-arctic-haze/60 focus:outline-none"
         >
           {languages.map((l) => (
-            <option key={l.language} value={l.language} className="bg-zinc-900">
+            <option key={l.language} value={l.language} className="bg-near-black">
               {l.label}
             </option>
           ))}
@@ -76,10 +76,10 @@ export default function ProfileForm({
           value={storeId}
           onChange={(e) => setStoreId(e.target.value)}
           disabled={pending}
-          className="w-full appearance-none rounded-xl bg-zinc-900 px-4 py-3 text-sm text-white ring-1 ring-white/10 focus:ring-2 focus:ring-white/30 focus:outline-none"
+          className="w-full appearance-none rounded-xl bg-white/[0.04] px-4 py-3 text-sm text-white ring-1 ring-white/10 transition-shadow focus:ring-2 focus:ring-arctic-haze/60 focus:outline-none"
         >
           {stores.map((s) => (
-            <option key={s.id} value={s.id} className="bg-zinc-900">
+            <option key={s.id} value={s.id} className="bg-near-black">
               {s.name}
               {s.city ? ` — ${s.city}` : ""}
             </option>
@@ -91,7 +91,7 @@ export default function ProfileForm({
         type="button"
         onClick={onSave}
         disabled={!dirty || pending}
-        className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black transition-opacity disabled:opacity-40"
+        className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-arctic-haze px-4 py-3 font-mono text-sm font-medium uppercase tracking-wider text-near-black transition-opacity hover:opacity-90 disabled:opacity-40"
       >
         <Check className="h-4 w-4" />
         {pending ? "Saving…" : dirty ? "Save changes" : "Saved"}
@@ -101,7 +101,7 @@ export default function ProfileForm({
         <form action={signOutAction}>
           <button
             type="submit"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300 ring-1 ring-red-400/20 transition-colors hover:bg-red-500/15"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive ring-1 ring-destructive/25 transition-colors hover:bg-destructive/15"
           >
             <LogOut className="h-4 w-4" />
             Sign out
@@ -115,7 +115,7 @@ export default function ProfileForm({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/45">
+      <div className="mb-2 font-mono text-xs font-medium uppercase tracking-wider text-white/45">
         {label}
       </div>
       {children}

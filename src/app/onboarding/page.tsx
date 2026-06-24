@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
+import DojoMark from "@/components/DojoMark";
 import OnboardingForm from "./OnboardingForm";
 
 export const metadata = { title: "Welcome · Dojo" };
@@ -46,16 +47,28 @@ export default async function OnboardingPage() {
       : ["en"];
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 py-16">
-      <div className="w-full max-w-md rounded-md border border-zinc-200 bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-semibold mb-2">
-          {needsReconfirm ? "Quick check-in" : "Welcome to Dojo"}
-        </h1>
-        <p className="text-sm text-zinc-600 mb-6">
-          {needsReconfirm
-            ? "Just confirming you're still in the right store. Update if it's changed."
-            : "A quick onboarding so we can tailor your training experience."}
-        </p>
+    <main className="relative isolate flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-near-black px-6 py-16 text-white">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-brand-gradient-dark opacity-50"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_20%_-10%,rgba(193,232,251,0.18),transparent_55%)]"
+      />
+
+      <div className="relative w-full max-w-md">
+        <div className="mb-8 text-center">
+          <DojoMark variant="wordmark" className="mx-auto h-10 w-auto text-white" />
+          <h1 className="mt-6 text-2xl font-medium tracking-tight sm:text-3xl">
+            {needsReconfirm ? "Quick check-in" : "Welcome to Dojo"}
+          </h1>
+          <p className="mt-2 text-sm text-white/65">
+            {needsReconfirm
+              ? "Just confirming you're still in the right store. Update if it's changed."
+              : "A quick onboarding so we can tailor your training experience."}
+          </p>
+        </div>
         <OnboardingForm
           stores={storeRows}
           languages={languages}

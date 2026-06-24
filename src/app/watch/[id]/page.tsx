@@ -89,14 +89,17 @@ export default async function WatchPage({
 
 function NotReadyBanner() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-50">
-      <div className="rounded-md border border-amber-200 bg-amber-50 p-6 text-amber-900 max-w-md text-sm">
-        <p className="font-medium">No lessons ready yet</p>
+    <main className="flex min-h-screen items-center justify-center bg-near-black px-6">
+      <div className="max-w-md rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-sm text-white/80">
+        <p className="font-medium text-white">No lessons ready yet</p>
         <p className="mt-1">
           The lessons assigned to your client are still processing or missing
           media. Check back in a few minutes.
         </p>
-        <Link href="/browse" className="mt-3 inline-block text-amber-900 underline">
+        <Link
+          href="/browse"
+          className="mt-3 inline-block font-mono text-xs uppercase tracking-wider text-arctic-haze hover:text-arctic-haze/80"
+        >
           ← Back to lessons
         </Link>
       </div>

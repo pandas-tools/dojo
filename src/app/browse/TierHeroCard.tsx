@@ -58,15 +58,15 @@ export default function TierHeroCard({
         onClick={() => setOpen(true)}
         className={cn(
           "group block w-full text-left",
-          "rounded-2xl bg-zinc-900/80 ring-1 ring-white/5",
+          "rounded-2xl bg-white/[0.04] ring-1 ring-white/5",
           "px-4 py-3 sm:px-5 sm:py-3.5",
-          "transition-colors hover:bg-zinc-900",
+          "transition-colors hover:bg-white/[0.07] hover:ring-arctic-haze/20",
         )}
       >
         <div className="flex items-center justify-between gap-3">
           <p className="min-w-0 flex-1 text-sm text-white/90">
             You are <span className="text-base">{currentTier.emoji}</span>{" "}
-            <span className="font-semibold text-white">{currentTier.name}</span>
+            <span className="font-medium text-white">{currentTier.name}</span>
             {nextTier ? (
               <span className="text-white/55">
                 {" · "}
@@ -76,7 +76,7 @@ export default function TierHeroCard({
               </span>
             ) : null}
           </p>
-          <ChevronRight className="h-4 w-4 shrink-0 text-white/35 transition-transform group-hover:translate-x-0.5" />
+          <ChevronRight className="h-4 w-4 shrink-0 text-white/35 transition-transform group-hover:translate-x-0.5 group-hover:text-arctic-haze" />
         </div>
       </button>
 
@@ -97,38 +97,17 @@ export default function TierHeroCard({
   );
 }
 
-// Color treatment is POSITIONAL — first tier = warm/amber, top tier = emerald
-// (Pandas brand), everything in between = sky. Works for N=3 today and any
-// N≥2 if admin adds tiers later.
-function tierStyle(index: number, total: number): {
-  ring: string;
-  bg: string;
-  accent: string;
-  text: string;
-} {
-  if (total <= 1 || index === total - 1) {
-    return {
-      ring: "ring-emerald-400/30",
-      bg: "bg-emerald-950/30",
-      accent: "text-emerald-200",
-      text: "text-emerald-50",
-    };
-  }
-  if (index === 0) {
-    return {
-      ring: "ring-amber-400/30",
-      bg: "bg-amber-950/30",
-      accent: "text-amber-200",
-      text: "text-amber-50",
-    };
-  }
-  return {
-    ring: "ring-sky-400/30",
-    bg: "bg-sky-950/30",
-    accent: "text-sky-200",
-    text: "text-sky-50",
-  };
-}
+// The Pandas palette is intentionally cool — no warm hues exist as brand
+// elements. So rather than rotating hue per tier (amber/sky/emerald), we
+// treat tier hierarchy with restraint: every row is a quiet dark card, the
+// user's own tier is the one wearing the arctic-haze brand wash + ring.
+const TIER_ROW_BASE = "bg-white/[0.035] ring-white/5";
+const TIER_ROW_ACCENT = "text-white/55";
+const TIER_ROW_TEXT = "text-white";
+
+const YOUR_TIER_ROW = "bg-arctic-haze/[0.07] ring-arctic-haze/35";
+const YOUR_TIER_ACCENT = "text-arctic-haze";
+const YOUR_TIER_TEXT = "text-white";
 
 function TierModal({
   open,
@@ -163,10 +142,10 @@ function TierModal({
       <DialogContent
         size="sm"
         hideClose
-        className="border-white/10 bg-zinc-950 text-white shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]"
+        className="border-white/10 bg-near-black text-white shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]"
       >
         <div className="flex items-center justify-between">
-          <DialogTitle className="text-lg font-semibold text-white">
+          <DialogTitle className="text-lg font-medium text-white">
             Your training
           </DialogTitle>
           <button
@@ -185,7 +164,6 @@ function TierModal({
             const isYou = tier.id === currentTierId;
             const isAboveYou = ladderIndex > currentIndex;
             const isBelowYou = ladderIndex < currentIndex;
-            const styles = tierStyle(ladderIndex, ladder.length);
             const count = counts[tier.id] ?? 0;
 
             return (
@@ -193,8 +171,9 @@ function TierModal({
                 key={tier.id}
                 className={cn(
                   "relative rounded-2xl px-4 py-4 ring-1",
-                  styles.bg,
-                  isYou ? `ring-2 ${styles.ring}` : "ring-white/5",
+                  isYou
+                    ? cn(YOUR_TIER_ROW, "ring-2")
+                    : TIER_ROW_BASE,
                 )}
               >
                 <div className="flex items-center gap-3">
@@ -203,11 +182,16 @@ function TierModal({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className={cn("text-base font-semibold", styles.text)}>
+                      <span
+                        className={cn(
+                          "text-base font-medium",
+                          isYou ? YOUR_TIER_TEXT : TIER_ROW_TEXT,
+                        )}
+                      >
                         {tier.name}
                       </span>
                       {isYou && (
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/90">
+                        <span className="rounded-full bg-arctic-haze/20 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-arctic-haze">
                           You
                         </span>
                       )}
@@ -227,23 +211,28 @@ function TierModal({
                   </div>
 
                   {isAboveYou && count > 0 && (
-                    <div className={cn("text-right text-sm leading-tight", styles.accent)}>
-                      <div className="font-semibold">{count} ahead</div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/45">
+                    <div
+                      className={cn(
+                        "text-right text-sm leading-tight",
+                        TIER_ROW_ACCENT,
+                      )}
+                    >
+                      <div className="font-medium text-white/80">{count} ahead</div>
+                      <div className="font-mono text-[10px] uppercase tracking-wider text-white/45">
                         of you
                       </div>
                     </div>
                   )}
 
                   {isBelowYou && (
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300 ring-1 ring-emerald-400/20">
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2.5 py-1 text-xs font-medium text-success ring-1 ring-success/25">
                       <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
                       <span>Completed</span>
                     </div>
                   )}
 
                   {isYou && (
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-black">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-arctic-haze text-sm font-medium text-near-black">
                       {userInitial}
                     </div>
                   )}
@@ -255,7 +244,7 @@ function TierModal({
 
         {groupProgress.length > 0 && (
           <div className="mt-5 border-t border-white/5 pt-5">
-            <div className="text-xs font-semibold uppercase tracking-wider text-white/45">
+            <div className="font-mono text-xs font-medium uppercase tracking-wider text-white/45">
               Progress by group
             </div>
             <div className="mt-3 flex flex-col gap-2.5">
@@ -266,12 +255,12 @@ function TierModal({
                     <div className="min-w-0 flex-1 truncate text-sm text-white/85">
                       {g.name}
                     </div>
-                    <div className="text-xs tabular-nums text-white/55">
+                    <div className="font-mono text-xs tabular-nums text-white/55">
                       {g.completed}/{g.total}
                     </div>
                     <div className="h-1 w-16 overflow-hidden rounded-full bg-white/5">
                       <div
-                        className="h-full rounded-full bg-emerald-400/80"
+                        className="h-full rounded-full bg-arctic-haze/80"
                         style={{ width: `${Math.round(pct * 100)}%` }}
                       />
                     </div>

@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
 import BottomNav from "@/components/BottomNav";
+import DojoMark from "@/components/DojoMark";
 import ProfileForm from "./ProfileForm";
 
 export const metadata = { title: "Profile · Dojo" };
@@ -56,15 +58,24 @@ export default async function ProfilePage() {
   const userInitial = (session.user.email ?? "?").charAt(0).toUpperCase();
 
   return (
-    <main className="min-h-dvh bg-black text-white selection:bg-white/20">
-      <header className="px-5 pt-10 pb-8 text-center sm:pt-14">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white text-2xl font-semibold text-black">
+    <main className="min-h-dvh bg-near-black text-white selection:bg-arctic-haze/30">
+      <header className="flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
+        <Link
+          href="/browse"
+          aria-label="Dojo home"
+          className="text-white transition-opacity hover:opacity-80"
+        >
+          <DojoMark variant="wordmark" className="h-7 w-auto sm:h-8" />
+        </Link>
+      </header>
+      <div className="px-5 pt-10 pb-8 text-center sm:pt-12">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-arctic-haze text-2xl font-medium text-near-black">
           {userInitial}
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        <h1 className="text-2xl font-medium tracking-tight sm:text-3xl">
           Profile
         </h1>
-      </header>
+      </div>
 
       <div className="mx-auto max-w-md px-5 pb-36">
         <ProfileForm

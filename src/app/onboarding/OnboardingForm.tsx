@@ -79,16 +79,16 @@ export default function OnboardingForm({
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <div>
-        <label className="block text-sm font-medium text-zinc-700 mb-1">
+        <label className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider text-white/55">
           Preferred language
         </label>
         <select
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          className="w-full appearance-none rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white transition-shadow focus:border-arctic-haze/60 focus:outline-none focus:ring-2 focus:ring-arctic-haze/40"
         >
           {languages.map((code) => (
-            <option key={code} value={code}>
+            <option key={code} value={code} className="bg-near-black">
               {labelFor(code)}
             </option>
           ))}
@@ -96,39 +96,39 @@ export default function OnboardingForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-zinc-700 mb-1">
+        <label className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider text-white/55">
           Your store
         </label>
         <select
           value={storeId}
           onChange={(e) => setStoreId(e.target.value)}
           disabled={hq}
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-50 disabled:text-zinc-400"
+          className="w-full appearance-none rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white transition-shadow focus:border-arctic-haze/60 focus:outline-none focus:ring-2 focus:ring-arctic-haze/40 disabled:opacity-40"
         >
           {stores.length === 0 ? (
             <option value="">— no stores configured —</option>
           ) : (
             stores.map((s) => (
-              <option key={s.id} value={s.id}>
+              <option key={s.id} value={s.id} className="bg-near-black">
                 {s.name}
                 {s.city ? ` — ${s.city}` : ""}
               </option>
             ))
           )}
         </select>
-        <label className="mt-2 flex items-center gap-2 text-sm text-zinc-700">
+        <label className="mt-3 flex items-center gap-2 text-sm text-white/80">
           <input
             type="checkbox"
             checked={hq}
             onChange={(e) => setHq(e.target.checked)}
-            className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+            className="h-4 w-4 rounded border-white/20 bg-white/[0.04] text-arctic-haze accent-arctic-haze focus:ring-arctic-haze"
           />
           I'm not assigned to a store (HQ / other)
         </label>
       </div>
 
       {error && (
-        <p className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </p>
       )}
@@ -136,7 +136,7 @@ export default function OnboardingForm({
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:bg-zinc-300 transition-colors"
+        className="inline-flex w-full items-center justify-center rounded-xl bg-arctic-haze px-4 py-3 font-mono text-sm font-medium uppercase tracking-wider text-near-black transition-opacity hover:opacity-90 disabled:opacity-40"
       >
         {pending ? "Saving…" : mode === "reconfirm" ? "Confirm" : "Continue"}
       </button>

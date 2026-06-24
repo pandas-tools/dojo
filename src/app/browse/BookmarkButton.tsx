@@ -44,7 +44,7 @@ export default function BookmarkButton({
         "transition-[transform,color] duration-150 ease-out",
         "disabled:opacity-60 active:scale-90",
         bookmarked
-          ? "text-red-500 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
+          ? "text-arctic-haze drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
           : "text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] hover:text-white",
       )}
     >

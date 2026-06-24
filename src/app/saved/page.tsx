@@ -6,6 +6,7 @@ import { scopedDb } from "@/lib/db/scoped";
 import { shapeBrowseData, type BrowseCard } from "@/lib/browse-shape";
 import BookmarkButton from "../browse/BookmarkButton";
 import BottomNav from "@/components/BottomNav";
+import DojoMark from "@/components/DojoMark";
 
 export const metadata = { title: "Saved · Dojo" };
 export const dynamic = "force-dynamic";
@@ -62,17 +63,26 @@ export default async function SavedPage() {
   const reelsHref = reelsTarget ? `/watch/${reelsTarget.id}` : undefined;
 
   return (
-    <main className="min-h-dvh bg-black text-white selection:bg-white/20">
-      <header className="px-5 pt-10 pb-6 text-center sm:pt-14">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+    <main className="min-h-dvh bg-near-black text-white selection:bg-arctic-haze/30">
+      <header className="flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
+        <Link
+          href="/browse"
+          aria-label="Dojo home"
+          className="text-white transition-opacity hover:opacity-80"
+        >
+          <DojoMark variant="wordmark" className="h-7 w-auto sm:h-8" />
+        </Link>
+      </header>
+      <div className="px-5 pt-10 pb-8 text-center sm:pt-12">
+        <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">
           Saved
         </h1>
-        <p className="mt-2 text-sm text-white/55">
+        <p className="mt-2 font-mono text-xs uppercase tracking-wider text-white/55">
           {savedCards.length === 0
             ? "Nothing saved yet"
             : `${savedCards.length} ${savedCards.length === 1 ? "lesson" : "lessons"}`}
         </p>
-      </header>
+      </div>
 
       {savedCards.length === 0 ? (
         <EmptyState />
@@ -121,7 +131,7 @@ function SavedCard({ card }: { card: BrowseCard }) {
         )}
 
         {card.completed && (
-          <div className="absolute left-3 top-3 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-black">
+          <div className="absolute left-3 top-3 rounded-full bg-arctic-haze px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-near-black">
             Done
           </div>
         )}

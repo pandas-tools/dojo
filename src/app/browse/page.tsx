@@ -11,6 +11,7 @@ import { getBrowseTierData } from "@/lib/tiers-data";
 import BookmarkButton from "./BookmarkButton";
 import TierHeroCard from "./TierHeroCard";
 import BottomNav from "@/components/BottomNav";
+import DojoMark from "@/components/DojoMark";
 
 export const metadata = { title: "Lessons · Dojo" };
 export const dynamic = "force-dynamic";
@@ -54,8 +55,18 @@ export default async function BrowsePage() {
   const reelsHref = reelsTarget ? `/watch/${reelsTarget.id}` : undefined;
 
   return (
-    <main className="min-h-dvh bg-black text-white selection:bg-white/20">
-      <div className="px-5 pt-8 sm:px-8 sm:pt-10">
+    <main className="min-h-dvh bg-near-black text-white selection:bg-arctic-haze/30">
+      <header className="flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
+        <Link
+          href="/browse"
+          aria-label="Dojo home"
+          className="text-white transition-opacity hover:opacity-80"
+        >
+          <DojoMark variant="wordmark" className="h-7 w-auto sm:h-8" />
+        </Link>
+      </header>
+
+      <div className="px-5 pt-6 sm:px-8 sm:pt-8">
         {data.totals.lessons > 0 && (
           <div className="mx-auto max-w-2xl">
             <TierHeroCard
@@ -67,16 +78,10 @@ export default async function BrowsePage() {
         )}
       </div>
 
-      <header className="px-5 pt-8 pb-8 text-center sm:pt-10 sm:pb-10">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          Lesson library
-        </h1>
-      </header>
-
       {data.totals.lessons === 0 ? (
         <EmptyState />
       ) : (
-        <div className="pb-36 space-y-10 sm:space-y-14">
+        <div className="pt-10 pb-36 space-y-10 sm:pt-12 sm:space-y-14">
           {data.newRail && <GroupRail key="__new" group={data.newRail} />}
           {data.groups.map((group) => (
             <GroupRail key={group.id ?? "__ungrouped"} group={group} />
@@ -146,7 +151,7 @@ function LessonCard({ card }: { card: BrowseCard }) {
         )}
 
         {card.completed && (
-          <div className="absolute left-3 top-3 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-black">
+          <div className="absolute left-3 top-3 rounded-full bg-arctic-haze px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-near-black">
             Done
           </div>
         )}
