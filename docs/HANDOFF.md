@@ -1,4 +1,4 @@
-# Dojo — Handoff (2026-06-24)
+# Dojo — Handoff (2026-06-24 — rebrand)
 
 > Source-of-truth snapshot for picking up Dojo cold. Updated when scope shifts.
 > Read this first; then `spec.md`, `architecture.md`, `decisions.md`, `deploy.md`.
@@ -25,7 +25,58 @@ If you've been dropped into Dojo with no prior context, do these in order:
 - **Whitelisted email domains only.** No passwords. Magic-link sign-in via Resend. Per-client domain allowlist.
 - **Eventual domain:** `learn.pandas.io`. Currently `web-s2cr-production.up.railway.app`.
 
-## Status as of 2026-06-24
+## Status as of 2026-06-24 (evening — Pandas-universe rebrand)
+
+**Pre-production.** Iris-only session. The whole visual identity was brought into the Pandas universe — token layer rewired, brand fonts in, brand wordmark in, every surface swept (employee + auth + admin).
+
+**What shipped (commits `f4a337d` + `96cbda8`):**
+
+- **Token foundation** (`src/app/globals.css` + `src/app/layout.tsx`):
+  - Color: dropped emerald `#10B981` + zinc neutrals (off-brand). New tokens use the Pandas cool palette — `arctic-haze #C1E8FB` brand + `near-black #0E0E0E` + cool neutrals (`snowglint`, `paper-dusk`, `fogbound`, `frosted-fjord`, `blue-quarry`, `steel-harbor`). Source: `/shared/wiki/mkt/design-system/tokens.md`.
+  - Type: dropped Geist. **Sharp Grotesk** (Book 400 + Medium 500) as `--font-sans`, **Silka Mono** (Regular + Medium) as `--font-mono`, loaded via `next/font/local` from `public/brand/fonts/`. OTFs mirrored from `pandas-website/public/brand/fonts/`. Brand has no bold weight — `--font-weight-bold` capped at 500 in `@theme` so existing `font-bold` / `font-semibold` classes render correctly without synthetic-bolding.
+  - Functional signals: muted teal `--color-success`, muted red `--color-destructive`, muted amber `--color-warning` (kept cool per brand-rules.md — never as brand elements).
+  - Brand gradients: utility classes `.bg-brand-gradient-dark`, `.bg-brand-gradient`, `.bg-brand-fade-dark`, `.text-brand-gradient` for hero moments.
+  - Radii: full Pandas scale `8/10/22/30/9999` (replaces old 4/6/8/12).
+  - Focus ring: `brand-deep` (steel-harbor) so it's visible on light surfaces.
+
+- **DojoMark component** (`src/components/DojoMark.tsx`) + brand assets:
+  - Pulled the **dojo wordmark** SVG from Figma (`KYD-Branding` file, node `66:10`) — the Pandas P-emblem + "dojo" wordmark. Stripped the Figma background fill and converted strokes to `currentColor` so it inherits the surface's text color.
+  - Two variants: `wordmark` (full lockup) + `emblem` (P-emblem only). Single inline-SVG component, no `<img>` loading.
+  - Also saved as static SVGs at `public/brand/dojo-wordmark.svg` + `public/brand/dojo-emblem.svg` for non-React usage.
+
+- **Employee surface sweep** (dark surfaces, kept all polished mechanics):
+  - `/browse`: header wordmark top-left, "Done" pill emerald → arctic-haze (mono-uppercase label), tier modal palette refactored from positional amber/sky/emerald (warm — brand violation) to a quiet cool palette where only the user's own tier wears the arctic-haze ring + brand wash, "Completed" pill on tiers below moved to the cool `--color-success` token, group-progress bar emerald → arctic-haze, modal bg `bg-zinc-950` → `bg-near-black`, font-weights pulled to 500 across the surface.
+  - `/saved`: header wordmark, Done pill swap, page subtitle reformatted as Silka Mono uppercase label.
+  - `/profile`: header wordmark, avatar tile white → arctic-haze on near-black, CTA button white → arctic-haze (mono-uppercase), sign-out moved from raw red → `--color-destructive` token, form inputs gain arctic-haze focus ring.
+  - `/watch` NotReadyBanner: amber-on-amber-bg → cool-on-near-black with arctic-haze back link.
+  - BookmarkButton filled state: red (warm — brand violation) → arctic-haze.
+
+- **Auth flow dark redesign** (closes the tonal loop — was the largest deferred gap):
+  - `/login`, `/onboarding`, `/login/check-email`: light/functional → dark/branded. Bg layers: `bg-near-black` + `bg-brand-gradient-dark` at opacity-50 + an arctic-haze radial glow top-left. Big centered Dojo wordmark as the brand statement (~h-14 sm:h-16 on /login).
+  - Forms restyled for dark: white/[0.04] inputs with white/10 border, arctic-haze focus ring, mono-uppercase labels (`text-white/55`), arctic-haze CTA buttons in Silka Mono uppercase.
+  - Check-email success state: arctic-haze checkmark in a brand-haze card.
+
+- **Admin shell + UI primitives** (admin stays light, on Pandas palette):
+  - Layout: `bg-zinc-50` → `bg-snowglint`. Replaced the "D" placeholder + "Dojo admin" word with the real DojoMark wordmark + a Silka Mono "admin" label (both desktop sidebar + mobile top bar). Nav active state moved from neutral `bg-zinc-100` to `bg-arctic-haze/20` + `text-brand-deep` icon — subtle brand affordance on the active route.
+  - `/admin` overview: rounded-2xl cards, Silka Mono uppercase labels on stat boxes + section headers, hover ring → arctic-haze, numbers in `font-medium tabular-nums`, "Manage clients →" link in brand-deep mono.
+  - UI primitives — every admin page inherits these for free:
+    - **Button**: new `brand` variant (arctic-haze + near-black), primary now near-black, destructive → token, `rounded-md` → `rounded-lg`.
+    - **Badge**: success/warning/destructive remapped to muted cool tokens; new `brand` + `info` variants on arctic-haze.
+    - **Card / Dialog / Input / Textarea / Select / Sheet / Label / EmptyState / PageHeader**: zinc/red/emerald swapped for `border-border`, `bg-card`, `bg-snowglint`, `text-near-black`, `text-muted-foreground`, `focus:border-brand-deep`, `bg-near-black/40` scrim, arctic-haze switch + focus ring.
+  - Heading weights capped at 500 across primitives.
+
+**Visual continuity wins:**
+- Five surfaces (login → onboarding → browse → reels → saved → profile) now share the same dark identity, the same brand gradient atmosphere on entry, the same arctic-haze accent vocabulary.
+- Admin stays light but no longer reads as generic shadcn — same wordmark, same cool palette, same Silka Mono labels.
+- One brand wordmark everywhere (login = big centered moment; in-app surfaces = quiet top-left identity mark; admin = sidebar header).
+
+**What's intentionally still pending (carried from the morning session):**
+- "New lessons" rail UI badge / per-card "NEW" treatment.
+- Rating placement.
+- Avatar upload / display name.
+- TranslationsManager + StoresManager visual polish (admin still inherits the new primitives but the manager components themselves haven't had a per-surface intent pass).
+
+**Earlier — same date — Status as of 2026-06-24 (morning)**
 
 **Pre-production.** Still. Same workflow stance: direct commits to `main`, no PR review gate, no `develop` branch — this lapses when real client employees come online (`/apps/dojo/CLAUDE.md`).
 
@@ -291,6 +342,8 @@ Mobile: parent layout `flex-col sm:flex-row`. Top bar with hamburger → Sheet d
 
 | Commit | What |
 |---|---|
+| `96cbda8` | `feat(brand)`: admin surface + UI primitives on Pandas tokens (Iris) |
+| `f4a337d` | `feat(brand)`: align dojo with the Pandas universe — token foundation, fonts, DojoMark, employee + auth sweep (Iris) |
 | `cd85453` | `feat(browse)`: dynamic 'New lessons' rail at top of /browse (Dex backend + Iris consumer wire) |
 | `035a520` | `chore(browse)`: one-off fixture seed (5 groups + 24 lessons reusing existing media) (Dex) |
 | `8e68907` | `feat(browse,saved)`: card radius 16→8px (Iris) |
@@ -408,9 +461,12 @@ The original 27-existing-13-missing list locked 2026-06-02 has been resolved by 
 ## Conventions Iris uses
 
 ### Design language source-of-truth
-- `src/app/globals.css` `@theme` carries the tokens — brand emerald `#10B981` is the affirmative accent. Signal colors per intent: green/amber/red. Geist Sans canonical. Sane `:focus-visible` ring. Honours `prefers-reduced-motion` globally.
-- Surfaces are zinc neutrals on `bg-zinc-50` with white cards (`border-zinc-200`, `rounded-lg`, no shadow unless intentional). Restraint over expression — Linear/Stripe-dashboard reference.
-- Internal admin is functional first; the employee Reels shell is the brand-expression surface.
+- `src/app/globals.css` `@theme` carries the Pandas tokens — `arctic-haze #C1E8FB` brand, `near-black #0E0E0E` text, cool neutrals (`snowglint`, `paper-dusk`, `fogbound`, `frosted-fjord`, `blue-quarry`, `steel-harbor`). Signal tokens (`success`, `destructive`, `warning`) all muted-cool, kept functional, never brand elements. Sharp Grotesk (Book + Medium) canonical, Silka Mono for CTAs/labels/mono. Brand has no bold weight — `--font-weight-bold` is capped at 500.
+- `src/components/DojoMark.tsx` is the single brand-mark component (variants: `wordmark` + `emblem`). Inline SVG, `currentColor`-flowing — re-color via `text-*`.
+- Dark surfaces use `bg-near-black` (not raw `bg-black`) for token consistency. Brand atmosphere on hero moments: `.bg-brand-gradient-dark` + arctic-haze radial glow inline. Selection: `bg-arctic-haze/30`.
+- Light admin surfaces: `bg-snowglint` body, `bg-card` cards (`border-border`, `rounded-2xl`). Restraint over expression — but with arctic-haze active-state affordance so users know which route is live.
+- The employee Reels shell is still the brand-expression surface. The employee Library + the auth flow are now branded too. Admin stays light + utility-first but no longer reads as generic shadcn.
+- Source: `/shared/wiki/mkt/design-system/tokens.md` + `brand-rules.md`. Brand assets origin: `pandas-website/public/brand/`.
 
 ### UI primitives discipline
 - Compose, don't sprawl. New surfaces use `src/components/ui/*` primitives. If a pattern repeats 3+ times, lift it.
