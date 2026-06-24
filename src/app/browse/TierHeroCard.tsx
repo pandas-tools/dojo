@@ -51,17 +51,18 @@ export default function TierHeroCard({
         )}
       >
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm text-white/90">
-              You are <span className="text-base">{meta.emoji}</span>{" "}
-              <span className="font-semibold text-white">{meta.name}</span>
-            </p>
-            <p className="mt-0.5 text-xs text-white/55">
-              {state.nextTier
-                ? `${state.lessonsToNextTier} ${state.lessonsToNextTier === 1 ? "lesson" : "lessons"} to ${TIER_META[state.nextTier].name}`
-                : "Top tier reached"}
-            </p>
-          </div>
+          <p className="min-w-0 flex-1 text-sm text-white/90">
+            You are <span className="text-base">{meta.emoji}</span>{" "}
+            <span className="font-semibold text-white">{meta.name}</span>
+            {state.nextTier ? (
+              <span className="text-white/55">
+                {" · "}
+                {state.lessonsToNextTier}{" "}
+                {state.lessonsToNextTier === 1 ? "lesson" : "lessons"} to{" "}
+                {TIER_META[state.nextTier].name}
+              </span>
+            ) : null}
+          </p>
           <ChevronRight className="h-4 w-4 shrink-0 text-white/35 transition-transform group-hover:translate-x-0.5" />
         </div>
       </button>
