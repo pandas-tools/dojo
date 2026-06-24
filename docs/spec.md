@@ -199,11 +199,26 @@ clients ─┬── client_allowed_domains (1:many)
          ├── users (1:many)
          └── client_lessons ──┐
                               │
+lesson_groups ── lessons.group_id (1:many, nullable; ungrouped = "More lessons" bucket)
+lesson_tiers (client_id nullable; client_id NULL = global default ladder)
+
 lessons ──┬── lesson_translations (1:many, one per language)
           └── client_lessons ──┘ (many:many assignment)
 
-users ── lesson_completions ── lessons (many:many through completions)
+users ── lesson_completions   ── lessons (legacy ratings table; completions read from lesson_events)
+users ── lesson_bookmarks     ── lessons (per-user save)
+users ── lesson_events        ── lessons (append-only event log: opened/completed/engagement/rating)
 ```
+
+### Tables added since the original spec
+
+The following tables (and the columns noted) shipped after this spec was originally written; the spec body above is preserved for the core data model, while the additions below describe the additive extensions. See `HANDOFF.md` for the human-readable summary and `decisions.md` for the ADRs.
+
+- `lesson_groups` — editorial sections shown on `/browse`. `id, name, sort_order, created_at`. Global (not per-client). Backed by admin at `/admin/lesson-groups`.
+- `lesson_bookmarks` — per-user save. PK `(user_id, lesson_id)`. Toggle via `scopedDb.bookmarks.toggle(lessonId)`.
+- `lesson_tiers` — gamification ladder. `id, client_id NULLABLE, name, emoji, min_pct (0..1), sort_order, is_active, timestamps`. `client_id NULL` = global default (used by every client). Seeded with the original 3 (🌱 / ⚡ / 🏆). Admin at `/admin/tiers`. Read via `getBrowseTierData` in `src/lib/tiers-data.ts`.
+- `lessons.group_id` (nullable FK → `lesson_groups`, `ON DELETE SET NULL`), `lessons.group_sort_order` (within-group order), `lessons.published_at` (set on first publish, backfilled = `created_at`).
+- `users.last_new_lessons_checked_at` (per-user high-water mark for the dynamic "New lessons" rail).
 
 ## 5. Auth Flow
 

@@ -20,37 +20,70 @@
 ```
 src/
 ├── middleware.ts              # auth + onboarding routing
+├── components/
+│   ├── ui/                    # hand-pulled Radix primitives (Dialog, Sheet, Select, etc.)
+│   └── BottomNav.tsx          # floating bottom nav on employee surfaces
 ├── lib/
 │   ├── env.ts                 # typed env-var access
-│   ├── auth.ts                # Auth.js config; exports { auth, signIn, signOut, handlers }
+│   ├── auth.ts                # Auth.js config; exports { auth, signIn, signOut, handlers, unstable_update }
+│   ├── auth.config.ts         # Edge-safe slim slice (middleware-only)
 │   ├── mux.ts                 # Mux client + webhook verifier helpers
 │   ├── domain.ts              # email-domain → client_id resolution
+│   ├── cn.ts                  # className helper (clsx + tailwind-merge)
+│   ├── audit-log.ts           # writeAuditEntry / getAuditLog
+│   ├── browse.ts              # getBrowseData — server orchestration for /browse
+│   ├── browse-shape.ts        # pure shaping logic for browse data (unit-tested)
+│   ├── tiers.ts               # pure tier types + classifyTier (client-safe)
+│   ├── tiers-data.ts          # live tier readers: getTierConfig, getClientTierRollup, getBrowseTierData
+│   ├── preview-tokens.ts      # signed preview-as-employee tokens
+│   ├── useLessonTracking.ts   # client hook: emits lesson_opened / lesson_completed / lesson_engagement
 │   └── db/
 │       ├── client.ts          # Drizzle client (postgres-js driver)
 │       ├── schema.ts          # all tables in one file
 │       ├── scoped.ts          # scopedDb(user) — tenant filter
 │       ├── migrate.ts         # runs pending migrations on boot
 │       └── seed.ts            # idempotent seed: Orange Belgium + Dimi as admin
+├── scripts/
+│   └── seed-browse-fixtures.ts  # one-off: 5 groups + 24 lessons reusing existing media
 ├── app/
 │   ├── layout.tsx
 │   ├── page.tsx               # → /login | /browse based on auth
 │   ├── login/page.tsx
 │   ├── onboarding/…
-│   ├── browse/page.tsx
-│   ├── watch/[id]/page.tsx
-│   ├── admin/…
+│   ├── browse/                # dark Reels-on-ramp library
+│   │   ├── page.tsx
+│   │   ├── TierHeroCard.tsx   # client component: hero card + tier modal
+│   │   ├── BookmarkButton.tsx # client component: optimistic bookmark toggle
+│   │   └── actions.ts         # toggleBookmark server action
+│   ├── watch/
+│   │   ├── page.tsx           # redirect to /watch/[firstIncomplete]
+│   │   ├── loading.tsx        # bg-black Suspense fallback
+│   │   └── [id]/
+│   │       ├── page.tsx
+│   │       ├── loading.tsx    # bg-black Suspense fallback
+│   │       └── ReelsFeed.tsx  # client component: scroll-snap feed
+│   ├── saved/page.tsx         # bookmarked lessons grid
+│   ├── profile/               # email / language / store / sign-out
+│   │   ├── page.tsx
+│   │   ├── ProfileForm.tsx    # client form
+│   │   └── actions.ts         # updatePreferredLanguage, updateStore
+│   ├── preview/[token]/…      # employee preview surfaces (admin entry)
+│   ├── admin/…                # admin surfaces: lessons, lesson-groups, tiers, clients, members, analytics, audit-log, employees
 │   └── api/
 │       ├── health/route.ts
 │       ├── auth/[…nextauth]/route.ts
 │       ├── auth/check-domain/route.ts
 │       ├── lessons/…
 │       ├── user/profile/…
+│       ├── media/[...path]/route.ts  # proxy stream for Railway Bucket
 │       ├── webhooks/mux/route.ts
 │       └── admin/…
 └── tests/
     ├── tenant-isolation.test.ts
     ├── auth-domain-check.test.ts
-    └── mux-webhook.test.ts
+    ├── mux-webhook.test.ts
+    ├── browse-shape.test.ts
+    └── tiers.test.ts
 ```
 
 ## Tenant scoping (the load-bearing pattern)

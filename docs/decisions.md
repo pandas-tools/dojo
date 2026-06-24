@@ -4,6 +4,78 @@ Running ADR for `dojo`. New decisions go at the top with a date and status. See 
 
 ---
 
+## 2026-06-24 — Dynamic "New lessons" rail at top of `/browse`
+
+**Status:** Decided.
+
+**Decision:** A virtual rail titled exactly "New lessons" appears at the top of `/browse` when there's at least one lesson published since the current user's last visit.
+
+- **High-water mark** — `users.last_new_lessons_checked_at timestamptz` per user. Read at request time; bumped to `now()` on every `/browse` render (best-effort, fire-and-forget). Trade accepted: a user sees the rail once per fresh batch; closing the tab without scrolling doesn't refund the visual.
+- **Publish moment** — `lessons.published_at` (set on `is_published` false→true, backfilled = `created_at` for existing rows) is the threshold field. Avoids `created_at` ambiguity for lessons authored long before publish.
+- **Read shape** — `getBrowseData` returns a separate `newRail: BrowseGroup | undefined` field, NOT an extra entry in `groups[]`. Reason: lessons in `newRail` ALSO stay in their normal editorial group, and totals/tier-progress/Reels should count each lesson exactly once. Embedding in `groups[]` would force the shaper/consumer to dedupe everywhere.
+- **UI** — Iris renders `data.newRail` first, then `data.groups.map(...)`. Per-card "NEW" badge / per-rail visual treatment deferred.
+
+**Why:** Returning users (the realistic mode for retail employees) need an obvious "what's new" signal. Anchoring to a per-user high-water mark beats globally-recent (which would re-surface to people who already saw it).
+
+**Trade-off:** Doesn't depend on the lesson-in-multiple-groups schema change Dimi also asked about — independent feature, smaller lift. The Netflix cross-tag pattern is deferred.
+
+---
+
+## 2026-06-24 — Gamification: 3-tier ladder, dignity-first naming, no leaderboard
+
+**Status:** Decided.
+
+**Decision:** The gamification system is a tier ladder, not points/coins/leaderboards.
+
+- **Tier names + emojis (v1 seed):** 🌱 Apprentice → ⚡ Specialist → 🏆 Expert. Tier count, names, emojis, and thresholds are all editable in `/admin/tiers` (see separate ADR), so this is the *starting* ladder, not a permanent one.
+- **No individual leaderboards.** Adult retail employees read kid-app gamification cynically; leaderboards create losers in a tight team. Rejected.
+- **Counts shown are CLIENT-WIDE, not store-level.** Dimi explicit: "I don't want to make each store specific at all — [the user] is competing against all the people in the entire organisation."
+- **Per-tier visibility rule:** counts only on tiers ABOVE the user's current tier (and only when count > 0); the user's own tier and tiers below stay silent. Tiers below get a "Completed" pill instead. Never name names; never shame the lowest tier.
+- **Avatar = email's first letter, uppercased.** Display name not collected at onboarding (Dimi: "we don't need the first name"). Trade-off documented in `HANDOFF.md` pending list.
+
+**Why:** Mechanics for adults differ from mechanics for kids. Store-level was rejected because it makes a quiet store feel under-pressure compared to a busy one even though both are doing their job. Tier framing ("Apprentice / Specialist / Expert") borrows literal Apple Store vocabulary, which is native to the Apple Premium Partner audience.
+
+**Trade-off:** Generic mailboxes (info@, sales@) collapse to one letter on the avatar. Acceptable given the audience is named individual employees.
+
+---
+
+## 2026-06-24 — Employee surface: dark, floating bottom nav, Reels immersive
+
+**Status:** Decided.
+
+**Decision:** The entire employee-facing surface (`/browse`, `/saved`, `/profile`, `/watch/*`) is dark (black bg, white type). Admin (`/admin/*`) stays light. Login + onboarding stay light for now (pending a follow-up).
+
+- **Floating bottom nav** — Instagram-style pill (`bg-zinc-900/95 rounded-full`), four tabs (Library, Reels, Saved, Avatar→Profile), `safe-area-inset-bottom` padding. Mounted per-page on the three flat surfaces. **Hidden on `/watch/[id]`** for full Reels immersion — the back chevron is the only way out. (Initially mounted with `overlay` backdrop; Dimi reversed the call mid-session.)
+- **Reels nav link is computed per-page**, pointing directly at `/watch/[firstIncompleteId]` rather than the `/watch` redirect helper. Skips the double-navigation flash that was visible even with Suspense fallbacks on both routes. `/watch` (no id) still exists as a fallback for direct-URL access.
+- **Sign-out moved off `/browse`** to `/profile`. Red treatment, single button. The only way out of the session.
+- **`loading.tsx` in `src/app/watch/{,[id]}/`** returns a fixed-position black div so the Suspense fallback during route transitions stays black instead of bleeding the root body's `bg-zinc-50` through.
+
+**Why:** Reels is the brand-expression surface; `/browse` is the on-ramp. Tonal continuity reads as one app, not two. Bottom nav matches mobile-native expectations (the primary surface per `spec.md §1.1`).
+
+**Trade-off:** Sign-out flow goes dark → light when redirecting to `/login`, which can flash. Accepted as rare. Onboarding/login dark redesign deferred.
+
+---
+
+## 2026-06-24 — `/browse` redesign visual specifics
+
+**Status:** Decided (visual hygiene baseline; further tuning is normal product work).
+
+**Decision:** The library surface uses these specifics, ratified by Dimi iteratively in-session:
+
+- **Cards** — 4:5 portrait (Instagram), `rounded-lg` (8px) corners, `object-cover` poster. Mobile width `w-[38vw]` (max 200px), targeting ~2.33 cards per row with a strong peek of the next card. Desktop scales to `sm:w-44 / md:w-48 / lg:w-52`.
+- **Per-rail layout** — horizontal scroll-snap-mandatory, hidden scrollbars, gap `8px` mobile / `12px` desktop.
+- **Per-content-type cues** — centered translucent play badge on video cards only. Image and carousel cards stay clean.
+- **Bookmark** — bottom-right corner of every card; white-outlined when off, red filled when saved. Optimistic toggle with `e.stopPropagation()` so it doesn't follow the card's link.
+- **Done indicator** — small emerald pill top-left of completed cards.
+- **Tier hero card** — single line "You are [emoji] {Tier} · X lessons to {NextTier}" with chevron-right; tap opens the modal. Sits ABOVE the page title.
+- **Tier modal** — Radix Dialog (true centered pop-up, no slide). Three tier rows stacked vertically, highest tier on top; current tier ringed + YOU badge + email-initial avatar; tiers above show "X ahead / of you" when count > 0; tiers below show "✓ Completed" pill. Row colors are POSITIONAL (first = amber, top = emerald/brand, middle = sky) so the treatment holds for any N-tier ladder.
+
+**Why:** Codifies the values Dimi tuned in-session so they don't drift on the next pass.
+
+**Trade-off:** Card width is in viewport units (`vw`) — looks correct on phones but pre-`sm` breakpoint (640px) tablets get fairly wide cards. Acceptable; mobile-first per spec §1.1.
+
+---
+
 ## 2026-06-24 — Tier system productized (data-driven `lesson_tiers`)
 
 **Status:** Decided. Backend shipped (this change); `/browse` UI rewire follows.

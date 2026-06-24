@@ -1,4 +1,4 @@
-# Dojo — Handoff (2026-06-03)
+# Dojo — Handoff (2026-06-24)
 
 > Source-of-truth snapshot for picking up Dojo cold. Updated when scope shifts.
 > Read this first; then `spec.md`, `architecture.md`, `decisions.md`, `deploy.md`.
@@ -25,7 +25,43 @@ If you've been dropped into Dojo with no prior context, do these in order:
 - **Whitelisted email domains only.** No passwords. Magic-link sign-in via Resend. Per-client domain allowlist.
 - **Eventual domain:** `learn.pandas.io`. Currently `web-s2cr-production.up.railway.app`.
 
-## Status as of 2026-06-03
+## Status as of 2026-06-24
+
+**Pre-production.** Still. Same workflow stance: direct commits to `main`, no PR review gate, no `develop` branch — this lapses when real client employees come online (`/apps/dojo/CLAUDE.md`).
+
+**Big lifts shipped in the 2026-06-24 session** (Iris-led, Dex providing backend on three sub-deliveries):
+
+- **`/browse` dark redesign + tier hero card + tap-to-open tier modal.** The library is now the brand-expression surface alongside Reels — black, centered title, horizontal-scroll rails of 4:5 portrait cards. Hero card pinned ABOVE the title shows "You are ⚡ Specialist · 2 lessons to Expert" in one line. Tap → centered modal with the tier ladder stacked vertically (highest tier on top, current tier ringed with a "YOU" badge + the user's initial, "X ahead of you" on tiers above, "Completed" pill on tiers below). Counts are CLIENT-WIDE (not store-level — explicitly rejected by Dimi). "X ahead of you" hides entirely when zero. The whole tier system is data-driven via the new `lesson_tiers` table + `/admin/tiers` page (see below).
+- **Floating bottom nav** (Instagram-style pill, dark, rounded-full, safe-area-inset-bottom). Four tabs: 🏠 Library / ▶ Reels / 🔖 Saved / Avatar (your email's first letter). Active tab gets a horizontally-stretched pill highlight. Reels link is computed PER-PAGE to point straight at `/watch/[firstIncompleteId]` so navigation is single-hop (no `/watch` redirect double-flash). Nav is hidden on `/watch/[id]` for full Reels immersion — back chevron is the only way out.
+- **New routes:**
+  - `/saved` — bookmarked lessons in a 2-col vertical grid (no groups, no horizontal scroll). Same card visuals as `/browse`.
+  - `/profile` — email (read-only), language + store change (server actions, JWT re-issue via `unstable_update`), and the sign-out button moved here from `/browse` top-right. Avatar tile up top.
+  - `/watch` (no id) — server-side redirect that picks the first-incomplete-by-sort-order lesson. Still useful for direct-URL access; the bottom nav itself skips it.
+- **Productized tier system** (Dex backend, Iris UI rewire). `lesson_tiers` table, `/admin/tiers` CRUD + reorder + threshold edit, `getBrowseTierData` read shape that the hero card consumes. Tier count / names / emojis / thresholds are all editable in data without a deploy. Seeded with the original 3 (🌱 Apprentice / ⚡ Specialist / 🏆 Expert) as the global default. Defensive fallback if the table is empty/unreachable. Legacy `src/lib/tier.ts` deleted on the rewire.
+- **Dynamic "New lessons" rail** (Dex backend). Per-user high-water mark (`users.last_new_lessons_checked_at`) + per-lesson publish moment (`lessons.published_at`). `getBrowseData` returns a separate `newRail` field when there's anything published since the user's last check; Iris's `/browse` renders it at the very top above the editorial groups. Lessons in `newRail` also stay in their normal group (so totals/tier-progress/reels count each once). Checkpoint bumped to now on each render.
+- **Lesson groups + bookmarks** (Dex backend, Iris UI). Earlier in the session — `lesson_groups` table, `lessons.group_id` + `lessons.group_sort_order`, `lesson_bookmarks` (PK `user_id+lesson_id`), `toggleBookmark` server action, `/admin/lesson-groups` page. Bookmark toggle is the icon at the bottom-right of every card (white when off, red filled when saved). Backs the entire dark `/browse` rail layout.
+- **Test fixture seed (one-off).** `src/scripts/seed-browse-fixtures.ts` — idempotent script that created 5 editorial groups (Managing the store · Customer flows · Vision AI basics · Trade-in process · Repair workflows) with 24 new lessons reusing the existing 7 lessons' media so cards render real posters. Total now: 6 rails / 31 lessons on Orange Belgium.
+
+**Visual hygiene tweaks made in-session** (worth noting for future styling):
+- Card aspect 4:5 (Instagram portrait).
+- Card width mobile: `w-[38vw]` max 200px → roughly 2.33 cards per row with peek. Desktop: `sm:w-44 md:w-48 lg:w-52`.
+- Card radius: `rounded-lg` (8px).
+- Card gap: `gap-2` mobile / `sm:gap-3` desktop (8px / 12px).
+- Play badge centered on video cards only; image + carousel cards stay clean.
+- Tier modal row colors are POSITIONAL (first tier = amber/warm, top tier = emerald/brand, middle tiers = sky) — so any N-tier ladder reads cleanly without per-tier-name styling.
+
+**Library view (Layout 2) — `/browse`** is no longer "untouched" — see "Library view" section below for the full description.
+
+**Live URL:** https://web-s2cr-production.up.railway.app
+**Login:**
+- Admin: `dimitris@pandas.io` (in `ADMIN_ALLOWLIST` env var)
+- Employee (Orange Belgium seed): `dimitris@parallel9.com` (in `parallel9.com` allowed domain)
+
+**Dev magic-link URL gate:** `DEV_LOG_MAGIC_LINKS=1` is set on Railway. The magic link URL is logged to `environmentLogs` ~15s after a sign-in trigger. Pull via the Railway GraphQL API at `https://backboard.railway.com/graphql/v2` with `Authorization: Bearer $RAILWAY_API_TOKEN` (account-scoped from `/personas/iris/.env`).
+
+---
+
+## Earlier — Status as of 2026-06-03
 
 **Pre-production.** No external client employees are using it yet; the public Railway URL is internal-only. Optimised for speed of iteration — direct commits to `main`, no PR review gate, no `develop` branch. This rule lapses when real client employees come online (spec'd in `/apps/dojo/CLAUDE.md`).
 
@@ -73,11 +109,15 @@ Helper script at `/tmp/dojo-login.sh` automates this. Flip the env var off when 
 
 ## Data model snapshot (post-2026-06-03)
 
-Migrations to date: `0000_init.sql`, `0001_media_types_and_events.sql`, `0002_admin_audit_log.sql`, `0003_mux_error_message.sql`, `0004_aspect_ratio.sql`. All additive; the `release` startCommand runs them on every deploy.
+Migrations to date: `0000_init.sql`, `0001_media_types_and_events.sql`, `0002_admin_audit_log.sql`, `0003_mux_error_message.sql`, `0004_aspect_ratio.sql`, `0005_lesson_groups_and_bookmarks.sql`, `0006_lesson_tiers.sql`, `0007_new_lessons_rail.sql`. All additive; the `release` startCommand runs them on every deploy.
 
 Tables (lesson surface):
 
-- `lessons` — `id, internal_name, type ('training'|'announcement'|'update'), content_type ('video'|'image'|'carousel'), sort_order, is_published, created_at`.
+- `lessons` — `id, internal_name, type ('training'|'announcement'|'update'), content_type ('video'|'image'|'carousel'), sort_order, group_id (FK → lesson_groups, nullable, ON DELETE SET NULL), group_sort_order, is_published, published_at (set on first publish, backfilled = created_at), created_at`.
+- `lesson_groups` — editorial sections shown on `/browse`. `id, name, sort_order, created_at`. Global (not per-client) — assignment to a client happens via the lessons that belong to the group + `client_lessons`. Admin at `/admin/lesson-groups`.
+- `lesson_bookmarks` — per-user save. PK `(user_id, lesson_id)`. Toggle via `scopedDb.bookmarks.toggle(lessonId)` server-side; consumed in `/browse` cards + `/saved` page.
+- `lesson_tiers` — productized gamification ladder. `id, client_id NULLABLE (NULL = global), name, emoji, min_pct (0..1 fraction of completed/assigned), sort_order, is_active, timestamps`. Seeded with the original 3 (🌱 / ⚡ / 🏆) as global default. Admin at `/admin/tiers`.
+- `users` adds `last_new_lessons_checked_at timestamptz` — per-user high-water mark for the dynamic "New lessons" rail. Bumped to now on each `/browse` render.
 - `lesson_translations` — `(lesson_id, language)` unique; carries per-language `title, description, notes_markdown`. Plus media + media-shape columns:
   - Video: `mux_playback_id, mux_asset_id, mux_upload_id, duration_seconds, thumbnail_url, mux_error_message` (set from `video.asset.errored` webhook or `resyncMuxUpload`).
   - Image: `image_url, image_alt`.
@@ -134,9 +174,78 @@ Wrong-shaped lessons (preferred language exists but media is missing) silently f
 
 ## Library view (Layout 2) — `/browse`
 
-**Not yet redesigned.** Still the pre-Reels Netflix-grid card layout (content-type-aware thumbnails since 50c9506). When the user-facing pivot started, the call was to lock Reels first and revisit `/browse` second. As of 2026-06-03 the redesign hasn't started.
+**The brand-expression surface alongside Reels.** Built 2026-06-23 → 2026-06-24.
 
-This is the largest outstanding UI lift. Real client employees would land on `/browse` first (per spec: returning users land on the first incomplete lesson which then opens Reels; but the explicit "all lessons" view IS `/browse`). Worth a dedicated design pass before going live.
+Layout (top to bottom):
+1. **Tier hero card** (above the title). One line: `You are [emoji] {Tier} · X lessons to {NextTier}` with a chevron-right. Tap → centered tier modal. Drops the chevron and changes the trailing clause to `Top tier reached — N of M complete` once Expert is hit.
+2. **`Lesson library` title** — centered, big, bold.
+3. **Dynamic "New lessons" rail** (when there's anything new for this user) — sits above the editorial groups.
+4. **Editorial group rails** — one per `lesson_groups` row (in `sort_order`), then a trailing "More lessons" bucket for ungrouped lessons.
+5. **Floating bottom nav** — pinned, see below.
+
+Card mechanics:
+- 4:5 portrait, `rounded-lg` (8px), object-cover poster. Mobile width `w-[38vw]` (max 200px) → ~2.33 cards per row with a peek. Desktop scales down to `sm:w-44 / md:w-48 / lg:w-52`.
+- Horizontal scroll-snap mandatory per rail, scroll-pl matched to outer padding, scrollbar hidden.
+- Per-content-type cues on the card:
+  - **Video** — centered translucent white play badge with backdrop-blur. Image and carousel cards stay clean (no center overlay).
+  - **Completed** — small emerald "Done" pill top-left.
+- **Bookmark button** — bottom-right of every card. White outline when off, red filled when saved. Tap = optimistic toggle, `e.stopPropagation()` so it doesn't follow the card's link.
+- Tap a card → `/watch/[id]` (the Reels view).
+- Wrong-shape / processing / no-preview lessons stay mounted with `opacity-60` and no link (consistent with Reels handling).
+
+### Tier hero card + modal
+
+- The hero card itself is one text line + chevron. Drop the surrounding chrome and emoji avatar tile that an earlier iteration had (small footprint won).
+- Modal (Radix Dialog, dark) renders the active ladder VERTICALLY, highest tier on top (Expert → Specialist → Apprentice for the seeded 3). Each row carries the tier emoji, name, and:
+  - **Your tier:** ring + "YOU" badge + your email's first letter as an avatar + `X lessons to {NextTier}` callout (or `Top tier reached` at the top).
+  - **Tiers above you:** `count ahead / of you` count text, **hidden entirely when count is 0**.
+  - **Tiers below you:** emerald `✓ Completed` pill.
+- Row colors are POSITIONAL: index 0 = amber/warm, index N-1 = emerald/brand, middle = sky. Adapts cleanly if an admin adds a 4th or 5th tier in `/admin/tiers`.
+- Below the tier stack: per-group progress (`2 of 4 in Managing the store`) with mini progress bars.
+- The whole modal consumes `getBrowseTierData({ clientId, completed })` from `src/lib/tiers-data.ts`. Counts are CLIENT-WIDE (not store-level). Tier definition reads from `lesson_tiers`; falls back to the hardcoded 3 if the table is empty/unreachable.
+
+### Dynamic "New lessons" rail
+
+- Returned as a separate `BrowseData.newRail` field (not inside `groups[]`) so totals + tier-progress count each lesson once.
+- Iris's `/browse` renders it first when present, then maps the editorial groups.
+- Threshold = `users.last_new_lessons_checked_at`. Bumped to now on each `/browse` render (best-effort, fire-and-forget). Once you see the rail, it stays empty until something else is published.
+- `lessons.published_at` is the per-lesson timestamp — set on `is_published` false→true; backfilled to `created_at` for existing rows.
+- Title: `New lessons`. Per-card "NEW" badge / per-rail visual treatment deferred (Iris's lane when called).
+
+## Bottom navigation — `src/components/BottomNav.tsx`
+
+Instagram-style floating pill at the bottom of every employee surface EXCEPT `/watch/[id]` (immersion). Four slots:
+
+- 🏠 **Library** → `/browse`
+- ▶ **Reels** → `/watch/[firstIncompleteLessonId]` — href is computed per-page (each consuming page passes `reelsHref`) so navigation is single-hop. The `/watch` (no id) redirect helper still exists for direct-URL access but the nav skips it.
+- 🔖 **Saved** → `/saved`
+- **Avatar** → `/profile` — the user's email-first-letter inside a white circle. Active state ring.
+
+Mechanics:
+- `fixed inset-x-0 bottom-0` with `safe-area-inset-bottom` padding for iOS.
+- `bg-zinc-900/95 ring-1 ring-white/10 rounded-full px-2.5 py-2`. `overlay` prop swaps in `bg-zinc-900/80 backdrop-blur-md` for video-bearing surfaces (currently unused since `/watch/[id]` doesn't mount the nav — kept for future).
+- Each tab is `h-11 w-16` so the active-state `bg-white/10 rounded-full` reads as a horizontal pill, not a circle.
+- Profile slot uses the user's initial (no avatar upload pipeline yet).
+
+## `/saved` — bookmarks page
+
+- 2-column vertical grid (no horizontal scroll, no editorial groups).
+- Reuses `shapeBrowseData` to assemble cards, then flattens + filters `card.isBookmarked === true`.
+- Cards mirror `/browse` visuals exactly (4:5, play badge on video, completed pill, bookmark toggle bottom-right — tapping the bookmark un-saves and removes the card from the list on next render).
+- Empty state with a bookmark icon and copy "Tap the bookmark on any lesson to save it here for later."
+- Bottom nav mounted; Reels href computed from the same data.
+
+## `/profile` — settings + sign out
+
+- Avatar tile at the top (user's email first letter), then "Profile" heading.
+- Three fields: email (read-only), language `<select>` populated from `client_languages`, store `<select>` populated from the client's `stores` (sorted by name).
+- Single "Save changes" button — disabled until either select is dirty. Server actions in `src/app/profile/actions.ts` (`updatePreferredLanguage`, `updateStore`) update the DB + call `unstable_update()` to re-issue the JWT with fresh claims (so middleware and downstream renders pick up the change immediately).
+- Sign-out button at the bottom in red treatment. This is the ONLY way out — sign-out removed from `/browse` top-right entirely.
+- Toast feedback on save success/failure (Sonner).
+
+## `/watch` (no id) — entry redirect
+
+Server-side: fetches the user's lessons + completed events, picks the first lesson without a completion (or the first lesson if all complete), redirects to `/watch/[id]`. Falls back to `/browse` if no lessons. Used for direct URL access; the bottom nav now points directly at `/watch/[firstIncompleteId]` so the redirect is rarely hit during normal nav.
 
 ## Preview-as-employee — `/preview/<token>/...`
 
@@ -182,6 +291,24 @@ Mobile: parent layout `flex-col sm:flex-row`. Top bar with hamburger → Sheet d
 
 | Commit | What |
 |---|---|
+| `cd85453` | `feat(browse)`: dynamic 'New lessons' rail at top of /browse (Dex backend + Iris consumer wire) |
+| `035a520` | `chore(browse)`: one-off fixture seed (5 groups + 24 lessons reusing existing media) (Dex) |
+| `8e68907` | `feat(browse,saved)`: card radius 16→8px (Iris) |
+| `787519a` | `feat(browse)`: card gap 12→8px mobile, 16→12px desktop (Iris) |
+| `2dc486f` | `feat(browse)`: hide 'X ahead of you' when count is 0 (Iris) |
+| `9be32d6` | `feat(browse)`: rewire tier hero card to consume live tier data (Iris) |
+| `797b91b` | `feat(tiers)`: productize tier system — `lesson_tiers` + `/admin/tiers` (Dex) |
+| `2004858` | `feat(browse)`: collapse hero card to a single line (Iris) |
+| `5800fb7` | `feat(browse)`: drop tier bar; 'You are [emoji] Tier' + lessons-to-next (Iris) |
+| `c30cbc4` | `fix(reels)`: nav Reels link goes straight to /watch/[id] — kill double-hop flash (Iris) |
+| `a467f1e` | `fix(reels)`: black Suspense fallback on /watch — kills the white flash on enter (Iris) |
+| `339da11` | `feat(employee)`: BottomNav + /saved + /profile + /watch entry redirect (Iris) |
+| `ea09a06` | `feat(nav)`: wider tabs + horizontal pill highlight (Iris) |
+| `8211b39` | `feat(browse)`: tighter cards (~2.5/row), play overlay on video, drop metadata row (Iris) |
+| `e1499e3` | `feat(browse)`: 'X ahead' on upper tiers + 'Completed' on cleared tiers (Iris) |
+| `8294753` | `feat(browse)`: tier hero card above title + tap-to-open modal (mocked) (Iris) |
+| `c03ffca` | `feat(browse)`: dark Reels-on-ramp redesign of /browse (Iris) |
+| `0452a53` | `feat(browse)`: editorial lesson groups + per-user bookmarks (Dex) |
 | `6051dbd` | `feat(admin)`: thread aspectRatio through NewLessonDialog + Resync-metadata link on Ready video state (Dex) |
 | `46e72dd` | `feat(reels)`: strip background from back arrow — plain white chevron over the scene (Iris) |
 | `38a9ef9` | `feat(carousel)`: TikTok-style horizontal swipe + bottom-center dots (Iris) |
@@ -223,8 +350,11 @@ Mobile: parent layout `flex-col sm:flex-row`. Top bar with hamburger → Sheet d
 - Add an admin email to `ADMIN_ALLOWLIST` — though you can also add admins from the live Members surface once signed in.
 
 ### Deferred (acknowledged, not done)
-- **Library view (`/browse`) redesign** — biggest pending UI item. Still the pre-Reels card layout. Reels is the brand-expression surface, Library is the navigator that hangs off it. Real client employees would land here first. Iris's lane when Dimi greenlights.
+- **Lesson-in-multiple-groups (Netflix-style cross-tag).** Dimi raised this 2026-06-24 alongside the New-lessons rail. Today `lessons.group_id` is a single nullable FK (1:N). Many-to-many requires a junction table (`lesson_group_assignments`), backfill migration, admin UI for multi-tagging, and read pipeline rewrite. Skipped for now; revisit when content strategy actually needs cross-listing. Dex's lane when greenlit.
+- **"New lessons" rail UI badge / per-card "NEW" treatment.** Backend ships the rail; Iris's visual flourish on the rail header + per-card chip is unbuilt. Dimi explicitly said "we can think of it later."
 - **Rating placement.** Removed from Reels in the 2026-06-03 polish pass. Real product gap — needs a decision on where it lives (slide-in after lesson complete? on Library? as a separate question after the lesson?) and whether to migrate from 1–5 stars to thumbs. Currently deferred.
+- **Avatar upload / display name.** Avatar is the email's first letter for now. Display name not collected at onboarding either — Dimi explicitly accepted this trade-off 2026-06-24 ("we don't need the first name"). When this gets revisited, the change is: add `users.display_name`, onboarding step to collect, profile field to edit, avatar derives initials from it.
+- **Onboarding + login dark redesign.** `/onboarding` and `/login` are still functional/light. Employee surface ( `/browse` `/saved` `/profile` `/watch` ) all went dark this session. Closing the loop on the auth flow would unify the surface — not blocking, just pending.
 - **Comments / feedback / questions on lessons.** Intentionally deferred pending Dimi's framing decision.
 - **TranslationsManager + StoresManager internal polish.** Functional but visually inherit from the previous era. Low priority.
 - **Per-lesson dwell-time override for image lessons.** Hardcoded 5s globally. Would be a column on `lessons`. Not implemented.
