@@ -45,9 +45,7 @@ export default async function BrowsePage() {
       total: g.cards.length,
     }));
 
-  const email = session.user.email ?? "";
-  const userInitial = (email || "?").charAt(0).toUpperCase();
-  const userName = nameFromEmail(email);
+  const userInitial = (session.user.email ?? "?").charAt(0).toUpperCase();
 
   return (
     <main className="min-h-dvh bg-black text-white selection:bg-white/20">
@@ -58,7 +56,6 @@ export default async function BrowsePage() {
               completed={data.totals.completed}
               total={data.totals.lessons}
               userInitial={userInitial}
-              userName={userName}
               groupProgress={groupProgress}
               mockedCounts={MOCKED_TIER_COUNTS}
             />
@@ -170,12 +167,6 @@ function LessonCard({ card }: { card: BrowseCard }) {
   ) : (
     <div className={`${cardShell} opacity-60`}>{inner}</div>
   );
-}
-
-function nameFromEmail(email: string): string {
-  const local = email.split("@")[0] ?? "you";
-  const first = local.split(/[._-]/)[0] ?? local;
-  return first ? first.charAt(0).toUpperCase() + first.slice(1) : "you";
 }
 
 function EmptyState() {

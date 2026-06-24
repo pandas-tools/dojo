@@ -22,7 +22,6 @@ type Props = {
   completed: number;
   total: number;
   userInitial: string;
-  userName: string;
   groupProgress: GroupProgress[];
   /** Mocked until Dex ships the store rollup query — colleague count per tier. */
   mockedCounts: Record<Tier, number>;
@@ -32,17 +31,12 @@ export default function TierHeroCard({
   completed,
   total,
   userInitial,
-  userName,
   groupProgress,
   mockedCounts,
 }: Props) {
   const [open, setOpen] = useState(false);
   const state = classifyTier(completed, total);
-  const currentIndex = TIER_ORDER.indexOf(state.tier);
-
-  const headline = state.nextTier
-    ? `Hi ${userName} · ${state.lessonsToNextTier} ${state.lessonsToNextTier === 1 ? "lesson" : "lessons"} to ${TIER_META[state.nextTier].name}`
-    : `Hi ${userName} · You're an Expert`;
+  const meta = TIER_META[state.tier];
 
   return (
     <>
@@ -56,45 +50,19 @@ export default function TierHeroCard({
           "transition-colors hover:bg-zinc-900",
         )}
       >
-        <div className="flex items-center gap-2">
-          <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">
-            {headline}
-          </p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-white/90">
+              You are <span className="text-base">{meta.emoji}</span>{" "}
+              <span className="font-semibold text-white">{meta.name}</span>
+            </p>
+            <p className="mt-0.5 text-xs text-white/55">
+              {state.nextTier
+                ? `${state.lessonsToNextTier} ${state.lessonsToNextTier === 1 ? "lesson" : "lessons"} to ${TIER_META[state.nextTier].name}`
+                : "Top tier reached"}
+            </p>
+          </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-white/35 transition-transform group-hover:translate-x-0.5" />
-        </div>
-
-        <div className="mt-2.5 flex items-center gap-1.5">
-          {TIER_ORDER.map((tier, idx) => {
-            const reached = idx <= currentIndex;
-            const isCurrent = idx === currentIndex;
-            return (
-              <div key={tier} className="flex flex-1 items-center gap-1.5">
-                <div
-                  className={cn(
-                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs transition-all",
-                    isCurrent
-                      ? "bg-white text-black ring-2 ring-white scale-110"
-                      : reached
-                        ? "bg-emerald-400/15 ring-1 ring-emerald-400/30"
-                        : "bg-white/5 opacity-60",
-                  )}
-                  aria-label={TIER_META[tier].name}
-                >
-                  {TIER_META[tier].emoji}
-                </div>
-                {idx < TIER_ORDER.length - 1 && (
-                  <div
-                    className={cn(
-                      "h-px flex-1 transition-colors",
-                      idx < currentIndex
-                        ? "bg-emerald-400/40"
-                        : "bg-white/10",
-                    )}
-                  />
-                )}
-              </div>
-            );
-          })}
         </div>
       </button>
 
