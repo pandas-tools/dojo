@@ -1,14 +1,17 @@
 import * as React from "react";
 import { cn } from "@/lib/cn";
 
-type Variant = "neutral" | "success" | "warning" | "destructive" | "info";
+type Variant = "neutral" | "success" | "warning" | "destructive" | "info" | "brand";
 
+// Functional signal colors stay muted (per brand-rules.md). Brand variant
+// uses arctic-haze so admin can flag "this is a brand-aligned state."
 const variantClasses: Record<Variant, string> = {
-  neutral: "bg-zinc-100 text-zinc-700 border-zinc-200",
-  success: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  warning: "bg-amber-50 text-amber-700 border-amber-200",
-  destructive: "bg-red-50 text-red-700 border-red-200",
-  info: "bg-blue-50 text-blue-700 border-blue-200",
+  neutral: "bg-paper-dusk text-near-black/75 border-border",
+  success: "bg-success/10 text-success border-success/25",
+  warning: "bg-warning/10 text-warning border-warning/25",
+  destructive: "bg-destructive/10 text-destructive border-destructive/25",
+  info: "bg-arctic-haze/15 text-brand-deep border-arctic-haze/30",
+  brand: "bg-arctic-haze text-near-black border-arctic-haze",
 };
 
 export interface BadgeProps

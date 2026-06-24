@@ -16,6 +16,7 @@ import { signOutAction } from "../actions";
 import AdminNavLink from "./AdminNavLink";
 import MobileNavTrigger from "./MobileNavTrigger";
 import { Toaster } from "@/components/ui/toaster";
+import DojoMark from "@/components/DojoMark";
 
 export default async function AdminLayout({
   children,
@@ -27,19 +28,19 @@ export default async function AdminLayout({
   if (session.user.role !== "admin") redirect("/browse");
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex flex-col sm:flex-row">
+    <div className="min-h-screen bg-snowglint flex flex-col sm:flex-row">
       {/* Desktop sidebar */}
-      <aside className="hidden sm:flex w-56 shrink-0 flex-col border-r border-zinc-200 bg-white">
-        <div className="px-5 py-5 border-b border-zinc-200">
+      <aside className="hidden sm:flex w-56 shrink-0 flex-col border-r border-border bg-card">
+        <div className="px-5 py-5 border-b border-border">
           <Link
             href="/admin"
-            className="flex items-center gap-2 text-zinc-900"
+            className="flex items-center gap-2 text-near-black transition-opacity hover:opacity-80"
+            aria-label="Dojo admin home"
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-900 text-white text-xs font-bold">
-              D
+            <DojoMark variant="wordmark" className="h-5 w-auto" />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              admin
             </span>
-            <span className="font-semibold tracking-tight">Dojo</span>
-            <span className="text-xs text-zinc-400 font-normal">admin</span>
           </Link>
         </div>
         <nav className="flex-1 px-2.5 py-3 space-y-0.5">
@@ -89,10 +90,10 @@ export default async function AdminLayout({
             Audit log
           </AdminNavLink>
         </nav>
-        <div className="border-t border-zinc-200 px-4 py-3">
+        <div className="border-t border-border px-4 py-3">
           <div className="flex items-center justify-between gap-2">
             <p
-              className="text-xs text-zinc-500 truncate"
+              className="text-xs text-muted-foreground truncate"
               title={session.user.email ?? ""}
             >
               {session.user.email}
@@ -100,7 +101,7 @@ export default async function AdminLayout({
             <form action={signOutAction}>
               <button
                 type="submit"
-                className="text-zinc-400 hover:text-zinc-900 transition-colors p-1 -m-1"
+                className="text-muted-foreground hover:text-near-black transition-colors p-1 -m-1"
                 title="Sign out"
                 aria-label="Sign out"
               >
@@ -112,19 +113,20 @@ export default async function AdminLayout({
       </aside>
 
       {/* Mobile top bar — sticky for navigation persistence on scroll */}
-      <header className="sm:hidden sticky top-0 z-30 flex items-center justify-between border-b border-zinc-200 bg-white/90 backdrop-blur px-4 py-3">
+      <header className="sm:hidden sticky top-0 z-30 flex items-center justify-between border-b border-border bg-card/90 backdrop-blur px-4 py-3">
         <MobileNavTrigger
           email={session.user.email ?? ""}
           signOutAction={signOutAction}
         />
         <Link
           href="/admin"
-          className="flex items-center gap-2 text-zinc-900"
+          className="flex items-center gap-2 text-near-black"
+          aria-label="Dojo admin home"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-900 text-white text-xs font-bold">
-            D
+          <DojoMark variant="wordmark" className="h-5 w-auto" />
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            admin
           </span>
-          <span className="font-semibold tracking-tight text-sm">Dojo</span>
         </Link>
         <span className="w-9" aria-hidden />
       </header>

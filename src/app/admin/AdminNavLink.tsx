@@ -23,17 +23,17 @@ export default function AdminNavLink({
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+        "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors",
         isActive
-          ? "bg-zinc-100 text-zinc-900 font-medium"
-          : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900",
+          ? "bg-arctic-haze/20 text-near-black font-medium"
+          : "text-muted-foreground hover:bg-paper-dusk hover:text-near-black",
       )}
     >
       {icon && (
         <span
           className={cn(
             "shrink-0",
-            isActive ? "text-zinc-900" : "text-zinc-400",
+            isActive ? "text-brand-deep" : "text-muted-foreground/70",
           )}
           aria-hidden
         >

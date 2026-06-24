@@ -17,7 +17,7 @@ export const SheetOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-40 bg-zinc-900/40 backdrop-blur-[2px]",
+      "fixed inset-0 z-40 bg-near-black/40 backdrop-blur-[2px]",
       "transition-opacity duration-150",
       "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
       className,
@@ -50,7 +50,7 @@ export const SheetContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed z-50 bg-white border-zinc-200 shadow-xl shadow-zinc-900/10",
+        "fixed z-50 bg-card border-border shadow-xl shadow-near-black/10",
         "transition-transform duration-200 ease-out",
         "flex flex-col",
         sideClasses[side],
@@ -61,7 +61,7 @@ export const SheetContent = React.forwardRef<
       {children}
       {!hideClose && (
         <DialogPrimitive.Close
-          className="absolute right-3 top-3 rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+          className="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground hover:bg-paper-dusk hover:text-near-black transition-colors"
           aria-label="Close"
         >
           <X className="h-4 w-4" />

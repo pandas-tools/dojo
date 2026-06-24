@@ -52,31 +52,33 @@ export default async function AdminHome() {
         />
       </div>
 
-      <div className="rounded-lg border border-zinc-200 bg-white">
-        <div className="border-b border-zinc-200 px-5 py-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-zinc-900">Clients</h2>
+      <div className="rounded-2xl border border-border bg-card">
+        <div className="border-b border-border px-5 py-3 flex items-center justify-between">
+          <h2 className="font-mono text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Clients
+          </h2>
           <Link
             href="/admin/clients"
-            className="text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
+            className="font-mono text-xs uppercase tracking-wider text-brand-deep hover:text-near-black transition-colors"
           >
             Manage clients →
           </Link>
         </div>
         {clientList.length === 0 ? (
-          <p className="p-6 text-sm text-zinc-500">No clients yet.</p>
+          <p className="p-6 text-sm text-muted-foreground">No clients yet.</p>
         ) : (
-          <ul className="divide-y divide-zinc-100">
+          <ul className="divide-y divide-border">
             {clientList.map((c) => (
               <li key={c.id}>
                 <Link
                   href={`/admin/clients/${c.id}`}
-                  className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50/60 transition-colors"
+                  className="flex items-center justify-between px-5 py-3 hover:bg-snowglint transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-sm font-medium text-zinc-900 truncate">
+                    <span className="text-sm font-medium text-near-black truncate">
                       {c.name}
                     </span>
-                    <span className="text-xs text-zinc-400 font-mono">
+                    <span className="font-mono text-xs text-muted-foreground">
                       {c.slug}
                     </span>
                   </div>
@@ -107,12 +109,12 @@ function Stat({
   return (
     <Link
       href={href}
-      className="rounded-lg border border-zinc-200 bg-white p-4 hover:border-zinc-400 transition-colors"
+      className="rounded-2xl border border-border bg-card p-4 transition-colors hover:border-arctic-haze/60 hover:bg-arctic-haze/[0.04]"
     >
-      <div className="text-[11px] uppercase tracking-wide text-zinc-500">
+      <div className="font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
-      <div className="mt-1 text-2xl font-semibold text-zinc-900">{value}</div>
+      <div className="mt-1 text-2xl font-medium text-near-black tabular-nums">{value}</div>
     </Link>
   );
 }

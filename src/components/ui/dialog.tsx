@@ -17,7 +17,7 @@ export const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-40 bg-zinc-900/40 backdrop-blur-[2px]",
+      "fixed inset-0 z-40 bg-near-black/40 backdrop-blur-[2px]",
       "transition-opacity duration-150",
       "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
       className,
@@ -51,7 +51,7 @@ export const DialogContent = React.forwardRef<
       className={cn(
         "fixed left-1/2 top-1/2 z-50 grid -translate-x-1/2 -translate-y-1/2 gap-4",
         "w-[calc(100vw-1rem)]",
-        "bg-white border border-zinc-200 rounded-xl shadow-2xl shadow-zinc-900/10",
+        "bg-card border border-border rounded-2xl shadow-2xl shadow-near-black/15",
         "p-4 sm:p-6",
         "transition-all duration-150 ease-out",
         "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
@@ -65,7 +65,7 @@ export const DialogContent = React.forwardRef<
       {children}
       {!hideClose && (
         <DialogPrimitive.Close
-          className="absolute right-4 top-4 rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+          className="absolute right-4 top-4 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-paper-dusk hover:text-near-black"
           aria-label="Close"
         >
           <X className="h-4 w-4" />
@@ -109,7 +109,7 @@ export const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("text-lg font-semibold text-zinc-900", className)}
+    className={cn("text-lg font-medium text-near-black", className)}
     {...props}
   />
 ));
@@ -121,7 +121,7 @@ export const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-zinc-500", className)}
+    className={cn("text-sm text-muted-foreground", className)}
     {...props}
   />
 ));

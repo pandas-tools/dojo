@@ -16,17 +16,17 @@ export const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-9 w-full items-center justify-between rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-900",
-      "placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none transition-colors",
-      "disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-400",
-      "data-[placeholder]:text-zinc-400",
+      "flex h-9 w-full items-center justify-between rounded-md border border-border bg-card px-3 text-sm text-near-black",
+      "placeholder:text-muted-foreground/70 focus:border-brand-deep focus:outline-none transition-colors",
+      "disabled:cursor-not-allowed disabled:bg-snowglint disabled:text-muted-foreground/70",
+      "data-[placeholder]:text-muted-foreground/70",
       className,
     )}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 text-zinc-500" />
+      <ChevronDown className="h-4 w-4 text-muted-foreground" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -42,7 +42,7 @@ export const SelectContent = React.forwardRef<
       position={position}
       sideOffset={4}
       className={cn(
-        "relative z-50 max-h-[var(--radix-select-content-available-height)] min-w-[8rem] overflow-hidden rounded-md border border-zinc-200 bg-white text-zinc-900 shadow-lg",
+        "relative z-50 max-h-[var(--radix-select-content-available-height)] min-w-[8rem] overflow-hidden rounded-md border border-border bg-card text-near-black shadow-lg",
         className,
       )}
       {...props}
@@ -70,7 +70,7 @@ export const SelectItem = React.forwardRef<
     ref={ref}
     className={cn(
       "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-7 pr-2 text-sm outline-none",
-      "focus:bg-zinc-100 focus:text-zinc-900",
+      "focus:bg-paper-dusk focus:text-near-black",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className,
     )}
