@@ -4,6 +4,30 @@ Running ADR for `dojo`. New decisions go at the top with a date and status. See 
 
 ---
 
+## 2026-06-24 — Tier system productized (data-driven `lesson_tiers`)
+
+**Status:** Decided. Backend shipped (this change); `/browse` UI rewire follows.
+
+**Decision:** Replace the code-defined Apprentice/Specialist/Expert ladder (`src/lib/tier.ts` constants + `MOCKED_TIER_COUNTS` in `/browse`) with a data-driven system:
+
+1. **Schema** — `lesson_tiers` (`id, client_id NULLABLE, name, emoji, min_pct, sort_order, is_active, timestamps`). `client_id NULL` = the global default ladder used by every client; a non-null `client_id` is a future per-client override (the nullable column means per-client ladders land later with **no schema change**). Admin v1 manages the global ladder only. `sort_order` is intentionally **not unique** — reorder swaps two rows' `sort_order` in one txn, mirroring the `lessons` table.
+
+2. **Threshold model** — `min_pct` is a 0..1 fraction of the client's assigned, published lessons completed. Percent, not absolute count, so a tier stays meaningful as a client's curriculum grows. **Classification orders by `min_pct`** (threshold = source of truth for progression); `sort_order` is only display order, so the two are decoupled and reordering never reclassifies anyone.
+
+3. **Counts are CLIENT-WIDE only** (Dimi, explicit) — an employee competes against everyone in their whole organisation, not their store. The store-level rollup was dropped. Read shape: `{ tiers, me: { completed, total, tierId }, counts: Record<tierId, number> }`.
+
+4. **Runtime** — pure logic (types, `classifyTier`, `FALLBACK_TIERS`) in `src/lib/tiers.ts` (client-safe, unit-tested); live readers (`getTierConfig`, `getClientTierRollup`, `getBrowseTierData`) in `src/lib/tiers-data.ts` (server-only, request-memoized via React `cache`). **Defensive fallback:** an empty or unreachable table resolves to the built-in 3 tiers, so the hero can never blank.
+
+5. **Admin** — new `/admin/tiers` (create/rename/delete/reorder + threshold edit), audit-logged (`tier.*`), neighbour-swap reorder. Ladder validation (in-txn): the lowest tier must be 0%, and no two tiers may share a threshold.
+
+6. **Migration** — `0006_lesson_tiers` creates the table and **idempotently seeds the current 3 global tiers** (fixed UUIDs + `ON CONFLICT (id) DO NOTHING`) in the same file, so the seeded ladder exists the instant the migration applies — before any rerouted consumer reads it. The old `src/lib/tier.ts` + mocked `/browse` consumer stay in place until the UI rewire swaps them.
+
+**Why:** Dimi wants tier count, names, emojis, and thresholds all editable in data without code changes, and the colleague counts live instead of mocked.
+
+**Trade-off:** Two tier modules briefly coexist (`tier.ts` legacy + `tiers.ts`/`tiers-data.ts`) until the `/browse` rewire lands and the legacy file is deleted.
+
+---
+
 ## 2026-06-23 — Lesson groups (editorial sections) + bookmarks for the /browse redesign
 
 **Status:** Decided.
