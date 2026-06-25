@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
-import AuthAtmosphere from "@/components/AuthAtmosphere";
 import OnboardingWizard from "./OnboardingWizard";
 
 export const metadata = { title: "Welcome · Dojo" };
@@ -40,7 +39,6 @@ export default async function OnboardingPage() {
 
   return (
     <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white">
-      <AuthAtmosphere />
       <OnboardingWizard
         stores={storeRows}
         languages={languages}

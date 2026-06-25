@@ -5,10 +5,15 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 /**
- * SuccessCard — the glass-card primitive used by all success states
- * (onboarding complete, lesson complete, tier unlocked). The icon slot
- * gets a soft arctic-haze halo behind it; the card itself enters with a
- * small lift + scale.
+ * SuccessCard — the popup primitive used by all success states.
+ *
+ * Matches the Figma file (node 96:175 — Success Step):
+ *   - bg rgba(14, 16, 21, 0.6) (dark, slightly transparent so the bg sheen
+ *     shows through)
+ *   - rounded-[16px], padding 24px horizontal / 32px vertical
+ *   - 50px icon container at top, 24px gap, then the heading
+ *   - Sharp Grotesk Medium 24px, color #fefefe, text width 267px so the
+ *     copy wraps on two lines as the Figma designs it
  */
 export default function SuccessCard({
   icon,
@@ -27,25 +32,26 @@ export default function SuccessCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        "relative w-full max-w-sm rounded-3xl border border-white/12 bg-white/[0.04] p-7 text-center backdrop-blur-2xl shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)]",
+        "flex flex-col items-center gap-6 rounded-[16px] bg-[rgba(14,16,21,0.6)] px-6 py-8 backdrop-blur-md",
         className,
       )}
     >
-      <div className="pointer-events-none absolute -inset-x-4 -top-6 h-20 bg-[radial-gradient(60%_100%_at_50%_100%,rgba(193,232,251,0.22),transparent_70%)]" />
-      <div className="relative flex flex-col items-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.6 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-5 flex h-14 w-14 items-center justify-center text-3xl"
-        >
-          {icon}
-        </motion.div>
-        <h2 className="text-balance text-[22px] font-medium leading-tight tracking-tight text-white sm:text-2xl">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.6 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+        className="flex h-[50px] w-[50px] items-center justify-center"
+      >
+        {icon}
+      </motion.div>
+      <div className="flex w-[267px] flex-col items-center gap-2 text-center">
+        <h2 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#fefefe]">
           {title}
         </h2>
         {subtitle && (
-          <p className="mt-2 text-sm text-white/70">{subtitle}</p>
+          <p className="text-[14px] leading-[22px] text-[#fefefe]/70">
+            {subtitle}
+          </p>
         )}
       </div>
     </motion.div>
@@ -53,20 +59,20 @@ export default function SuccessCard({
 }
 
 /**
- * CheckRingIcon — arctic-haze circle with a check glyph. The default icon for
- * the onboarding success card.
+ * CheckRingIcon — 48px arctic-haze ring with a dark check glyph.
+ * Matches the Figma's Success Icon (node 109:971).
  */
 export function CheckRingIcon() {
   return (
-    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-arctic-haze">
+    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#C1E8FB]">
       <svg
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2.4"
+        strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="h-7 w-7 text-near-black"
+        className="h-6 w-6 text-[#0e0e0e]"
         aria-hidden
       >
         <path d="M5 12.5l4.5 4.5L19 7.5" />

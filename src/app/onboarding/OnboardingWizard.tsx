@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import AuthAtmosphere from "@/components/AuthAtmosphere";
+import SuccessAtmosphere from "@/components/SuccessAtmosphere";
 import StepProgress from "@/components/StepProgress";
 import { completeOnboarding } from "./actions";
 import LanguageStep from "./steps/LanguageStep";
@@ -66,16 +68,21 @@ export default function OnboardingWizard({
 
   if (step === "done") {
     return (
-      <div className="relative z-10 mx-auto h-dvh w-full max-w-[402px]">
-        <div className="absolute left-1/2 top-1/2 w-[327px] -translate-x-1/2 -translate-y-1/2">
-          <AllSetStep mode={mode} />
+      <>
+        <SuccessAtmosphere />
+        <div className="relative z-10 mx-auto h-dvh w-full max-w-[402px]">
+          <div className="absolute left-1/2 top-1/2 w-[327px] -translate-x-1/2 -translate-y-1/2">
+            <AllSetStep mode={mode} />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="relative z-10 mx-auto h-dvh w-full max-w-[402px]">
+    <>
+      <AuthAtmosphere />
+      <div className="relative z-10 mx-auto h-dvh w-full max-w-[402px]">
       {/* HEADER — top 13.3% */}
       <div className="absolute left-0 right-0 top-[13.3%] flex flex-col items-center gap-10 px-6">
         <StepProgress current={currentSegment} total={3} />
@@ -147,7 +154,8 @@ export default function OnboardingWizard({
           {pending ? "Saving…" : step === "language" ? "Continue" : submitLabel}
         </button>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
