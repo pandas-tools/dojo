@@ -150,7 +150,12 @@ function TierModal({
       <DialogContent
         size="sm"
         hideClose
-        className="relative overflow-hidden border-white/10 bg-near-black text-white shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]"
+        // Don't add `relative` here — DialogContent's base classes include
+        // `fixed`, and twMerge resolves the conflict by dropping `fixed`,
+        // which flushes the modal into normal flow at the bottom of the
+        // portal. `fixed` is already a positioned containing block, so the
+        // absolute inner glow below anchors to it without help.
+        className="overflow-hidden border-white/10 bg-near-black text-white shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]"
       >
         {/* Internal arctic-haze glow at the top of the modal */}
         <div
