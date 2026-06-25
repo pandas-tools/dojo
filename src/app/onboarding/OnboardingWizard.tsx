@@ -41,7 +41,7 @@ export default function OnboardingWizard({
     initialStoreId ?? stores[0]?.id ?? "",
   );
 
-  const currentSegment = step === "language" ? 1 : step === "store" ? 2 : 3;
+  const currentSegment = step === "language" ? 2 : 3;
   const submitLabel = mode === "reconfirm" ? "Confirm" : "Finish";
 
   function handleSubmit() {
@@ -60,12 +60,14 @@ export default function OnboardingWizard({
   }
 
   return (
-    <div className="w-full">
-      <div className="mb-7">
-        <StepProgress current={currentSegment} total={3} />
-      </div>
+    <div className="flex w-full flex-1 flex-col">
+      {step !== "done" && (
+        <div className="mx-auto w-full max-w-md">
+          <StepProgress current={currentSegment} total={3} />
+        </div>
+      )}
 
-      <div className="relative">
+      <div className="relative flex flex-1 flex-col">
         <AnimatePresence mode="wait" initial={false}>
           {step === "language" && (
             <motion.div
@@ -74,6 +76,7 @@ export default function OnboardingWizard({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={TRANSITION}
+              className="flex flex-1 flex-col"
             >
               <LanguageStep
                 languages={languages}
@@ -91,6 +94,7 @@ export default function OnboardingWizard({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={TRANSITION}
+              className="flex flex-1 flex-col"
             >
               <StoreStep
                 stores={stores}
@@ -114,6 +118,7 @@ export default function OnboardingWizard({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={TRANSITION}
+              className="flex flex-1 flex-col"
             >
               <AllSetStep mode={mode} />
             </motion.div>

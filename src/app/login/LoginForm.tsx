@@ -47,7 +47,7 @@ export default function LoginForm() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={TRANSITION}
-          className="rounded-2xl border border-arctic-haze/30 bg-arctic-haze/[0.07] p-5 text-sm text-white"
+          className="rounded-3xl border border-arctic-haze/30 bg-arctic-haze/[0.07] p-5 text-sm text-white"
         >
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-arctic-haze text-near-black">
@@ -69,31 +69,24 @@ export default function LoginForm() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={TRANSITION}
-          className="space-y-4"
+          className="space-y-5"
         >
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-2 block font-mono text-xs font-medium uppercase tracking-wider text-white/55"
-            >
-              Work email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              autoFocus
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@orange.be"
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-sm text-white placeholder:text-white/30 transition-shadow focus:border-arctic-haze/60 focus:outline-none focus:ring-2 focus:ring-arctic-haze/40"
-            />
-          </div>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autoFocus
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@orange.com"
+            aria-label="Work email"
+            className="w-full rounded-full border border-white/15 bg-white/[0.03] px-5 py-3.5 text-center text-sm text-white placeholder:text-white/35 transition-all duration-200 focus:border-arctic-haze/60 focus:bg-white/[0.05] focus:outline-none focus:ring-2 focus:ring-arctic-haze/30"
+          />
 
           {error && (
-            <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <p className="rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
               {error}
             </p>
           )}
@@ -101,14 +94,10 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={pending || !email}
-            className="inline-flex w-full items-center justify-center rounded-2xl bg-arctic-haze px-4 py-3.5 font-mono text-sm font-medium uppercase tracking-wider text-near-black transition-opacity duration-200 hover:opacity-90 disabled:opacity-40"
+            className="inline-flex w-full items-center justify-center rounded-full bg-near-black px-4 py-4 text-sm font-medium text-white shadow-[0_18px_50px_-12px_rgba(0,0,0,0.65)] ring-1 ring-white/10 transition-all duration-200 hover:bg-near-black/85 hover:ring-white/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {pending ? "Sending…" : "Continue"}
           </button>
-
-          <p className="pt-1 text-center text-xs text-white/45">
-            We&apos;ll email you a one-time sign-in link.
-          </p>
         </motion.form>
       )}
     </AnimatePresence>
