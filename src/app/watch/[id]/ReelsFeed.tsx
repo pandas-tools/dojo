@@ -9,7 +9,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronUp, ChevronDown, Heart, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { CarouselSlide } from "@/lib/db/schema";
 import VideoLessonViewer from "./VideoLessonViewer";
@@ -224,36 +224,96 @@ export default function ReelsFeed({
         })}
       </div>
 
-      {/* Bottom overlay — title + description for the currently active lesson */}
+      {/* TITLE CHIP — middle-screen quote pill, fades with overlay */}
+      <div
+        className={cn(
+          "pointer-events-none fixed inset-x-0 z-40 flex justify-center px-6 transition-opacity duration-300",
+          overlayVisible ? "opacity-100" : "opacity-0",
+        )}
+        style={{ top: "calc(60% - 1rem)" }}
+      >
+        <div
+          className="rounded-[8px] bg-[rgba(14,14,14,0.6)] px-4 py-3 backdrop-blur-md"
+          style={{ maxWidth: "min(90%, 360px)" }}
+        >
+          <p className="text-center text-[18px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
+            {current?.title}
+          </p>
+        </div>
+      </div>
+
+      {/* BOTTOM OVERLAY — lesson name + description on left, interaction icons on right */}
       <div
         className={cn(
           "pointer-events-none fixed inset-x-0 bottom-0 z-50 transition-opacity duration-300",
-          "px-5 pt-16",
           overlayVisible ? "opacity-100" : "opacity-0",
         )}
         style={{
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)",
           backgroundImage:
-            "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.65) 40%, rgba(0,0,0,0) 100%)",
+            "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0) 100%)",
           transform: "translateZ(0)",
           willChange: "opacity",
         }}
       >
-        <p
-          className="max-w-2xl text-[15px] leading-snug"
-          style={{ textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}
+        <div
+          className="flex items-end gap-2 px-6 pb-10 pt-10"
+          style={{
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 2.5rem)",
+          }}
         >
-          <span className="font-semibold">{current?.title}</span>
-          {current?.description && (
-            <>
-              <span className="mx-1.5 text-white/70">·</span>
-              <span className="text-white/90">{current.description}</span>
-            </>
-          )}
-        </p>
+          {/* Left column: lesson name + description */}
+          <div className="flex flex-1 flex-col gap-2 text-[#f9fdff]">
+            <p
+              className="text-[20px] font-normal leading-[1.3]"
+              style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
+            >
+              {current?.title}
+            </p>
+            {current?.description && (
+              <p
+                className="text-[16px] font-normal leading-[1.3]"
+                style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
+              >
+                {current.description}
+              </p>
+            )}
+          </div>
+
+          {/* Right column: stacked interaction icons (visual only — wiring in Phase 2) */}
+          <div className="pointer-events-auto flex flex-col items-center gap-4 pl-2">
+            <button
+              type="button"
+              aria-label="Like"
+              onClick={(e) => e.stopPropagation()}
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+            >
+              <Heart className="h-5 w-5" strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              aria-label="Notes"
+              onClick={(e) => e.stopPropagation()}
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+            >
+              <MessageSquare className="h-5 w-5" strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+
+        {/* Progress bar at the very bottom edge */}
+        <div className="h-1 w-full bg-white/12">
+          <div
+            className="h-full bg-[#c1e8fb] transition-[width] duration-300 ease-out"
+            style={{
+              width: `${
+                items.length > 0 ? ((activeIndex + 1) / items.length) * 100 : 0
+              }%`,
+            }}
+          />
+        </div>
       </div>
 
-      {/* Persistent back button — never fades. */}
+      {/* Persistent back button — 48px circular, never fades */}
       <div
         className="pointer-events-none fixed inset-x-0 top-0 z-50"
         style={{
@@ -265,19 +325,18 @@ export default function ReelsFeed({
           className="pointer-events-none absolute inset-x-0 top-0 h-20"
           style={{
             backgroundImage:
-              "linear-gradient(to bottom, rgba(0,0,0,0.45), rgba(0,0,0,0))",
+              "linear-gradient(to bottom, rgba(0,0,0,0.5), rgba(0,0,0,0))",
           }}
           aria-hidden
         />
-        <div className="relative px-4 pt-3">
+        <div className="relative flex px-6 pt-4">
           <Link
             href={backHref}
             aria-label="Back to lessons"
             onClick={(e) => e.stopPropagation()}
-            className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center text-white transition-opacity hover:opacity-80"
-            style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.45))" }}
+            className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
           >
-            <ChevronLeft className="h-7 w-7" strokeWidth={2.25} />
+            <ChevronLeft className="h-5 w-5" strokeWidth={2} />
           </Link>
         </div>
       </div>
