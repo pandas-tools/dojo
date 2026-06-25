@@ -5,24 +5,24 @@ import { motion } from "motion/react";
 /**
  * AuthAtmosphere — backdrop for the Figma auth surfaces.
  *
- * Built around the "glow horizon" idea: a bright horizon line of light at the
- * bottom of the viewport, bleeding upward through white → arctic-haze → dark.
- * Like a sunrise viewed through the screen. The horizon breathes slowly, and
- * a secondary blob drifts horizontally to give the scene quiet life.
+ * Built from the 21st.dev `glow-horizon` pattern (ahammed_bashar) — stacked
+ * blurred circles/ellipses, not radial-gradient stops. The blurred edges of
+ * each layer ARE the glow. Centered+bottom-anchored produces the localized
+ * "round halo near the bottom" that the Figma file shows (a baked-in
+ * `Subtract` image asset; we approximate in CSS).
  *
- * Matches the Figma file's intent (node 96:80): the Figma uses a baked-in
- * `Subtract` image asset to create this glow; we approximate in CSS using
- * stacked radial gradients with `mix-blend-mode: screen` for depth.
- *
- * Reduced-motion suppresses both animations via the global CSS rule.
+ * Colors are the Pandas brand cool palette (white + arctic-haze + steel-
+ * harbor) instead of the reference's violet. The whole halo breathes
+ * slowly; reduced-motion suppresses via the global CSS rule.
  */
 export default function AuthAtmosphere() {
   return (
     <div
       aria-hidden
       className="pointer-events-none absolute inset-0 overflow-hidden bg-[#0e0e0e]"
+      style={{ isolation: "isolate" }}
     >
-      {/* 1. Linear top-down — steel-harbor → near-black at ~32% (Figma spec) */}
+      {/* Linear top-down: steel-harbor → near-black at ~32% (Figma spec) */}
       <div
         className="absolute inset-0"
         style={{
@@ -31,47 +31,77 @@ export default function AuthAtmosphere() {
         }}
       />
 
-      {/* 2. THE HORIZON — bright bottom-edge sweep that defines the brand
-            moment. Three stacked radial gradients build depth:
-              - A sharp white core glowing at the bottom edge (the "horizon line")
-              - An arctic-haze haze above it
-              - A wider muted bleed to soften the falloff */}
+      {/* HORIZON — stacked blurred ellipses, breathing in place.
+            Layers go from largest+darkest (back) to smallest+brightest (front).
+            Each ellipse is positioned with its lower half off-screen below the
+            viewport so we see the rounded TOP of the halo. */}
       <motion.div
-        className="absolute inset-0"
-        initial={{ opacity: 0.85 }}
-        animate={{ opacity: [0.85, 1, 0.85] }}
-        transition={{ duration: 6.5, repeat: Infinity, ease: "easeInOut" }}
-        style={{
-          backgroundImage: [
-            // The core — bright white at the very bottom, fades quickly
-            "radial-gradient(ellipse 65% 35% at 50% 100%, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 70%)",
-            // The cyan haze — arctic-haze bleeding upward
-            "radial-gradient(ellipse 85% 60% at 50% 100%, rgba(193,232,251,0.6) 0%, rgba(193,232,251,0) 65%)",
-            // The outer bleed — muted to extend the glow's reach
-            "radial-gradient(ellipse 120% 80% at 50% 100%, rgba(159,191,207,0.35) 0%, rgba(159,191,207,0) 70%)",
-          ].join(", "),
-        }}
-      />
+        className="absolute left-1/2 -translate-x-1/2 bottom-[-40%] aspect-square w-[120%]"
+        animate={{ scale: [1, 1.04, 1], opacity: [0.92, 1, 0.92] }}
+        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+      >
+        {/* Dark falloff ring (innermost, darkest — softens edges into bg) */}
+        <Arc color="#0e0e0e" size="120%" blur={60} />
 
-      {/* 3. Drifting accent blob — a softer cyan halo that drifts horizontally
-            to give the static gradient a quiet pulse of motion. Screen blend
-            so it adds light rather than overpainting. */}
+        {/* Steel-harbor — muted cool base */}
+        <Arc color="#445158" size="115%" blur={45} />
+
+        {/* Arctic-haze haze — the brand color */}
+        <Arc color="#9FBFCF" size="98%" blur={32} />
+
+        {/* Glacier whisper — bright cyan-white core */}
+        <Arc color="#DBF3FF" size="78%" blur={26} />
+
+        {/* White core w/ glow box-shadow */}
+        <Arc
+          color="#FFFFFF"
+          size="56%"
+          blur={18}
+          boxShadow="0 -8px 60px 10px rgba(255,255,255,0.45)"
+        />
+      </motion.div>
+
+      {/* Quiet horizontal drift — extra cyan accent that slides slowly, screen
+          blend so it adds light without overpainting */}
       <motion.div
-        className="absolute"
-        initial={{ x: "-8%" }}
-        animate={{ x: ["-8%", "8%", "-8%"] }}
-        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute left-1/2 bottom-[-20%] aspect-[2/1] w-[80%] -translate-x-1/2 rounded-full"
         style={{
-          left: "10%",
-          right: "10%",
-          bottom: "-15%",
-          height: "55%",
+          background: "#C1E8FB",
+          filter: "blur(80px)",
           mixBlendMode: "screen",
-          backgroundImage:
-            "radial-gradient(ellipse 55% 80% at 50% 100%, rgba(219,243,255,0.55) 0%, rgba(193,232,251,0.2) 35%, rgba(193,232,251,0) 70%)",
-          filter: "blur(20px)",
+          opacity: 0.35,
         }}
+        animate={{ x: ["-6%", "6%", "-6%"] }}
+        transition={{ duration: 24, repeat: Infinity, ease: "easeInOut" }}
       />
     </div>
+  );
+}
+
+function Arc({
+  color,
+  size,
+  blur,
+  boxShadow,
+}: {
+  color: string;
+  size: string;
+  blur: number;
+  boxShadow?: string;
+}) {
+  const scale = parseFloat(size) / 100;
+  return (
+    <div
+      aria-hidden
+      className="absolute inset-0 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+      style={{
+        width: "100%",
+        height: "100%",
+        scale,
+        background: color,
+        filter: `blur(${blur}px)`,
+        ...(boxShadow && { boxShadow }),
+      }}
+    />
   );
 }

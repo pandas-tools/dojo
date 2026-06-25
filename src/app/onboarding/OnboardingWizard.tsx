@@ -142,7 +142,7 @@ export default function OnboardingWizard({
             (step === "language" && !language) ||
             (step === "store" && !hq && !storeId)
           }
-          className="flex h-[56px] flex-1 items-center justify-center rounded-[40px] bg-[#0e0e0e] px-8 text-[16px] font-normal leading-[1.3] text-[#fefefe] shadow-[0_18px_50px_-12px_rgba(0,0,0,0.65)] ring-1 ring-white/10 transition-all duration-200 hover:bg-[#1a1a1a] hover:ring-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-[56px] flex-1 items-center justify-center rounded-[40px] bg-[#0e0e0e] px-8 text-[16px] font-normal leading-[1.3] text-[#fefefe] transition-colors duration-200 hover:bg-[#1a1a1a] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {pending ? "Saving…" : step === "language" ? "Continue" : submitLabel}
         </button>
