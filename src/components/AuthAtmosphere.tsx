@@ -5,12 +5,14 @@ import { motion } from "motion/react";
 /**
  * AuthAtmosphere — backdrop for the Figma auth surfaces.
  *
- * Based on the 21st.dev `glow-horizon` pattern (stacked blurred ellipses).
- * Localized glow sphere anchored to the bottom-center, mostly off-screen
- * so only the bright top arc shows. Matches the Figma's `Subtract` image
- * asset — a contained round halo, NOT a full-screen wash.
+ * The Figma file has a wide HORIZONTAL bright band at the bottom of the
+ * screen (like a horizon at sunrise) — not a localized halo. This rebuild
+ * matches that: a wide flat glow that spans the full viewport width and
+ * fades upward into the dark.
  *
- * Whole halo breathes slowly; reduced-motion suppresses via global CSS.
+ * Built as stacked WIDE+FLAT blurred ellipses (per the 21st.dev
+ * glow-horizon pattern) instead of round circles, so the result is a band
+ * not a halo. Brightest at the bottom-center, fades out radially.
  */
 export default function AuthAtmosphere() {
   return (
@@ -28,73 +30,75 @@ export default function AuthAtmosphere() {
         }}
       />
 
-      {/* HORIZON SPHERE — localized round halo at the bottom-center.
-            Container is 60vh × 60vh, anchored so its CENTER sits at the
-            viewport's bottom edge (only the top half shows as the arc). */}
+      {/* HORIZON BAND — wide flat ellipses stacked at the bottom.
+            Container is 150vw wide × 70vh tall, anchored with bottom -25vh
+            so the brightest part sits in the lower third of the viewport. */}
       <motion.div
         className="absolute left-1/2 -translate-x-1/2"
         style={{
-          width: "60vh",
-          height: "60vh",
-          bottom: "-30vh",
+          width: "150vw",
+          height: "70vh",
+          bottom: "-25vh",
         }}
-        animate={{ scale: [1, 1.04, 1], opacity: [0.92, 1, 0.92] }}
+        animate={{ scale: [1, 1.025, 1], opacity: [0.92, 1, 0.92] }}
         transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
       >
-        {/* Dark falloff ring (outermost — softens the halo's outer edge into bg) */}
-        <Arc color="#0e0e0e" scale={1.3} blur={50} />
+        {/* Dark falloff (outer edge softens halo into bg) */}
+        <Ellipse color="#0e0e0e" scaleX={1.2} scaleY={1.3} blur={60} />
 
         {/* Steel-harbor cool base */}
-        <Arc color="#445158" scale={1.15} blur={40} />
+        <Ellipse color="#445158" scaleX={1} scaleY={1.1} blur={50} />
 
-        {/* Arctic-haze halo */}
-        <Arc color="#C1E8FB" scale={0.95} blur={32} opacity={0.85} />
+        {/* Arctic-haze haze */}
+        <Ellipse color="#9FBFCF" scaleX={0.85} scaleY={0.9} blur={40} opacity={0.9} />
 
-        {/* Glacier-whisper inner ring */}
-        <Arc color="#DBF3FF" scale={0.7} blur={24} opacity={0.9} />
+        {/* Glacier-whisper bright haze */}
+        <Ellipse color="#DBF3FF" scaleX={0.6} scaleY={0.7} blur={32} opacity={0.85} />
 
-        {/* White core — small + bright */}
-        <Arc color="#FFFFFF" scale={0.4} blur={20} opacity={0.95} />
+        {/* White core — wide oval, hugs the bottom */}
+        <Ellipse color="#FFFFFF" scaleX={0.45} scaleY={0.45} blur={28} opacity={0.7} />
       </motion.div>
 
-      {/* Quiet secondary halo drifting horizontally for atmospheric motion */}
+      {/* Soft horizontal accent — drifts slowly for atmospheric motion */}
       <motion.div
-        className="absolute left-1/2 -translate-x-1/2 rounded-full"
+        className="absolute left-1/2 -translate-x-1/2 rounded-[100%]"
         style={{
-          width: "70vh",
+          width: "120vw",
           height: "30vh",
           bottom: "-10vh",
           background: "#C1E8FB",
-          filter: "blur(80px)",
+          filter: "blur(100px)",
           mixBlendMode: "screen",
-          opacity: 0.18,
+          opacity: 0.15,
         }}
-        animate={{ x: ["-4%", "4%", "-4%"] }}
+        animate={{ x: ["-3%", "3%", "-3%"] }}
         transition={{ duration: 24, repeat: Infinity, ease: "easeInOut" }}
       />
     </div>
   );
 }
 
-function Arc({
+function Ellipse({
   color,
-  scale,
+  scaleX,
+  scaleY,
   blur,
   opacity = 1,
 }: {
   color: string;
-  scale: number;
+  scaleX: number;
+  scaleY: number;
   blur: number;
   opacity?: number;
 }) {
   return (
     <div
       aria-hidden
-      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[100%]"
       style={{
         width: "100%",
         height: "100%",
-        scale,
+        transform: `translate(-50%, -50%) scale(${scaleX}, ${scaleY})`,
         background: color,
         filter: `blur(${blur}px)`,
         opacity,
