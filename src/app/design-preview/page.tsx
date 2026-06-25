@@ -1,5 +1,5 @@
 import Link from "next/link";
-import BrandAtmosphere from "@/components/BrandAtmosphere";
+import AuthAtmosphere from "@/components/AuthAtmosphere";
 
 export const metadata = { title: "Design preview · Dojo" };
 
@@ -34,7 +34,7 @@ const PREVIEWS = [
 export default function DesignPreviewIndex() {
   return (
     <main className="relative isolate min-h-dvh overflow-hidden bg-near-black px-6 py-16 text-white">
-      <BrandAtmosphere variant="full" showStars showDots animated />
+      <AuthAtmosphere />
       <div className="relative z-10 mx-auto max-w-2xl">
         <h1 className="text-balance text-3xl font-medium tracking-tight">Design preview</h1>
         <p className="mt-2 text-sm text-white/65">
