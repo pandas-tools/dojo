@@ -5,15 +5,12 @@ import { motion } from "motion/react";
 /**
  * AuthAtmosphere — backdrop for the Figma auth surfaces.
  *
- * Built from the 21st.dev `glow-horizon` pattern (ahammed_bashar) — stacked
- * blurred circles/ellipses, not radial-gradient stops. The blurred edges of
- * each layer ARE the glow. Centered+bottom-anchored produces the localized
- * "round halo near the bottom" that the Figma file shows (a baked-in
- * `Subtract` image asset; we approximate in CSS).
+ * Based on the 21st.dev `glow-horizon` pattern (stacked blurred ellipses).
+ * Localized glow sphere anchored to the bottom-center, mostly off-screen
+ * so only the bright top arc shows. Matches the Figma's `Subtract` image
+ * asset — a contained round halo, NOT a full-screen wash.
  *
- * Colors are the Pandas brand cool palette (white + arctic-haze + steel-
- * harbor) instead of the reference's violet. The whole halo breathes
- * slowly; reduced-motion suppresses via the global CSS rule.
+ * Whole halo breathes slowly; reduced-motion suppresses via global CSS.
  */
 export default function AuthAtmosphere() {
   return (
@@ -31,47 +28,48 @@ export default function AuthAtmosphere() {
         }}
       />
 
-      {/* HORIZON — stacked blurred ellipses, breathing in place.
-            Layers go from largest+darkest (back) to smallest+brightest (front).
-            Each ellipse is positioned with its lower half off-screen below the
-            viewport so we see the rounded TOP of the halo. */}
+      {/* HORIZON SPHERE — localized round halo at the bottom-center.
+            Container is 60vh × 60vh, anchored so its CENTER sits at the
+            viewport's bottom edge (only the top half shows as the arc). */}
       <motion.div
-        className="absolute left-1/2 -translate-x-1/2 bottom-[-40%] aspect-square w-[120%]"
+        className="absolute left-1/2 -translate-x-1/2"
+        style={{
+          width: "60vh",
+          height: "60vh",
+          bottom: "-30vh",
+        }}
         animate={{ scale: [1, 1.04, 1], opacity: [0.92, 1, 0.92] }}
         transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
       >
-        {/* Dark falloff ring (innermost, darkest — softens edges into bg) */}
-        <Arc color="#0e0e0e" size="120%" blur={60} />
+        {/* Dark falloff ring (outermost — softens the halo's outer edge into bg) */}
+        <Arc color="#0e0e0e" scale={1.3} blur={50} />
 
-        {/* Steel-harbor — muted cool base */}
-        <Arc color="#445158" size="115%" blur={45} />
+        {/* Steel-harbor cool base */}
+        <Arc color="#445158" scale={1.15} blur={40} />
 
-        {/* Arctic-haze haze — the brand color */}
-        <Arc color="#9FBFCF" size="98%" blur={32} />
+        {/* Arctic-haze halo */}
+        <Arc color="#C1E8FB" scale={0.95} blur={32} opacity={0.85} />
 
-        {/* Glacier whisper — bright cyan-white core */}
-        <Arc color="#DBF3FF" size="78%" blur={26} />
+        {/* Glacier-whisper inner ring */}
+        <Arc color="#DBF3FF" scale={0.7} blur={24} opacity={0.9} />
 
-        {/* White core w/ glow box-shadow */}
-        <Arc
-          color="#FFFFFF"
-          size="56%"
-          blur={18}
-          boxShadow="0 -8px 60px 10px rgba(255,255,255,0.45)"
-        />
+        {/* White core — small + bright */}
+        <Arc color="#FFFFFF" scale={0.4} blur={20} opacity={0.95} />
       </motion.div>
 
-      {/* Quiet horizontal drift — extra cyan accent that slides slowly, screen
-          blend so it adds light without overpainting */}
+      {/* Quiet secondary halo drifting horizontally for atmospheric motion */}
       <motion.div
-        className="absolute left-1/2 bottom-[-20%] aspect-[2/1] w-[80%] -translate-x-1/2 rounded-full"
+        className="absolute left-1/2 -translate-x-1/2 rounded-full"
         style={{
+          width: "70vh",
+          height: "30vh",
+          bottom: "-10vh",
           background: "#C1E8FB",
           filter: "blur(80px)",
           mixBlendMode: "screen",
-          opacity: 0.35,
+          opacity: 0.18,
         }}
-        animate={{ x: ["-6%", "6%", "-6%"] }}
+        animate={{ x: ["-4%", "4%", "-4%"] }}
         transition={{ duration: 24, repeat: Infinity, ease: "easeInOut" }}
       />
     </div>
@@ -80,27 +78,26 @@ export default function AuthAtmosphere() {
 
 function Arc({
   color,
-  size,
+  scale,
   blur,
-  boxShadow,
+  opacity = 1,
 }: {
   color: string;
-  size: string;
+  scale: number;
   blur: number;
-  boxShadow?: string;
+  opacity?: number;
 }) {
-  const scale = parseFloat(size) / 100;
   return (
     <div
       aria-hidden
-      className="absolute inset-0 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
       style={{
         width: "100%",
         height: "100%",
         scale,
         background: color,
         filter: `blur(${blur}px)`,
-        ...(boxShadow && { boxShadow }),
+        opacity,
       }}
     />
   );
