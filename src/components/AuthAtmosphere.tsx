@@ -1,20 +1,22 @@
 /**
- * AuthAtmosphere — backdrop for the Figma onboarding/auth surfaces (login,
- * language, store). Matches the Figma file (node 96:80):
- *   - Linear top-down gradient: steel-harbor (#445158) → near-black at 31.844%
- *   - 20% black flatten overlay
- *   - Bottom cyan glow approximating the baked-in `Subtract` image asset.
- *     The glow is the BRAND moment — bright arctic-haze sweeping up from the
- *     bottom-center, soft & wide. Slow drift gives life. GPU-composited,
- *     auto-suppressed by prefers-reduced-motion.
+ * AuthAtmosphere — backdrop for the Figma auth surfaces.
+ *
+ * Composition (matches Figma node 96:80):
+ *   1. Linear gradient top → bottom: steel-harbor (#445158) → near-black at ~32%
+ *   2. Big arctic-haze BOTTOM GLOW occupying ~55% of viewport height,
+ *      brightest at the bottom-center, fades up. THIS is the brand moment —
+ *      the Figma's baked-in `Subtract` asset. Approximated here in CSS.
+ *
+ * Slow drift on the glow gives a "dynamic but quiet" feel.
+ * Reduced-motion suppresses the animation. All GPU-composited.
  */
 export default function AuthAtmosphere() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-0 overflow-hidden"
+      className="pointer-events-none absolute inset-0 overflow-hidden bg-[#0e0e0e]"
     >
-      {/* Base: steel-harbor → near-black linear (matches Figma exactly) */}
+      {/* 1. Linear top-down: steel-harbor → near-black at 31.844% */}
       <div
         className="absolute inset-0"
         style={{
@@ -22,35 +24,24 @@ export default function AuthAtmosphere() {
             "linear-gradient(180deg, #445158 0%, #0e0e0e 31.844%)",
         }}
       />
-      {/* 20% black flatten overlay (Figma applies this on top of the linear) */}
-      <div className="absolute inset-0 bg-[rgba(14,14,14,0.2)]" />
 
-      {/* Bottom glow — the brand moment. Bright arctic-haze sweep from
-          bottom-center, large enough to be the dominant element of the lower
-          half. Sized in vmin so it scales with the smaller viewport dimension
-          (works on mobile portrait AND desktop wide). */}
+      {/* 2. BOTTOM GLOW — the brand moment. Anchored to the bottom of the
+            viewport, brightest at the bottom edge, fades up into the dark. */}
       <div
-        className="aurora-layer-a absolute left-1/2 -translate-x-1/2"
+        className="absolute inset-x-0 bottom-0 h-[55vh] aurora-layer-a"
         style={{
-          bottom: "-25vmin",
-          width: "180vmin",
-          height: "90vmin",
           background:
-            "radial-gradient(ellipse 50% 70% at 50% 100%, rgba(255,255,255,0.95) 0%, rgba(219,243,255,0.85) 12%, rgba(193,232,251,0.7) 28%, rgba(159,191,207,0.35) 50%, rgba(132,158,171,0.12) 68%, transparent 82%)",
-          filter: "blur(2px)",
+            "radial-gradient(ellipse 100% 100% at 50% 100%, rgba(255,255,255,0.95) 0%, rgba(219,243,255,0.85) 8%, rgba(193,232,251,0.7) 22%, rgba(159,191,207,0.4) 42%, rgba(132,158,171,0.15) 65%, transparent 85%)",
         }}
       />
 
-      {/* Secondary diffusion — softer outer halo to extend the glow's reach */}
+      {/* Soft outer halo — extends the glow's reach upward + sideways */}
       <div
-        className="aurora-layer-b absolute left-1/2 -translate-x-1/2"
+        className="absolute inset-x-[-20%] bottom-[-10vh] h-[75vh] aurora-layer-b"
         style={{
-          bottom: "-10vmin",
-          width: "220vmin",
-          height: "70vmin",
           background:
-            "radial-gradient(ellipse 60% 80% at 50% 100%, rgba(193,232,251,0.45) 0%, rgba(132,158,171,0.18) 40%, transparent 70%)",
-          filter: "blur(30px)",
+            "radial-gradient(ellipse 70% 100% at 50% 100%, rgba(193,232,251,0.3) 0%, rgba(132,158,171,0.1) 45%, transparent 75%)",
+          filter: "blur(40px)",
         }}
       />
     </div>
