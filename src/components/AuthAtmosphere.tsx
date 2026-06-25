@@ -1,14 +1,20 @@
+"use client";
+
+import { motion } from "motion/react";
+
 /**
  * AuthAtmosphere — backdrop for the Figma auth surfaces.
  *
- * Composition (matches Figma node 96:80):
- *   1. Linear gradient top → bottom: steel-harbor (#445158) → near-black at ~32%
- *   2. Big arctic-haze BOTTOM GLOW occupying ~55% of viewport height,
- *      brightest at the bottom-center, fades up. THIS is the brand moment —
- *      the Figma's baked-in `Subtract` asset. Approximated here in CSS.
+ * Built around the "glow horizon" idea: a bright horizon line of light at the
+ * bottom of the viewport, bleeding upward through white → arctic-haze → dark.
+ * Like a sunrise viewed through the screen. The horizon breathes slowly, and
+ * a secondary blob drifts horizontally to give the scene quiet life.
  *
- * Slow drift on the glow gives a "dynamic but quiet" feel.
- * Reduced-motion suppresses the animation. All GPU-composited.
+ * Matches the Figma file's intent (node 96:80): the Figma uses a baked-in
+ * `Subtract` image asset to create this glow; we approximate in CSS using
+ * stacked radial gradients with `mix-blend-mode: screen` for depth.
+ *
+ * Reduced-motion suppresses both animations via the global CSS rule.
  */
 export default function AuthAtmosphere() {
   return (
@@ -16,7 +22,7 @@ export default function AuthAtmosphere() {
       aria-hidden
       className="pointer-events-none absolute inset-0 overflow-hidden bg-[#0e0e0e]"
     >
-      {/* 1. Linear top-down: steel-harbor → near-black at 31.844% */}
+      {/* 1. Linear top-down — steel-harbor → near-black at ~32% (Figma spec) */}
       <div
         className="absolute inset-0"
         style={{
@@ -25,23 +31,45 @@ export default function AuthAtmosphere() {
         }}
       />
 
-      {/* 2. BOTTOM GLOW — the brand moment. Anchored to the bottom of the
-            viewport, brightest at the bottom edge, fades up into the dark. */}
-      <div
-        className="absolute inset-x-0 bottom-0 h-[55vh] aurora-layer-a"
+      {/* 2. THE HORIZON — bright bottom-edge sweep that defines the brand
+            moment. Three stacked radial gradients build depth:
+              - A sharp white core glowing at the bottom edge (the "horizon line")
+              - An arctic-haze haze above it
+              - A wider muted bleed to soften the falloff */}
+      <motion.div
+        className="absolute inset-0"
+        initial={{ opacity: 0.85 }}
+        animate={{ opacity: [0.85, 1, 0.85] }}
+        transition={{ duration: 6.5, repeat: Infinity, ease: "easeInOut" }}
         style={{
-          background:
-            "radial-gradient(ellipse 100% 100% at 50% 100%, rgba(255,255,255,0.95) 0%, rgba(219,243,255,0.85) 8%, rgba(193,232,251,0.7) 22%, rgba(159,191,207,0.4) 42%, rgba(132,158,171,0.15) 65%, transparent 85%)",
+          backgroundImage: [
+            // The core — bright white at the very bottom, fades quickly
+            "radial-gradient(ellipse 65% 35% at 50% 100%, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 70%)",
+            // The cyan haze — arctic-haze bleeding upward
+            "radial-gradient(ellipse 85% 60% at 50% 100%, rgba(193,232,251,0.6) 0%, rgba(193,232,251,0) 65%)",
+            // The outer bleed — muted to extend the glow's reach
+            "radial-gradient(ellipse 120% 80% at 50% 100%, rgba(159,191,207,0.35) 0%, rgba(159,191,207,0) 70%)",
+          ].join(", "),
         }}
       />
 
-      {/* Soft outer halo — extends the glow's reach upward + sideways */}
-      <div
-        className="absolute inset-x-[-20%] bottom-[-10vh] h-[75vh] aurora-layer-b"
+      {/* 3. Drifting accent blob — a softer cyan halo that drifts horizontally
+            to give the static gradient a quiet pulse of motion. Screen blend
+            so it adds light rather than overpainting. */}
+      <motion.div
+        className="absolute"
+        initial={{ x: "-8%" }}
+        animate={{ x: ["-8%", "8%", "-8%"] }}
+        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
         style={{
-          background:
-            "radial-gradient(ellipse 70% 100% at 50% 100%, rgba(193,232,251,0.3) 0%, rgba(132,158,171,0.1) 45%, transparent 75%)",
-          filter: "blur(40px)",
+          left: "10%",
+          right: "10%",
+          bottom: "-15%",
+          height: "55%",
+          mixBlendMode: "screen",
+          backgroundImage:
+            "radial-gradient(ellipse 55% 80% at 50% 100%, rgba(219,243,255,0.55) 0%, rgba(193,232,251,0.2) 35%, rgba(193,232,251,0) 70%)",
+          filter: "blur(20px)",
         }}
       />
     </div>
