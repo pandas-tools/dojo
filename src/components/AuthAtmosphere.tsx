@@ -5,14 +5,16 @@ import { motion } from "motion/react";
 /**
  * AuthAtmosphere — backdrop for the Figma auth surfaces.
  *
- * The Figma file has a wide HORIZONTAL bright band at the bottom of the
- * screen (like a horizon at sunrise) — not a localized halo. This rebuild
- * matches that: a wide flat glow that spans the full viewport width and
- * fades upward into the dark.
+ * The horizon glow is a single wide radial gradient anchored to the bottom-
+ * center of the viewport. Brightest at the bottom-center, fades up and to
+ * the sides. Stops are tuned per the Figma color palette:
+ *   #FFFFFF → #DBF3FF → #C1E8FB → #9FBFCF → #445158 → transparent
  *
- * Built as stacked WIDE+FLAT blurred ellipses (per the 21st.dev
- * glow-horizon pattern) instead of round circles, so the result is a band
- * not a halo. Brightest at the bottom-center, fades out radially.
+ * Wrapped in a motion.div that breathes slowly (scale + opacity) so the
+ * scene feels alive. A secondary cyan accent drifts horizontally on
+ * mix-blend-mode: screen to add atmospheric motion.
+ *
+ * Reduced-motion is suppressed via the global CSS rule.
  */
 export default function AuthAtmosphere() {
   return (
@@ -30,79 +32,38 @@ export default function AuthAtmosphere() {
         }}
       />
 
-      {/* HORIZON BAND — wide flat ellipses stacked at the bottom.
-            Container is 150vw wide × 70vh tall, anchored with bottom -25vh
-            so the brightest part sits in the lower third of the viewport. */}
+      {/* HORIZON BAND — wide radial centered at the bottom, breathing */}
       <motion.div
-        className="absolute left-1/2 -translate-x-1/2"
-        style={{
-          width: "150vw",
-          height: "70vh",
-          bottom: "-25vh",
-        }}
-        animate={{ scale: [1, 1.025, 1], opacity: [0.92, 1, 0.92] }}
+        className="absolute inset-x-0 bottom-0"
+        style={{ height: "65vh" }}
+        animate={{ opacity: [0.92, 1, 0.92] }}
         transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
       >
-        {/* Dark falloff (outer edge softens halo into bg) */}
-        <Ellipse color="#0e0e0e" scaleX={1.2} scaleY={1.3} blur={60} />
-
-        {/* Steel-harbor cool base */}
-        <Ellipse color="#445158" scaleX={1} scaleY={1.1} blur={50} />
-
-        {/* Arctic-haze haze */}
-        <Ellipse color="#9FBFCF" scaleX={0.85} scaleY={0.9} blur={40} opacity={0.9} />
-
-        {/* Glacier-whisper bright haze */}
-        <Ellipse color="#DBF3FF" scaleX={0.6} scaleY={0.7} blur={32} opacity={0.85} />
-
-        {/* White core — wide oval, hugs the bottom */}
-        <Ellipse color="#FFFFFF" scaleX={0.45} scaleY={0.45} blur={28} opacity={0.7} />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 90% 100% at 50% 100%, rgba(255,255,255,0.95) 0%, rgba(219,243,255,0.85) 10%, rgba(193,232,251,0.7) 25%, rgba(159,191,207,0.4) 45%, rgba(68,81,88,0.15) 68%, transparent 85%)",
+          }}
+        />
       </motion.div>
 
-      {/* Soft horizontal accent — drifts slowly for atmospheric motion */}
+      {/* Quiet cyan accent that drifts horizontally — adds atmospheric motion
+          without changing the horizon's overall shape. */}
       <motion.div
-        className="absolute left-1/2 -translate-x-1/2 rounded-[100%]"
+        className="absolute inset-x-0 bottom-0 mx-auto rounded-[100%]"
         style={{
           width: "120vw",
-          height: "30vh",
-          bottom: "-10vh",
+          height: "35vh",
+          marginLeft: "-10vw",
           background: "#C1E8FB",
-          filter: "blur(100px)",
+          filter: "blur(90px)",
           mixBlendMode: "screen",
-          opacity: 0.15,
+          opacity: 0.18,
         }}
         animate={{ x: ["-3%", "3%", "-3%"] }}
         transition={{ duration: 24, repeat: Infinity, ease: "easeInOut" }}
       />
     </div>
-  );
-}
-
-function Ellipse({
-  color,
-  scaleX,
-  scaleY,
-  blur,
-  opacity = 1,
-}: {
-  color: string;
-  scaleX: number;
-  scaleY: number;
-  blur: number;
-  opacity?: number;
-}) {
-  return (
-    <div
-      aria-hidden
-      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[100%]"
-      style={{
-        width: "100%",
-        height: "100%",
-        transform: `translate(-50%, -50%) scale(${scaleX}, ${scaleY})`,
-        background: color,
-        filter: `blur(${blur}px)`,
-        opacity,
-      }}
-    />
   );
 }
