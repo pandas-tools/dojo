@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Check } from "lucide-react";
+import StepProgress from "@/components/StepProgress";
 import { signInWithEmail } from "./actions";
 
 const TRANSITION = { duration: 0.4, ease: [0.25, 1, 0.5, 1] } as const;
@@ -39,67 +39,89 @@ export default function LoginForm() {
   }
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      {sent ? (
-        <motion.div
-          key="sent"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={TRANSITION}
-          className="rounded-3xl border border-arctic-haze/30 bg-arctic-haze/[0.07] p-5 text-sm text-white"
-        >
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-arctic-haze text-near-black">
-              <Check className="h-4 w-4" strokeWidth={2.5} />
-            </div>
-            <p className="font-medium">Check your inbox</p>
-          </div>
-          <p className="mt-3 text-white/70">
-            We sent a sign-in link to{" "}
-            <span className="font-mono text-arctic-haze">{email}</span>. The link
-            is valid for 24 hours.
-          </p>
-        </motion.div>
-      ) : (
-        <motion.form
-          key="form"
-          onSubmit={onSubmit}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={TRANSITION}
-          className="space-y-5"
-        >
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            autoFocus
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@orange.com"
-            aria-label="Work email"
-            className="w-full rounded-full border border-white/15 bg-white/[0.03] px-5 py-3.5 text-center text-sm text-white placeholder:text-white/35 transition-all duration-200 focus:border-arctic-haze/60 focus:bg-white/[0.05] focus:outline-none focus:ring-2 focus:ring-arctic-haze/30"
-          />
-
-          {error && (
-            <p className="rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
-              {error}
+    <form
+      onSubmit={onSubmit}
+      className="relative z-10 mx-auto h-dvh w-full max-w-[402px]"
+    >
+      {/* HEADER — top 13.3% (matches Figma's top-[116px] of 874) */}
+      <div className="absolute left-0 right-0 top-[13.3%] flex flex-col items-center gap-10 px-6">
+        <StepProgress current={1} total={3} />
+        <div className="space-y-2 text-center">
+          <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
+            {sent ? "Check your inbox" : "Hi, Welcome Back!"}
+          </h1>
+          {!sent && (
+            <p className="text-[14px] font-medium leading-[22px] tracking-[0.07px] text-[#f9fdff]/85">
+              Sign in to keep training on Pandas&nbsp;Vision&nbsp;AI.
             </p>
           )}
+        </div>
+      </div>
 
+      {/* FORM — vertically centered, 327px wide */}
+      <div className="absolute left-1/2 top-1/2 w-[327px] -translate-x-1/2 -translate-y-1/2">
+        <AnimatePresence mode="wait" initial={false}>
+          {sent ? (
+            <motion.div
+              key="sent"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={TRANSITION}
+              className="rounded-[24px] border border-arctic-haze/40 bg-[rgba(68,81,88,0.1)] px-5 py-5 text-center text-sm text-[#f9fdff]"
+            >
+              <p className="font-medium">Sign-in link sent.</p>
+              <p className="mt-2 text-[#f9fdff]/70">
+                We sent a link to{" "}
+                <span className="font-mono text-arctic-haze">{email}</span>. The
+                link is valid for 24 hours.
+              </p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="input"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={TRANSITION}
+            >
+              <label htmlFor="email" className="sr-only">
+                Work email
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autoFocus
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="andylexian22@orange.com"
+                className="block h-[52px] w-full rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-4 text-[16px] leading-[1.3] text-[#fefefe] placeholder:text-[#8e8e8e] focus:outline-none focus:ring-2 focus:ring-arctic-haze/40"
+              />
+              {error && (
+                <p className="mt-3 rounded-[16px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* CTA — bottom 14% (matches Figma's top-[752px] of 874) */}
+      {!sent && (
+        <div className="absolute left-0 right-0 top-[86%] px-6">
           <button
             type="submit"
             disabled={pending || !email}
-            className="inline-flex w-full items-center justify-center rounded-full bg-near-black px-4 py-4 text-sm font-medium text-white shadow-[0_18px_50px_-12px_rgba(0,0,0,0.65)] ring-1 ring-white/10 transition-all duration-200 hover:bg-near-black/85 hover:ring-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-[56px] w-full items-center justify-center rounded-[40px] bg-[#0e0e0e] px-8 text-[16px] font-normal leading-[1.3] text-[#fefefe] shadow-[0_18px_50px_-12px_rgba(0,0,0,0.65)] ring-1 ring-white/10 transition-all duration-200 hover:bg-[#1a1a1a] hover:ring-white/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {pending ? "Sending…" : "Continue"}
           </button>
-        </motion.form>
+        </div>
       )}
-    </AnimatePresence>
+    </form>
   );
 }

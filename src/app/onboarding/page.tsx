@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
-import BrandAtmosphere from "@/components/BrandAtmosphere";
+import AuthAtmosphere from "@/components/AuthAtmosphere";
 import OnboardingWizard from "./OnboardingWizard";
 
 export const metadata = { title: "Welcome · Dojo" };
@@ -39,18 +39,15 @@ export default async function OnboardingPage() {
     languageRows.length > 0 ? languageRows.map((r) => r.language) : ["en"];
 
   return (
-    <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-near-black text-white">
-      <BrandAtmosphere variant="full" showStars showDots animated />
-
-      <div className="relative z-10 flex min-h-dvh w-full flex-col px-6 pb-8 pt-10 sm:pb-10">
-        <OnboardingWizard
-          stores={storeRows}
-          languages={languages}
-          initialLanguage={session.user.preferredLanguage}
-          initialStoreId={session.user.storeId}
-          mode={needsReconfirm ? "reconfirm" : "first"}
-        />
-      </div>
+    <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white">
+      <AuthAtmosphere />
+      <OnboardingWizard
+        stores={storeRows}
+        languages={languages}
+        initialLanguage={session.user.preferredLanguage}
+        initialStoreId={session.user.storeId}
+        mode={needsReconfirm ? "reconfirm" : "first"}
+      />
     </main>
   );
 }
