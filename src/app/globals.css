@@ -133,6 +133,34 @@ select:focus-visible,
   z-index: 50;
 }
 
+/* === Aurora drift — slow, GPU-composited bg motion for brand moments ===
+ * Used by BrandAtmosphere when animated. Two layers drift in opposing
+ * directions on slightly different cycles so the loop never visually repeats.
+ */
+@keyframes aurora-drift-a {
+  0%   { transform: translate3d(-6%, -3%, 0) scale(1.05); opacity: 0.55; }
+  50%  { transform: translate3d(4%, 5%, 0)  scale(1.12); opacity: 0.75; }
+  100% { transform: translate3d(-6%, -3%, 0) scale(1.05); opacity: 0.55; }
+}
+@keyframes aurora-drift-b {
+  0%   { transform: translate3d(5%, 4%, 0) scale(1.08); opacity: 0.4; }
+  50%  { transform: translate3d(-4%, -6%, 0) scale(1.0); opacity: 0.6; }
+  100% { transform: translate3d(5%, 4%, 0) scale(1.08); opacity: 0.4; }
+}
+@keyframes star-twinkle {
+  0%, 100% { opacity: var(--twinkle-min, 0.3); }
+  50%      { opacity: var(--twinkle-max, 0.7); }
+}
+@keyframes confetti-burst-fade {
+  0%   { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.aurora-layer-a { animation: aurora-drift-a 22s ease-in-out infinite; will-change: transform, opacity; }
+.aurora-layer-b { animation: aurora-drift-b 28s ease-in-out infinite; will-change: transform, opacity; }
+.star-twinkle   { animation: star-twinkle 4s ease-in-out infinite; }
+
 /* Reduced motion — kill all transitions/animations */
 @media (prefers-reduced-motion: reduce) {
   *,

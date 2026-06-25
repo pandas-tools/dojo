@@ -7,7 +7,7 @@ export const metadata = { title: "Check your email · Dojo" };
 export default function CheckEmailPage() {
   return (
     <main className="relative isolate flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-near-black px-6 py-16 text-white">
-      <BrandAtmosphere variant="full" showStars showDots />
+      <BrandAtmosphere variant="full" showStars showDots animated />
 
       <div className="relative z-10 w-full max-w-md text-center">
         <DojoMark variant="wordmark" className="mx-auto h-10 w-auto text-white sm:h-12" />
