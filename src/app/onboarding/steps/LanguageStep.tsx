@@ -40,7 +40,7 @@ export default function LanguageStep({
               aria-pressed={selected}
               style={{ opacity: selected ? 1 : fadeOpacity }}
               className={cn(
-                "flex h-[52px] w-full items-center gap-3 rounded-[24px] border bg-[rgba(68,81,88,0.1)] px-5 text-left transition-all duration-200",
+                "flex h-[52px] w-full items-center gap-3 rounded-[24px] border bg-[rgba(68,81,88,0.1)] px-5 text-left backdrop-blur-md transition-all duration-200",
                 selected
                   ? "border-[#c1e8fb]"
                   : "border-[#445158] hover:border-[#445158]/80",

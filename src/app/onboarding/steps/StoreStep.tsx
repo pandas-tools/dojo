@@ -28,7 +28,7 @@ export default function StoreStep({
   return (
     <div className="flex flex-col gap-2">
       {/* Selected display (the Figma "dropdown trigger") */}
-      <div className="flex h-[52px] items-center gap-3 rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-4">
+      <div className="flex h-[52px] items-center gap-3 rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-4 backdrop-blur-md">
         <span
           className={cn(
             "flex-1 truncate text-[16px] leading-[24px] tracking-[0.08px]",
@@ -74,7 +74,7 @@ export default function StoreStep({
                   aria-pressed={selected}
                   style={{ opacity: selected ? 1 : fadeOpacity }}
                   className={cn(
-                    "flex h-[52px] w-full items-center justify-between rounded-[24px] border bg-[rgba(68,81,88,0.1)] px-4 text-left transition-all duration-200",
+                    "flex h-[52px] w-full items-center justify-between rounded-[24px] border bg-[rgba(68,81,88,0.1)] px-4 text-left backdrop-blur-md transition-all duration-200",
                     selected ? "border-[#c1e8fb]" : "border-[#445158]",
                   )}
                 >
@@ -96,7 +96,7 @@ export default function StoreStep({
       {/* HQ checkbox */}
       <label
         className={cn(
-          "mt-2 flex h-[52px] cursor-pointer items-center gap-3 rounded-[24px] border bg-[rgba(68,81,88,0.1)] px-4 text-[14px] text-[#8e8e8e] transition-all duration-200",
+          "mt-2 flex h-[52px] cursor-pointer items-center gap-3 rounded-[24px] border bg-[rgba(68,81,88,0.1)] px-4 text-[14px] text-[#8e8e8e] backdrop-blur-md transition-all duration-200",
           hq ? "border-[#c1e8fb]" : "border-[#445158]",
         )}
       >

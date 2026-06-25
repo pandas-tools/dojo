@@ -32,7 +32,7 @@ export default function SuccessCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        "flex flex-col items-center gap-6 rounded-[16px] bg-[rgba(14,16,21,0.6)] px-6 py-8 backdrop-blur-md",
+        "flex flex-col items-center gap-6 rounded-[16px] border border-white/[0.06] bg-[rgba(14,16,21,0.55)] px-6 py-8 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.55)] backdrop-blur-2xl",
         className,
       )}
     >
@@ -49,7 +49,7 @@ export default function SuccessCard({
           {title}
         </h2>
         {subtitle && (
-          <p className="text-[14px] leading-[22px] text-[#fefefe]/70">
+          <p className="text-[16px] leading-[1.3] text-[#fefefe]/80">
             {subtitle}
           </p>
         )}

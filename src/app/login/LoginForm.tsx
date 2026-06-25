@@ -98,7 +98,7 @@ export default function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="andylexian22@orange.com"
-                className="block h-[52px] w-full rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-4 text-[16px] leading-[1.3] text-[#fefefe] placeholder:text-[#8e8e8e] focus:outline-none focus:ring-2 focus:ring-arctic-haze/40"
+                className="block h-[52px] w-full rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-4 text-[16px] leading-[1.3] text-[#fefefe] backdrop-blur-md placeholder:text-[#8e8e8e] focus:outline-none focus:ring-2 focus:ring-arctic-haze/40"
               />
               {error && (
                 <p className="mt-3 rounded-[16px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
