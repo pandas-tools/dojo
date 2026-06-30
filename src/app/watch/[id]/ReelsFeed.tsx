@@ -386,7 +386,7 @@ export default function ReelsFeed({
                 {current?.title}
               </span>
               {current?.description && (
-                <span className="text-[13px] text-[#b2b2b2]">
+                <span className="text-[16px] text-[#b2b2b2]">
                   {" "}
                   {current.description}
                 </span>
