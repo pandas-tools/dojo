@@ -53,6 +53,7 @@ export default function ReelsFeed({
   backHref,
   urlPrefix,
   disableTracking = false,
+  initialUpvoted,
 }: {
   items: FeedItem[];
   initialId: string;
@@ -62,6 +63,9 @@ export default function ReelsFeed({
   urlPrefix: string;
   /** True in preview mode — no tracking events fire. */
   disableTracking?: boolean;
+  /** Set of lesson ids the user has already upvoted. Drives the filled-Heart
+   *  state for the matching lesson in the feed; empty/omitted in preview. */
+  initialUpvoted?: Set<string>;
 }) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -74,6 +78,50 @@ export default function ReelsFeed({
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [notesOpen, setNotesOpen] = useState(false);
   const fadeTimerRef = useRef<number | null>(null);
+  const [upvoted, setUpvoted] = useState<Set<string>>(
+    () => new Set(initialUpvoted ?? []),
+  );
+  const upvotePendingRef = useRef<Set<string>>(new Set());
+
+  const toggleUpvote = useCallback(async () => {
+    if (disableTracking) return;
+    const lesson = items[activeIndex];
+    if (!lesson) return;
+    const lessonId = lesson.id;
+    if (upvotePendingRef.current.has(lessonId)) return;
+    upvotePendingRef.current.add(lessonId);
+
+    const wasUpvoted = upvoted.has(lessonId);
+    setUpvoted((prev) => {
+      const next = new Set(prev);
+      if (wasUpvoted) next.delete(lessonId);
+      else next.add(lessonId);
+      return next;
+    });
+
+    try {
+      const res = await fetch(`/api/lessons/${lessonId}/upvote`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(`upvote failed: ${res.status}`);
+      const body = (await res.json()) as { upvoted: boolean };
+      setUpvoted((prev) => {
+        const next = new Set(prev);
+        if (body.upvoted) next.add(lessonId);
+        else next.delete(lessonId);
+        return next;
+      });
+    } catch {
+      setUpvoted((prev) => {
+        const next = new Set(prev);
+        if (wasUpvoted) next.add(lessonId);
+        else next.delete(lessonId);
+        return next;
+      });
+    } finally {
+      upvotePendingRef.current.delete(lessonId);
+    }
+  }, [activeIndex, disableTracking, items, upvoted]);
 
   function armFade() {
     if (fadeTimerRef.current !== null) window.clearTimeout(fadeTimerRef.current);
@@ -283,15 +331,27 @@ export default function ReelsFeed({
             )}
           </div>
 
-          {/* Right column: stacked interaction icons (visual only — wiring in Phase 2) */}
+          {/* Right column: stacked interaction icons */}
           <div className="pointer-events-auto flex flex-col items-center gap-4 pl-2">
             <button
               type="button"
-              aria-label="Like"
-              onClick={(e) => e.stopPropagation()}
+              aria-label={current && upvoted.has(current.id) ? "Remove upvote" : "Upvote"}
+              aria-pressed={current ? upvoted.has(current.id) : false}
+              onClick={(e) => {
+                e.stopPropagation();
+                void toggleUpvote();
+              }}
               className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
             >
-              <Heart className="h-5 w-5" strokeWidth={2} />
+              <Heart
+                className={cn(
+                  "h-5 w-5 transition-colors",
+                  current && upvoted.has(current.id)
+                    ? "fill-red-500 text-red-500"
+                    : "",
+                )}
+                strokeWidth={2}
+              />
             </button>
             <button
               type="button"

@@ -79,6 +79,7 @@ export default async function WatchPage({
   if (items.length === 0) return <NotReadyBanner />;
 
   const initialId = items.some((i) => i.id === id) ? id : items[0]!.id;
+  const upvotedIds = await sdb.upvotes.forUser();
 
   return (
     <ReelsFeed
@@ -86,6 +87,7 @@ export default async function WatchPage({
       initialId={initialId}
       backHref="/browse"
       urlPrefix="/watch/"
+      initialUpvoted={upvotedIds}
     />
   );
 }

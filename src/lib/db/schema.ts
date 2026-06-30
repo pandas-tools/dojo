@@ -48,6 +48,8 @@ export const lessonEventTypeEnum = pgEnum("lesson_event_type", [
   "lesson_completed",
   "lesson_engagement",
   "rating_submitted",
+  "lesson_upvoted",
+  "lesson_unvoted",
 ]);
 
 // Admin audit log — append-only record of every admin write action. Reads
@@ -380,6 +382,40 @@ export const lessonBookmarks = pgTable(
   }),
 );
 
+// Per-user lesson upvotes ("found this helpful"). One row per (user, lesson);
+// row present = upvoted. Toggled from the Reels watch shell. `client_id` is
+// denormalised at write time so per-tenant analytics rollups (count by client,
+// by lesson × client) don't need to join through `users`. The toggle path
+// in scopedDb.upvotes verifies the lesson is assigned to the user's client
+// before inserting. Rows are cleaned up by cascade if the user, lesson, or
+// client is deleted.
+export const lessonUpvotes = pgTable(
+  "lesson_upvotes",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lessonId: uuid("lesson_id")
+      .notNull()
+      .references(() => lessons.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.lessonId] }),
+    userIdx: index("idx_lesson_upvotes_user_id").on(t.userId),
+    lessonIdx: index("idx_lesson_upvotes_lesson_id").on(t.lessonId),
+    clientLessonIdx: index("idx_lesson_upvotes_client_lesson").on(
+      t.clientId,
+      t.lessonId,
+    ),
+  }),
+);
+
 export const lessonEvents = pgTable(
   "lesson_events",
   {
@@ -500,6 +536,8 @@ export type LessonGroup = typeof lessonGroups.$inferSelect;
 export type NewLessonGroup = typeof lessonGroups.$inferInsert;
 export type LessonBookmark = typeof lessonBookmarks.$inferSelect;
 export type NewLessonBookmark = typeof lessonBookmarks.$inferInsert;
+export type LessonUpvote = typeof lessonUpvotes.$inferSelect;
+export type NewLessonUpvote = typeof lessonUpvotes.$inferInsert;
 export type Store = typeof stores.$inferSelect;
 export type LessonCompletion = typeof lessonCompletions.$inferSelect;
 export type LessonEvent = typeof lessonEvents.$inferSelect;

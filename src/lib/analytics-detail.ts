@@ -14,6 +14,7 @@ import {
   lessonCompletions,
   lessonEvents,
   lessonBookmarks,
+  lessonUpvotes,
 } from "./db/schema";
 
 export type FunnelStage = {
@@ -43,6 +44,7 @@ export type LessonRow = {
   completionPct: number; // 0..1
   avgRating: number | null;
   ratingCount: number;
+  upvoteCount: number;
 };
 
 export type EmployeeRow = {
@@ -90,14 +92,30 @@ export async function getClientDetailAnalytics(
     .limit(1);
   if (!client) return null;
 
-  const [storeRows, employeeRows, clientLessonRows] = await Promise.all([
-    db.select().from(stores).where(eq(stores.clientId, clientId)),
-    db
-      .select()
-      .from(users)
-      .where(and(eq(users.role, "employee"), eq(users.clientId, clientId))),
-    db.select().from(clientLessons).where(eq(clientLessons.clientId, clientId)),
-  ]);
+  const [storeRows, employeeRows, clientLessonRows, upvoteRows] =
+    await Promise.all([
+      db.select().from(stores).where(eq(stores.clientId, clientId)),
+      db
+        .select()
+        .from(users)
+        .where(and(eq(users.role, "employee"), eq(users.clientId, clientId))),
+      db
+        .select()
+        .from(clientLessons)
+        .where(eq(clientLessons.clientId, clientId)),
+      db
+        .select({ lessonId: lessonUpvotes.lessonId })
+        .from(lessonUpvotes)
+        .where(eq(lessonUpvotes.clientId, clientId)),
+    ]);
+
+  const upvoteCountByLesson = new Map<string, number>();
+  for (const u of upvoteRows) {
+    upvoteCountByLesson.set(
+      u.lessonId,
+      (upvoteCountByLesson.get(u.lessonId) ?? 0) + 1,
+    );
+  }
 
   const assignedLessonIds = clientLessonRows.map((cl) => cl.lessonId);
   const [lessonRows, translationRows, ratingRows, completionEventRows] =
@@ -305,6 +323,7 @@ export async function getClientDetailAnalytics(
       completionPct,
       avgRating,
       ratingCount: ratingValues.length,
+      upvoteCount: upvoteCountByLesson.get(l.id) ?? 0,
     };
   });
 

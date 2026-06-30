@@ -275,6 +275,7 @@ function LessonsTable({ rows }: { rows: LessonRow[] }) {
             <th className="px-3 py-2 text-right">Completions</th>
             <th className="px-3 py-2 text-right">Completion %</th>
             <th className="px-3 py-2 text-right">Avg rating</th>
+            <th className="px-3 py-2 text-right">Upvotes</th>
             <th className="px-3 py-2"></th>
           </tr>
         </thead>
@@ -296,6 +297,7 @@ function LessonsTable({ rows }: { rows: LessonRow[] }) {
                   ? `${r.avgRating} (${r.ratingCount})`
                   : "—"}
               </td>
+              <td className="px-3 py-2 text-right">{r.upvoteCount}</td>
               <td className="px-3 py-2 text-right">
                 <Link
                   href={`/admin/lessons/${r.lessonId}`}
