@@ -17,6 +17,7 @@ export default function CarouselLessonViewer({
   slides,
   disableTracking = false,
   active = true,
+  onProgress,
 }: {
   lessonId: string;
   slides: Slide[];
@@ -25,6 +26,8 @@ export default function CarouselLessonViewer({
   aspectRatio?: number | null;
   /** Reels-feed mode: only the active carousel emits completion. */
   active?: boolean;
+  /** Emitted on slide change; pct is (index+1)/slides.length. */
+  onProgress?: (lessonId: string, pct: number) => void;
 }) {
   const { emitCompleted } = useLessonTracking({
     lessonId,
@@ -36,6 +39,11 @@ export default function CarouselLessonViewer({
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const viewedRef = useRef<Set<number>>(new Set([0]));
   const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (!active || slides.length === 0) return;
+    onProgress?.(lessonId, (index + 1) / slides.length);
+  }, [active, index, slides.length, onProgress, lessonId]);
 
   const markViewed = useCallback(
     (i: number) => {
@@ -75,6 +83,15 @@ export default function CarouselLessonViewer({
     return () => obs.disconnect();
   }, [markViewed]);
 
+  const gotoSlide = useCallback(
+    (next: number) => {
+      const clamped = Math.max(0, Math.min(slides.length - 1, next));
+      const el = slideRefs.current[clamped];
+      if (el) el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    },
+    [slides.length],
+  );
+
   useEffect(() => {
     if (!active) return;
     function onKey(e: KeyboardEvent) {
@@ -88,17 +105,7 @@ export default function CarouselLessonViewer({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, index, slides.length]);
-
-  const gotoSlide = useCallback(
-    (next: number) => {
-      const clamped = Math.max(0, Math.min(slides.length - 1, next));
-      const el = slideRefs.current[clamped];
-      if (el) el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-    },
-    [slides.length],
-  );
+  }, [active, index, gotoSlide]);
 
   return (
     <div className="relative flex h-full w-full items-center justify-center select-none">

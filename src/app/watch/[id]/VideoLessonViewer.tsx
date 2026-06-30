@@ -23,6 +23,8 @@ export default function VideoLessonViewer({
   active = true,
   muted,
   paused,
+  onProgress,
+  onSeekReady,
 }: {
   lessonId: string;
   playbackId: string;
@@ -39,6 +41,15 @@ export default function VideoLessonViewer({
   muted?: boolean;
   /** Press-hold pause flag owned by the parent. Defaults to false. */
   paused?: boolean;
+  /** Emitted on each timeupdate while active; pct is currentTime/duration.
+   *  The lessonId is sent back so the parent can route updates to the right
+   *  bar without per-lesson closures (which the React Compiler lint rejects). */
+  onProgress?: (lessonId: string, pct: number) => void;
+  /** Registers a seek(pct) fn with the parent while active; null on cleanup. */
+  onSeekReady?: (
+    lessonId: string,
+    seek: ((pct: number) => void) | null,
+  ) => void;
 }) {
   const [playing, setPlaying] = useState(false);
   const playerRef = useRef<HTMLElement | null>(null);
@@ -54,12 +65,12 @@ export default function VideoLessonViewer({
 
   const onTimeUpdate = useCallback(
     (e: Event) => {
-      if (completedRef.current) return;
-      if (!active) return;
       const t = e.target as HTMLMediaElement;
-      if (!t.duration || !Number.isFinite(t.duration)) return;
-      const pct = t.currentTime / t.duration;
-      if (pct >= COMPLETION_THRESHOLD) {
+      if (!active) return;
+      if (!t.duration || !Number.isFinite(t.duration) || t.duration <= 0) return;
+      const pct = Math.max(0, Math.min(1, t.currentTime / t.duration));
+      onProgress?.(lessonId, pct);
+      if (!completedRef.current && pct >= COMPLETION_THRESHOLD) {
         completedRef.current = true;
         emitCompleted({
           currentTime: t.currentTime,
@@ -68,8 +79,23 @@ export default function VideoLessonViewer({
         });
       }
     },
-    [emitCompleted, active],
+    [emitCompleted, active, onProgress, lessonId],
   );
+
+  // Register a seek(pct) hook with the parent while this lesson is active so
+  // the parent's scrubber can drive the video. Unregister on inactive/unmount.
+  useEffect(() => {
+    if (!active || !onSeekReady) return;
+    const seek = (pct: number) => {
+      const el = playerRef.current as unknown as HTMLMediaElement | null;
+      if (!el) return;
+      const dur = el.duration;
+      if (!Number.isFinite(dur) || dur <= 0) return;
+      el.currentTime = Math.max(0, Math.min(1, pct)) * dur;
+    };
+    onSeekReady(lessonId, seek);
+    return () => onSeekReady(lessonId, null);
+  }, [active, onSeekReady, lessonId]);
 
   // Drive play/pause from active + paused. Inactive lessons stay paused;
   // active lessons play unless the user is currently pressing to pause.

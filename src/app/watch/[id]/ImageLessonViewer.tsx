@@ -11,6 +11,7 @@ export default function ImageLessonViewer({
   imageAlt,
   disableTracking = false,
   active = true,
+  onProgress,
 }: {
   lessonId: string;
   imageUrl: string;
@@ -22,6 +23,8 @@ export default function ImageLessonViewer({
   aspectRatio?: number | null;
   /** Reels-feed mode: only the active lesson runs the dwell-completion timer. */
   active?: boolean;
+  /** Emitted as the dwell timer ticks; 0..1 over COMPLETION_DWELL_MS. */
+  onProgress?: (lessonId: string, pct: number) => void;
 }) {
   const { emitCompleted } = useLessonTracking({
     lessonId,
@@ -30,7 +33,8 @@ export default function ImageLessonViewer({
   });
 
   useEffect(() => {
-    if (disableTracking || !active) return;
+    if (!active) return;
+    onProgress?.(lessonId, 0);
     let elapsed = 0;
     let lastTick = Date.now();
     const interval = window.setInterval(() => {
@@ -39,13 +43,15 @@ export default function ImageLessonViewer({
         elapsed += now - lastTick;
       }
       lastTick = now;
+      const pct = Math.max(0, Math.min(1, elapsed / COMPLETION_DWELL_MS));
+      onProgress?.(lessonId, pct);
       if (elapsed >= COMPLETION_DWELL_MS) {
         window.clearInterval(interval);
-        emitCompleted({ dwellMs: elapsed });
+        if (!disableTracking) emitCompleted({ dwellMs: elapsed });
       }
-    }, 250);
+    }, 100);
     return () => window.clearInterval(interval);
-  }, [emitCompleted, disableTracking, active]);
+  }, [emitCompleted, disableTracking, active, onProgress, lessonId]);
 
   return (
     <div className="relative h-full w-full">

@@ -102,6 +102,33 @@ export default function ReelsFeed({
   const pressTimerRef = useRef<number | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const pressFiredRef = useRef(false);
+
+  // Per-lesson playback progress (0..1). The active viewer reports its own
+  // progress via handleProgress(lessonId, pct); inactive viewers stay frozen.
+  // Scrubbing the active video flips scrubbingRef and suppresses incoming
+  // onProgress for that lesson so the user-drag isn't overwritten by a stale
+  // onTimeUpdate from the player.
+  type SeekFn = (pct: number) => void;
+  const [progressByLessonId, setProgressByLessonId] = useState<
+    Record<string, number>
+  >({});
+  const seekRefs = useRef<Map<string, SeekFn>>(new Map());
+  const scrubbingRef = useRef<string | null>(null);
+
+  const handleProgress = useCallback((lessonId: string, pct: number) => {
+    if (scrubbingRef.current === lessonId) return;
+    setProgressByLessonId((prev) =>
+      prev[lessonId] === pct ? prev : { ...prev, [lessonId]: pct },
+    );
+  }, []);
+
+  const handleSeekReady = useCallback(
+    (lessonId: string, fn: SeekFn | null) => {
+      if (fn) seekRefs.current.set(lessonId, fn);
+      else seekRefs.current.delete(lessonId);
+    },
+    [],
+  );
   const [upvoted, setUpvoted] = useState<Set<string>>(
     () => new Set(initialUpvoted ?? []),
   );
@@ -384,6 +411,8 @@ export default function ReelsFeed({
                       disableTracking={disableTracking}
                       muted={muted}
                       paused={active && pausing}
+                      onProgress={handleProgress}
+                      onSeekReady={handleSeekReady}
                     />
                   )}
                   {it.content.type === "image" && (
@@ -394,6 +423,7 @@ export default function ReelsFeed({
                       aspectRatio={it.content.aspectRatio}
                       active={active}
                       disableTracking={disableTracking}
+                      onProgress={handleProgress}
                     />
                   )}
                   {it.content.type === "carousel" && (
@@ -403,6 +433,7 @@ export default function ReelsFeed({
                       aspectRatio={it.content.aspectRatio}
                       active={active}
                       disableTracking={disableTracking}
+                      onProgress={handleProgress}
                     />
                   )}
                   <UpvoteBurst active={active && burstLessonId === it.id} />
@@ -478,20 +509,72 @@ export default function ReelsFeed({
                       </div>
                     </div>
 
-                    {/* Progress bar — bottom edge of the card on lg, bottom
-                        edge of the viewport on mobile (same node either way). */}
-                    <div className="h-1 w-full bg-white/12">
-                      <div
-                        className="h-full bg-[#c1e8fb] transition-[width] duration-300 ease-out"
-                        style={{
-                          width: `${
-                            items.length > 0
-                              ? ((activeIndex + 1) / items.length) * 100
-                              : 0
-                          }%`,
-                        }}
-                      />
-                    </div>
+                    {/* Progress bar / scrubber — reflects the ACTIVE lesson's
+                        own playback progress (video: currentTime/duration,
+                        image: dwell elapsed, carousel: slide index). For the
+                        active video, an invisible hit-pad above the bar makes
+                        it draggable to seek without shifting the visual bar
+                        position; image/carousel render read-only. */}
+                    {(() => {
+                      const pct = progressByLessonId[it.id] ?? 0;
+                      const isVideoActive =
+                        active && it.content.type === "video";
+                      const applyScrub = (
+                        e: React.PointerEvent<HTMLDivElement>,
+                      ) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const next = Math.max(
+                          0,
+                          Math.min(1, (e.clientX - rect.left) / rect.width),
+                        );
+                        setProgressByLessonId((prev) => ({
+                          ...prev,
+                          [it.id]: next,
+                        }));
+                        seekRefs.current.get(it.id)?.(next);
+                      };
+                      const onScrubDown = (
+                        e: React.PointerEvent<HTMLDivElement>,
+                      ) => {
+                        e.stopPropagation();
+                        e.currentTarget.setPointerCapture?.(e.pointerId);
+                        scrubbingRef.current = it.id;
+                        applyScrub(e);
+                      };
+                      const onScrubMove = (
+                        e: React.PointerEvent<HTMLDivElement>,
+                      ) => {
+                        if (scrubbingRef.current !== it.id) return;
+                        e.stopPropagation();
+                        applyScrub(e);
+                      };
+                      const onScrubEnd = (
+                        e: React.PointerEvent<HTMLDivElement>,
+                      ) => {
+                        if (scrubbingRef.current !== it.id) return;
+                        e.stopPropagation();
+                        e.currentTarget.releasePointerCapture?.(e.pointerId);
+                        scrubbingRef.current = null;
+                      };
+                      return (
+                        <div className="relative h-1 w-full bg-white/12">
+                          <div
+                            className="absolute inset-y-0 left-0 bg-[#c1e8fb]"
+                            style={{ width: `${pct * 100}%` }}
+                          />
+                          {isVideoActive && (
+                            <div
+                              data-no-shell-gesture
+                              className="pointer-events-auto absolute -top-3 left-0 right-0 bottom-0 cursor-pointer touch-none select-none"
+                              onPointerDown={onScrubDown}
+                              onPointerMove={onScrubMove}
+                              onPointerUp={onScrubEnd}
+                              onPointerCancel={onScrubEnd}
+                            />
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
