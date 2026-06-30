@@ -42,6 +42,7 @@ export default async function WatchPage({
         id: lesson.id,
         title: t.title,
         description: t.description,
+        notesMarkdown: t.notesMarkdown ?? null,
         content: {
           type: "video",
           playbackId: t.muxPlaybackId,
@@ -53,6 +54,7 @@ export default async function WatchPage({
         id: lesson.id,
         title: t.title,
         description: t.description,
+        notesMarkdown: t.notesMarkdown ?? null,
         content: {
           type: "image",
           imageUrl: t.imageUrl,
@@ -67,6 +69,7 @@ export default async function WatchPage({
           id: lesson.id,
           title: t.title,
           description: t.description,
+          notesMarkdown: t.notesMarkdown ?? null,
           content: { type: "carousel", slides, aspectRatio: t.aspectRatio },
         });
       }

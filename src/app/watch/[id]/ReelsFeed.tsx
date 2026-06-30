@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronUp, ChevronDown, Heart, MessageSquare } from "lucide-react";
+import VideoNotesSheet from "@/components/VideoNotesSheet";
 import { cn } from "@/lib/cn";
 import type { CarouselSlide } from "@/lib/db/schema";
 import VideoLessonViewer from "./VideoLessonViewer";
@@ -41,6 +42,8 @@ export type FeedItem = {
   id: string;
   title: string;
   description: string | null;
+  /** Optional notes markdown — surfaced via the VideoNotesSheet. */
+  notesMarkdown?: string | null;
   content: FeedItemContent;
 };
 
@@ -69,6 +72,7 @@ export default function ReelsFeed({
   }, [items, initialId]);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [overlayVisible, setOverlayVisible] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(false);
   const fadeTimerRef = useRef<number | null>(null);
 
   function armFade() {
@@ -291,8 +295,11 @@ export default function ReelsFeed({
             </button>
             <button
               type="button"
-              aria-label="Notes"
-              onClick={(e) => e.stopPropagation()}
+              aria-label="Open notes"
+              onClick={(e) => {
+                e.stopPropagation();
+                setNotesOpen(true);
+              }}
               className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
             >
               <MessageSquare className="h-5 w-5" strokeWidth={2} />
@@ -368,6 +375,13 @@ export default function ReelsFeed({
           </button>
         </div>
       )}
+
+      <VideoNotesSheet
+        open={notesOpen}
+        onOpenChange={setNotesOpen}
+        notesMarkdown={current?.notesMarkdown ?? null}
+        lessonTitle={current?.title}
+      />
 
       <style>{`main > div::-webkit-scrollbar { display: none; }`}</style>
     </main>
