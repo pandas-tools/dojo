@@ -147,7 +147,14 @@ export function shapeBrowseData(args: {
     let thumbnail: string | null = null;
     let ready = false;
     if (lesson.contentType === "video") {
-      thumbnail = t?.thumbnailUrl ?? null;
+      // Prefer the persisted thumbnail (set by the asset.ready webhook from
+      // the user-selected poster time), fall back to Mux's auto-thumb
+      // whenever we have a playback id but no persisted thumbnail yet.
+      thumbnail =
+        t?.thumbnailUrl ??
+        (t?.muxPlaybackId
+          ? `https://image.mux.com/${t.muxPlaybackId}/thumbnail.jpg?time=1`
+          : null);
       ready = !!t?.muxPlaybackId;
     } else if (lesson.contentType === "image") {
       thumbnail = t?.imageUrl ?? null;

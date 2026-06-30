@@ -6,12 +6,10 @@ import type { BrowseCard } from "@/lib/browse";
 /**
  * LessonCard — single video/image/carousel tile in the Library rails.
  *
- * Matches Figma node 96:399 (New lessons / Video group cards):
  *   - 154px wide × 221px tall, rounded-[8px]
- *   - Cover image — no play circle overlay, no DONE pill (Figma intentionally
- *     keeps the thumbnail clean; completion is signalled via the progress
- *     bar at the bottom + dimmed opacity on the card itself)
- *   - Bookmark icon top-right
+ *   - object-cover thumbnail — fills the tile edge-to-edge
+ *   - bottom-anchored dark gradient gives the bookmark contrast
+ *   - bookmark icon bottom-right (red when saved)
  *   - 3px progress bar at the bottom edge (full track white/15, fill
  *     arctic-haze)
  *   - 12px Sharp Grotesk Book title below the card
@@ -35,7 +33,7 @@ export default function LessonCard({ card }: { card: BrowseCard }) {
           <img
             src={card.thumbnail}
             alt=""
-            className="absolute inset-0 h-full w-full object-contain"
+            className="absolute inset-0 h-full w-full object-cover"
             loading="lazy"
             decoding="async"
           />
@@ -45,8 +43,17 @@ export default function LessonCard({ card }: { card: BrowseCard }) {
           </div>
         )}
 
-        {/* Bookmark icon — top-right of cover (Figma) */}
-        <div className="absolute right-2 top-2">
+        {/* Bottom gradient — gives the bookmark icon contrast without a
+            per-icon drop-shadow. Tuned to about 40% of the card height. */}
+        {card.ready && card.thumbnail && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent"
+          />
+        )}
+
+        {/* Bookmark icon — bottom-right of cover */}
+        <div className="absolute bottom-1.5 right-1.5">
           <BookmarkButton
             lessonId={card.id}
             initialBookmarked={card.isBookmarked}

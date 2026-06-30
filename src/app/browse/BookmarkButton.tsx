@@ -40,16 +40,17 @@ export default function BookmarkButton({
       aria-pressed={bookmarked}
       aria-label={bookmarked ? "Remove bookmark" : "Save lesson"}
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-full",
+        "inline-flex h-7 w-7 items-center justify-center rounded-full",
         "transition-[transform,color] duration-150 ease-out",
         "disabled:opacity-60 active:scale-90",
-        bookmarked
-          ? "text-arctic-haze drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
-          : "text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] hover:text-white",
+        bookmarked ? "text-red-500" : "text-white/90 hover:text-white",
       )}
     >
       <Bookmark
-        className={cn("h-6 w-6", bookmarked ? "fill-current" : "stroke-[2.25]")}
+        className={cn(
+          "h-[18px] w-[18px]",
+          bookmarked ? "fill-current" : "stroke-[2.25]",
+        )}
       />
     </button>
   );
