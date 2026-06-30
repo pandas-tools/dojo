@@ -98,7 +98,9 @@ export default function StoreStep({
       </div>
 
       {/* Store list — height-capped to ~3 rows so the remainder fades out
-          of view (52px row + 8px gap × 3 ≈ 180px + a hint of the 4th). */}
+          of view (52px row + 8px gap × 3 ≈ 180px + a hint of the 4th).
+          Hides the currently-picked store so it's only visible in the
+          trigger above — no duplicate row. */}
       <div className="relative">
         <ul
           className="flex flex-col gap-2 overflow-y-auto pr-1 [scrollbar-width:thin]"
@@ -109,31 +111,28 @@ export default function StoreStep({
               No stores configured yet.
             </li>
           ) : (
-            stores.map((s) => {
-              const selected = !hq && storeId === s.id;
-              return (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onHqChange(false);
-                      onStoreChange(s.id);
-                    }}
-                    aria-pressed={selected}
-                    className={cn(
-                      "flex h-[52px] w-full items-center justify-center rounded-[24px] border bg-[rgba(68,81,88,0.1)] px-5 text-center backdrop-blur-md transition-all duration-200",
-                      selected
-                        ? "border-[#c1e8fb] text-[#fefefe]"
-                        : "border-[#445158] text-[#8e8e8e] hover:text-[#fefefe]",
-                    )}
-                  >
-                    <span className="truncate text-[16px] leading-[1.3]">
-                      {display(s.name)}
-                    </span>
-                  </button>
-                </li>
-              );
-            })
+            stores
+              .filter((s) => hq || s.id !== storeId)
+              .map((s) => {
+                return (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onHqChange(false);
+                        onStoreChange(s.id);
+                      }}
+                      className={cn(
+                        "flex h-[52px] w-full items-center justify-center rounded-[24px] border border-[#445158] bg-[rgba(68,81,88,0.1)] px-5 text-center text-[#8e8e8e] backdrop-blur-md transition-all duration-200 hover:text-[#fefefe]",
+                      )}
+                    >
+                      <span className="truncate text-[16px] leading-[1.3]">
+                        {display(s.name)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })
           )}
         </ul>
         {/* Soft bottom fade — signals 'scroll for more' without a hard cut */}
