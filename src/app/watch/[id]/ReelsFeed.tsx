@@ -9,7 +9,15 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronUp, ChevronDown, Heart } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronUp,
+  ChevronDown,
+  Heart,
+  BookOpen,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import VideoNotesSheet from "@/components/VideoNotesSheet";
 import UpvoteBurst from "@/components/UpvoteBurst";
 import { cn } from "@/lib/cn";
@@ -45,6 +53,19 @@ export type FeedItem = {
   notesMarkdown?: string | null;
   content: FeedItemContent;
 };
+
+/** Source URL for the lg+ ambient glow behind a lesson card. Video uses the
+ *  Mux animated WebP (a few hundred KB, loops the first 5s — cheap, dynamic).
+ *  Image/carousel use the lesson media itself. Returns null when no source
+ *  exists (rare; we just skip the glow then). */
+function glowSourceUrl(item: FeedItem): string | null {
+  if (item.content.type === "video") {
+    return `https://image.mux.com/${item.content.playbackId}/animated.webp?width=480&fps=15&start=0&end=5`;
+  }
+  if (item.content.type === "image") return item.content.imageUrl;
+  if (item.content.type === "carousel") return item.content.slides[0]?.url ?? null;
+  return null;
+}
 
 export default function ReelsFeed({
   items,
@@ -90,57 +111,55 @@ export default function ReelsFeed({
   const [burstLessonId, setBurstLessonId] = useState<string | null>(null);
   const burstTimerRef = useRef<number | null>(null);
 
-  const toggleUpvote = useCallback(async () => {
-    if (disableTracking) return;
-    const lesson = items[activeIndex];
-    if (!lesson) return;
-    const lessonId = lesson.id;
-    if (upvotePendingRef.current.has(lessonId)) return;
-    upvotePendingRef.current.add(lessonId);
+  const toggleUpvote = useCallback(
+    async (lessonId: string) => {
+      if (disableTracking) return;
+      if (upvotePendingRef.current.has(lessonId)) return;
+      upvotePendingRef.current.add(lessonId);
 
-    const wasUpvoted = upvoted.has(lessonId);
-    setUpvoted((prev) => {
-      const next = new Set(prev);
-      if (wasUpvoted) next.delete(lessonId);
-      else next.add(lessonId);
-      return next;
-    });
-    // Burst only on false → true. Cancel any in-flight burst first so a
-    // double-tap restarts the animation rather than ignoring the second tap.
-    if (!wasUpvoted) {
-      if (burstTimerRef.current !== null) {
-        window.clearTimeout(burstTimerRef.current);
+      const wasUpvoted = upvoted.has(lessonId);
+      setUpvoted((prev) => {
+        const next = new Set(prev);
+        if (wasUpvoted) next.delete(lessonId);
+        else next.add(lessonId);
+        return next;
+      });
+      if (!wasUpvoted) {
+        if (burstTimerRef.current !== null) {
+          window.clearTimeout(burstTimerRef.current);
+        }
+        setBurstLessonId(lessonId);
+        burstTimerRef.current = window.setTimeout(() => {
+          setBurstLessonId(null);
+          burstTimerRef.current = null;
+        }, 1100);
       }
-      setBurstLessonId(lessonId);
-      burstTimerRef.current = window.setTimeout(() => {
-        setBurstLessonId(null);
-        burstTimerRef.current = null;
-      }, 1100);
-    }
 
-    try {
-      const res = await fetch(`/api/lessons/${lessonId}/upvote`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error(`upvote failed: ${res.status}`);
-      const body = (await res.json()) as { upvoted: boolean };
-      setUpvoted((prev) => {
-        const next = new Set(prev);
-        if (body.upvoted) next.add(lessonId);
-        else next.delete(lessonId);
-        return next;
-      });
-    } catch {
-      setUpvoted((prev) => {
-        const next = new Set(prev);
-        if (wasUpvoted) next.add(lessonId);
-        else next.delete(lessonId);
-        return next;
-      });
-    } finally {
-      upvotePendingRef.current.delete(lessonId);
-    }
-  }, [activeIndex, disableTracking, items, upvoted]);
+      try {
+        const res = await fetch(`/api/lessons/${lessonId}/upvote`, {
+          method: "POST",
+        });
+        if (!res.ok) throw new Error(`upvote failed: ${res.status}`);
+        const body = (await res.json()) as { upvoted: boolean };
+        setUpvoted((prev) => {
+          const next = new Set(prev);
+          if (body.upvoted) next.add(lessonId);
+          else next.delete(lessonId);
+          return next;
+        });
+      } catch {
+        setUpvoted((prev) => {
+          const next = new Set(prev);
+          if (wasUpvoted) next.add(lessonId);
+          else next.delete(lessonId);
+          return next;
+        });
+      } finally {
+        upvotePendingRef.current.delete(lessonId);
+      }
+    },
+    [disableTracking, upvoted],
+  );
 
   // Scroll to the initial lesson on mount.
   useEffect(() => {
@@ -178,7 +197,6 @@ export default function ReelsFeed({
     );
     sectionRefs.current.forEach((el) => obs.observe(el));
     return () => obs.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
   // Sync URL with active lesson.
@@ -220,11 +238,6 @@ export default function ReelsFeed({
     return () => window.removeEventListener("keydown", onKey);
   }, [activeIndex, gotoIndex, router, backHref]);
 
-  // Pointer gesture handling — Reels/TikTok pattern.
-  //   tap (down + up under ~250ms, no drag) → toggle mute
-  //   press-hold (down + held ≥ 250ms) → pause while held; resume on release
-  // Clicks on interactive controls (buttons, links, dialogs) bypass the
-  // shell handler entirely so the chrome stays responsive.
   const PRESS_HOLD_MS = 250;
   const TAP_MOVE_PX = 12;
 
@@ -258,7 +271,6 @@ export default function ReelsFeed({
     const dx = Math.abs(e.clientX - pointerStartRef.current.x);
     const dy = Math.abs(e.clientY - pointerStartRef.current.y);
     if (dx > TAP_MOVE_PX || dy > TAP_MOVE_PX) {
-      // User is scrolling — cancel the press intent without firing anything.
       clearPressTimer();
       pointerStartRef.current = null;
       if (pressFiredRef.current) {
@@ -279,7 +291,6 @@ export default function ReelsFeed({
       return;
     }
     if (hadPointer) {
-      // Tap → toggle mute
       setMuted((m) => !m);
     }
   }
@@ -292,6 +303,7 @@ export default function ReelsFeed({
   }
 
   const current = items[activeIndex];
+  const currentNotes = current?.notesMarkdown ?? null;
 
   return (
     <main
@@ -308,6 +320,11 @@ export default function ReelsFeed({
       >
         {items.map((it, i) => {
           const active = i === activeIndex;
+          const isUpvoted = upvoted.has(it.id);
+          const hasNotes = !!(
+            it.notesMarkdown && it.notesMarkdown.trim().length > 0
+          );
+          const glowSrc = glowSourceUrl(it);
           return (
             <section
               key={it.id}
@@ -316,132 +333,219 @@ export default function ReelsFeed({
                 else sectionRefs.current.delete(it.id);
               }}
               data-lesson-id={it.id}
-              className="relative snap-start flex items-center justify-center bg-black"
+              className="relative snap-start bg-black"
               style={{ height: "100dvh", width: "100%" }}
             >
-              {it.content.type === "video" && (
-                <VideoLessonViewer
-                  lessonId={it.id}
-                  playbackId={it.content.playbackId}
-                  title={it.title}
-                  subtitlesEnabled
-                  aspectRatio={it.content.aspectRatio}
-                  active={active}
-                  disableTracking={disableTracking}
-                  muted={muted}
-                  paused={active && pausing}
-                />
+              {/* GLOW LAYER — desktop only. Blurred copy of the active media
+                  bleeds soft color around the card. Hidden < lg. */}
+              {glowSrc && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 hidden lg:block overflow-hidden"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={glowSrc}
+                    alt=""
+                    className="absolute left-1/2 top-1/2 h-[120%] w-[120%] max-w-none -translate-x-1/2 -translate-y-1/2 object-cover opacity-50"
+                    style={{ filter: "blur(80px) saturate(1.4)" }}
+                    draggable={false}
+                  />
+                </div>
               )}
-              {it.content.type === "image" && (
-                <ImageLessonViewer
-                  lessonId={it.id}
-                  imageUrl={it.content.imageUrl}
-                  imageAlt={it.content.imageAlt}
-                  aspectRatio={it.content.aspectRatio}
-                  active={active}
-                  disableTracking={disableTracking}
-                />
-              )}
-              {it.content.type === "carousel" && (
-                <CarouselLessonViewer
-                  lessonId={it.id}
-                  slides={it.content.slides}
-                  aspectRatio={it.content.aspectRatio}
-                  active={active}
-                  disableTracking={disableTracking}
-                />
-              )}
-              {/* Upvote burst — fires once on false→true */}
-              <UpvoteBurst active={active && burstLessonId === it.id} />
+
+              {/* CENTERING LAYER — flex on lg, passthrough below. */}
+              <div className="relative h-full w-full lg:flex lg:items-center lg:justify-center lg:gap-5">
+                {/* CARD FRAME — full-bleed on mobile, rounded portrait card on lg. */}
+                <div
+                  className={cn(
+                    "relative h-full w-full bg-black",
+                    "lg:h-auto lg:w-auto",
+                    "lg:aspect-[9/16] lg:max-h-[min(90vh,880px)] lg:max-w-[80vw]",
+                    "lg:overflow-hidden lg:rounded-2xl",
+                    "lg:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)]",
+                    "lg:ring-1 lg:ring-white/10",
+                  )}
+                >
+                  {it.content.type === "video" && (
+                    <VideoLessonViewer
+                      lessonId={it.id}
+                      playbackId={it.content.playbackId}
+                      title={it.title}
+                      subtitlesEnabled
+                      aspectRatio={it.content.aspectRatio}
+                      active={active}
+                      disableTracking={disableTracking}
+                      muted={muted}
+                      paused={active && pausing}
+                    />
+                  )}
+                  {it.content.type === "image" && (
+                    <ImageLessonViewer
+                      lessonId={it.id}
+                      imageUrl={it.content.imageUrl}
+                      imageAlt={it.content.imageAlt}
+                      aspectRatio={it.content.aspectRatio}
+                      active={active}
+                      disableTracking={disableTracking}
+                    />
+                  )}
+                  {it.content.type === "carousel" && (
+                    <CarouselLessonViewer
+                      lessonId={it.id}
+                      slides={it.content.slides}
+                      aspectRatio={it.content.aspectRatio}
+                      active={active}
+                      disableTracking={disableTracking}
+                    />
+                  )}
+                  <UpvoteBurst active={active && burstLessonId === it.id} />
+
+                  {/* BOTTOM OVERLAY — per-section. Inside the card on lg,
+                      full-width gradient on mobile (same as before). Title +
+                      description + (mobile) Heart + (mobile) Learn more +
+                      progress bar. */}
+                  <div
+                    className="pointer-events-none absolute inset-x-0 bottom-0 z-40"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0) 100%)",
+                    }}
+                  >
+                    <div
+                      className="flex items-end gap-2 px-6 pb-10 pt-10 lg:px-5 lg:pt-8 lg:pb-7"
+                      style={{
+                        paddingBottom:
+                          "calc(env(safe-area-inset-bottom, 0px) + 2.5rem)",
+                      }}
+                    >
+                      <div
+                        className="flex flex-1 flex-col gap-1.5 text-[#f9fdff]"
+                        style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
+                      >
+                        <p className="leading-[1.3]">
+                          <span className="text-[22px] font-medium text-[#f9fdff]">
+                            {it.title}
+                          </span>
+                          {it.description && (
+                            <span className="text-[13px] text-[#b2b2b2]">
+                              {" "}
+                              {it.description}
+                            </span>
+                          )}
+                        </p>
+                        {hasNotes && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNotesOpen(true);
+                            }}
+                            className="self-start text-[11px] leading-[1.3] text-[#b2b2b2] underline underline-offset-2 transition-colors hover:text-[#f9fdff] lg:hidden"
+                          >
+                            Learn more
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Mobile-only Heart (right column). On lg the rail
+                          outside the card owns this affordance. */}
+                      <div className="pointer-events-auto flex flex-col items-center gap-4 pl-2 lg:hidden">
+                        <button
+                          type="button"
+                          aria-label={isUpvoted ? "Remove upvote" : "Upvote"}
+                          aria-pressed={isUpvoted}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void toggleUpvote(it.id);
+                          }}
+                          className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                        >
+                          <Heart
+                            className={cn(
+                              "h-5 w-5 transition-colors",
+                              isUpvoted ? "fill-arctic-haze text-arctic-haze" : "",
+                            )}
+                            strokeWidth={2}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Progress bar — bottom edge of the card on lg, bottom
+                        edge of the viewport on mobile (same node either way). */}
+                    <div className="h-1 w-full bg-white/12">
+                      <div
+                        className="h-full bg-[#c1e8fb] transition-[width] duration-300 ease-out"
+                        style={{
+                          width: `${
+                            items.length > 0
+                              ? ((activeIndex + 1) / items.length) * 100
+                              : 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SIDE RAIL — desktop only, vertical stack to the right of the
+                    card. Heart + (optional) Notes + (video) Mute. */}
+                <div className="pointer-events-auto hidden lg:flex flex-col items-center gap-3 pl-1">
+                  <button
+                    type="button"
+                    aria-label={isUpvoted ? "Remove upvote" : "Upvote"}
+                    aria-pressed={isUpvoted}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void toggleUpvote(it.id);
+                    }}
+                    className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                  >
+                    <Heart
+                      className={cn(
+                        "h-5 w-5 transition-colors",
+                        isUpvoted ? "fill-arctic-haze text-arctic-haze" : "",
+                      )}
+                      strokeWidth={2}
+                    />
+                  </button>
+                  {hasNotes && (
+                    <button
+                      type="button"
+                      aria-label="Open lesson notes"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNotesOpen(true);
+                      }}
+                      className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                    >
+                      <BookOpen className="h-5 w-5" strokeWidth={2} />
+                    </button>
+                  )}
+                  {it.content.type === "video" && (
+                    <button
+                      type="button"
+                      aria-label={muted ? "Unmute" : "Mute"}
+                      aria-pressed={!muted}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMuted((m) => !m);
+                      }}
+                      className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                    >
+                      {muted ? (
+                        <VolumeX className="h-5 w-5" strokeWidth={2} />
+                      ) : (
+                        <Volume2 className="h-5 w-5" strokeWidth={2} />
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
             </section>
           );
         })}
-      </div>
-
-      {/* BOTTOM OVERLAY — lesson name + description on left, interaction icons on right.
-          Always visible (no fade). The middle title chip from the prior pass
-          was removed — title now lives inline at the bottom. */}
-      <div
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-50"
-        style={{
-          backgroundImage:
-            "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0) 100%)",
-          transform: "translateZ(0)",
-          willChange: "opacity",
-        }}
-      >
-        <div
-          className="flex items-end gap-2 px-6 pb-10 pt-10"
-          style={{
-            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 2.5rem)",
-          }}
-        >
-          {/* Left column: inline title + description + Learn more (Figma) */}
-          <div
-            className="flex flex-1 flex-col gap-1.5 text-[#f9fdff]"
-            style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
-          >
-            <p className="leading-[1.3]">
-              <span className="text-[22px] font-medium text-[#f9fdff]">
-                {current?.title}
-              </span>
-              {current?.description && (
-                <span className="text-[16px] text-[#b2b2b2]">
-                  {" "}
-                  {current.description}
-                </span>
-              )}
-            </p>
-            {current?.notesMarkdown && current.notesMarkdown.trim().length > 0 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setNotesOpen(true);
-                }}
-                className="self-start text-[11px] leading-[1.3] text-[#b2b2b2] underline underline-offset-2 transition-colors hover:text-[#f9fdff]"
-              >
-                Learn more
-              </button>
-            )}
-          </div>
-
-          {/* Right column: stacked interaction icons */}
-          <div className="pointer-events-auto flex flex-col items-center gap-4 pl-2">
-            <button
-              type="button"
-              aria-label={current && upvoted.has(current.id) ? "Remove upvote" : "Upvote"}
-              aria-pressed={current ? upvoted.has(current.id) : false}
-              onClick={(e) => {
-                e.stopPropagation();
-                void toggleUpvote();
-              }}
-              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
-            >
-              <Heart
-                className={cn(
-                  "h-5 w-5 transition-colors",
-                  current && upvoted.has(current.id)
-                    ? "fill-arctic-haze text-arctic-haze"
-                    : "",
-                )}
-                strokeWidth={2}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* Progress bar at the very bottom edge */}
-        <div className="h-1 w-full bg-white/12">
-          <div
-            className="h-full bg-[#c1e8fb] transition-[width] duration-300 ease-out"
-            style={{
-              width: `${
-                items.length > 0 ? ((activeIndex + 1) / items.length) * 100 : 0
-              }%`,
-            }}
-          />
-        </div>
       </div>
 
       {/* Persistent back button — 48px circular, never fades */}
@@ -503,7 +607,7 @@ export default function ReelsFeed({
       <VideoNotesSheet
         open={notesOpen}
         onOpenChange={setNotesOpen}
-        notesMarkdown={current?.notesMarkdown ?? null}
+        notesMarkdown={currentNotes}
         lessonTitle={current?.title}
       />
 
