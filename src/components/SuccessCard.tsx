@@ -49,7 +49,7 @@ export default function SuccessCard({
           {title}
         </h2>
         {subtitle && (
-          <p className="text-[8px] leading-[1.3] text-[#fefefe]/80">
+          <p className="text-[12px] leading-[1.3] text-[#fefefe]/80">
             {subtitle}
           </p>
         )}
