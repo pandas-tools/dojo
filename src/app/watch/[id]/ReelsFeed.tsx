@@ -347,8 +347,14 @@ export default function ReelsFeed({
                   <img
                     src={glowSrc}
                     alt=""
-                    className="absolute left-1/2 top-1/2 h-[130%] w-[130%] max-w-none -translate-x-1/2 -translate-y-1/2 object-cover opacity-20"
-                    style={{ filter: "blur(120px) saturate(0.5)" }}
+                    className="absolute left-1/2 top-1/2 h-[110%] w-[70%] max-w-none -translate-x-1/2 -translate-y-1/2 object-cover opacity-30"
+                    style={{
+                      filter: "blur(140px) saturate(0.6)",
+                      maskImage:
+                        "radial-gradient(ellipse 60% 70% at center, black 0%, rgba(0,0,0,0.4) 45%, transparent 75%)",
+                      WebkitMaskImage:
+                        "radial-gradient(ellipse 60% 70% at center, black 0%, rgba(0,0,0,0.4) 45%, transparent 75%)",
+                    }}
                     draggable={false}
                   />
                 </div>
