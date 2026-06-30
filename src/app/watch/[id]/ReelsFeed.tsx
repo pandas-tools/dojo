@@ -381,14 +381,17 @@ export default function ReelsFeed({
             className="flex flex-1 flex-col gap-1.5 text-[#f9fdff]"
             style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
           >
-            <h2 className="text-[22px] font-medium leading-[1.2] text-[#f9fdff]">
-              {current?.title}
-            </h2>
-            {current?.description && (
-              <p className="text-[13px] leading-[1.35] text-[#b2b2b2]">
-                {current.description}
-              </p>
-            )}
+            <p className="leading-[1.3]">
+              <span className="text-[22px] font-medium text-[#f9fdff]">
+                {current?.title}
+              </span>
+              {current?.description && (
+                <span className="text-[13px] text-[#b2b2b2]">
+                  {" "}
+                  {current.description}
+                </span>
+              )}
+            </p>
             {current?.notesMarkdown && current.notesMarkdown.trim().length > 0 && (
               <button
                 type="button"
