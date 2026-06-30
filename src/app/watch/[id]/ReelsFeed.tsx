@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronUp, ChevronDown, Heart, MessageSquare } from "lucide-react";
 import VideoNotesSheet from "@/components/VideoNotesSheet";
+import UpvoteBurst from "@/components/UpvoteBurst";
 import { cn } from "@/lib/cn";
 import type { CarouselSlide } from "@/lib/db/schema";
 import VideoLessonViewer from "./VideoLessonViewer";
@@ -82,6 +83,10 @@ export default function ReelsFeed({
     () => new Set(initialUpvoted ?? []),
   );
   const upvotePendingRef = useRef<Set<string>>(new Set());
+  // Per-lesson burst: when the user upvotes a lesson (false → true), we show
+  // the UpvoteBurst overlay for ~700ms then unmount it.
+  const [burstLessonId, setBurstLessonId] = useState<string | null>(null);
+  const burstTimerRef = useRef<number | null>(null);
 
   const toggleUpvote = useCallback(async () => {
     if (disableTracking) return;
@@ -98,6 +103,18 @@ export default function ReelsFeed({
       else next.add(lessonId);
       return next;
     });
+    // Burst only on false → true. Cancel any in-flight burst first so a
+    // double-tap restarts the animation rather than ignoring the second tap.
+    if (!wasUpvoted) {
+      if (burstTimerRef.current !== null) {
+        window.clearTimeout(burstTimerRef.current);
+      }
+      setBurstLessonId(lessonId);
+      burstTimerRef.current = window.setTimeout(() => {
+        setBurstLessonId(null);
+        burstTimerRef.current = null;
+      }, 700);
+    }
 
     try {
       const res = await fetch(`/api/lessons/${lessonId}/upvote`, {
@@ -137,6 +154,7 @@ export default function ReelsFeed({
     armFade();
     return () => {
       if (fadeTimerRef.current !== null) window.clearTimeout(fadeTimerRef.current);
+      if (burstTimerRef.current !== null) window.clearTimeout(burstTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -271,6 +289,8 @@ export default function ReelsFeed({
                   disableTracking={disableTracking}
                 />
               )}
+              {/* Upvote burst — fires once on false→true */}
+              <UpvoteBurst active={active && burstLessonId === it.id} />
             </section>
           );
         })}
@@ -347,7 +367,7 @@ export default function ReelsFeed({
                 className={cn(
                   "h-5 w-5 transition-colors",
                   current && upvoted.has(current.id)
-                    ? "fill-red-500 text-red-500"
+                    ? "fill-arctic-haze text-arctic-haze"
                     : "",
                 )}
                 strokeWidth={2}

@@ -10,9 +10,14 @@ const PREVIEWS = [
     desc: "The glass card that closes the onboarding flow. Auto-routes to / after ~2s.",
   },
   {
-    href: "/design-preview/success-lesson",
-    title: "Success — chapter complete (confetti)",
-    desc: "Shown after the user finishes the last lesson in a chapter.",
+    href: "/design-preview/success-three-lesson",
+    title: "Success — first three lessons complete (confetti)",
+    desc: "Shown after the user finishes their first three lessons. Replaces the prior 'chapter complete' frame.",
+  },
+  {
+    href: "/design-preview/success-group",
+    title: "Success — group complete (emoji rating + comment)",
+    desc: "Shown after the user finishes a lesson group. Asks for a rating + optional comment.",
   },
   {
     href: "/design-preview/success-tier",
