@@ -118,50 +118,18 @@ export default async function BrowsePage() {
 }
 
 /**
- * FeaturedRail — the FIRST rail ("New lessons"). Wrapped in a glassy
- * bordered card with subtle internal glow blobs per the Figma design.
+ * FeaturedRail — the FIRST rail ("New lessons"). Differentiated from regular
+ * groups by a gradient title (arctic-haze → steel-harbor) and a hairline
+ * divider beneath. No bordered frame or glow — composition does the work.
  */
 function FeaturedRail({ group }: { group: BrowseGroup }) {
   return (
     <section>
-      <div
-        className="relative overflow-hidden border-y border-white/60 py-6 pl-6"
-        style={{
-          // Figma uses an SVG-embedded radial gradient (grey/white at 0.2
-          // opacity) over a 0.2 black overlay — gives a 'frosted' texture
-          // without competing with the cards. Approximated here.
-          backgroundImage:
-            "radial-gradient(ellipse 60% 50% at 35% 30%, rgba(193,232,251,0.06) 0%, rgba(193,232,251,0) 60%), radial-gradient(ellipse 50% 40% at 70% 80%, rgba(159,191,207,0.08) 0%, rgba(159,191,207,0) 60%), linear-gradient(90deg, rgba(14,14,14,0.2) 0%, rgba(14,14,14,0.2) 100%)",
-        }}
-      >
-        {/* Very subtle accent blob top-left — matches Figma's Ellipse 102
-            but dialed back; Figma's are barely perceptible. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -left-32 -top-24 h-[400px] w-[400px] rounded-full opacity-25"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(193,232,251,0.4) 0%, rgba(193,232,251,0) 65%)",
-            filter: "blur(60px)",
-          }}
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -bottom-24 -right-24 h-[360px] w-[360px] rounded-full opacity-20"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(159,191,207,0.45) 0%, rgba(159,191,207,0) 60%)",
-            filter: "blur(60px)",
-          }}
-        />
-
-        <div className="relative">
-          <h2 className="mb-4 text-[20px] font-medium leading-[1.2] tracking-tight text-white">
-            {group.name}
-          </h2>
-          <HorizontalRail group={group} />
-        </div>
-      </div>
+      <h2 className="mb-4 inline-block w-fit px-6 text-[20px] font-medium leading-[1.2] tracking-tight whitespace-nowrap bg-gradient-to-r from-arctic-haze to-steel-harbor bg-clip-text text-transparent">
+        {group.name}
+      </h2>
+      <HorizontalRail group={group} edgeToEdge />
+      <div aria-hidden className="mx-6 mt-8 h-px bg-white/10" />
     </section>
   );
 }
