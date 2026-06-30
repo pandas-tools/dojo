@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import AuthAtmosphere from "@/components/AuthAtmosphere";
 import SuccessAtmosphere from "@/components/SuccessAtmosphere";
@@ -9,6 +9,16 @@ import { completeOnboarding } from "./actions";
 import LanguageStep from "./steps/LanguageStep";
 import StoreStep from "./steps/StoreStep";
 import AllSetStep from "./steps/AllSetStep";
+
+const PRELOGIN_KEY = "dojo:pending-onboarding";
+const PRELOGIN_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h — matches magic link
+
+type PendingOnboarding = {
+  email?: string;
+  storeId: string | null;
+  language: string;
+  ts: number;
+};
 
 type StoreRow = { id: string; name: string; city: string | null };
 type Step = "language" | "store" | "done";
@@ -36,6 +46,8 @@ export default function OnboardingWizard({
   const [step, setStep] = useState<Step>("language");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Guard so the auto-apply effect only fires once per mount.
+  const autoAppliedRef = useRef(false);
 
   const defaultLanguage = languages.includes(initialLanguage)
     ? initialLanguage
@@ -65,6 +77,74 @@ export default function OnboardingWizard({
       setStep("done");
     });
   }
+
+  // Auto-apply data the user picked in the pre-login wizard. If the
+  // localStorage payload is present + fresh, complete onboarding silently
+  // and skip the in-page wizard entirely.
+  useEffect(() => {
+    if (autoAppliedRef.current) return;
+    if (typeof window === "undefined") return;
+    let raw: string | null;
+    try {
+      raw = window.localStorage.getItem(PRELOGIN_KEY);
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    let pending: PendingOnboarding | null;
+    try {
+      pending = JSON.parse(raw) as PendingOnboarding;
+    } catch {
+      try {
+        window.localStorage.removeItem(PRELOGIN_KEY);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+    if (!pending || Date.now() - pending.ts > PRELOGIN_MAX_AGE_MS) {
+      try {
+        window.localStorage.removeItem(PRELOGIN_KEY);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+    autoAppliedRef.current = true;
+    const langValid = languages.includes(pending.language);
+    const storeValid =
+      pending.storeId === null ||
+      stores.some((s) => s.id === pending.storeId);
+    if (!langValid || !storeValid) {
+      // Stale payload — don't apply, fall through to manual wizard.
+      try {
+        window.localStorage.removeItem(PRELOGIN_KEY);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+    // Apply silently — completeOnboarding action runs, success → done step
+    // (which shows AllSet then auto-routes to /).
+    startTransition(async () => {
+      const res = await completeOnboarding({
+        language: pending.language,
+        storeId: pending.storeId,
+      });
+      try {
+        window.localStorage.removeItem(PRELOGIN_KEY);
+      } catch {
+        // ignore
+      }
+      if (!res?.error) {
+        setLanguage(pending.language);
+        if (pending.storeId === null) setHq(true);
+        else setStoreId(pending.storeId);
+        setStep("done");
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (step === "done") {
     return (
