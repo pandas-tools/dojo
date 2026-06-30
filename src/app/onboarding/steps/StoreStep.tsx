@@ -5,19 +5,17 @@ import { cn } from "@/lib/cn";
 
 type StoreRow = { id: string; name: string; city: string | null };
 
+const HQ_LABEL = "I'm not assigned to a store (HQ / other)";
+
 /**
  * StoreStep — matches Figma 96:103. Layout:
- *   1. Dropdown trigger row at top — shows the currently picked store (or
- *      empty placeholder + chevron). Visual summary; tap doesn't toggle
- *      anything since the list below is always visible.
- *   2. List of stores. Capped to ~3 visible rows (height 192px) — the rest
- *      scroll behind a soft bottom fade so 'there's more' is implicit.
- *   3. HQ checkbox below the list (functional necessity for HQ users —
- *      Figma omits this but real users without a store need a way out).
+ *   1. Dropdown trigger row at top — shows the currently picked store
+ *      (or 'HQ / …' if HQ, or empty + chevron when nothing picked).
+ *   2. List of stores below + an HQ row at the bottom so users without
+ *      a store still have a single, unified picker.
  *
- * Selected highlight on the chosen row in the list (arctic-haze border)
- * is the only place the selection state is visible inside the list — the
- * trigger above gives the same info but as a label.
+ * Selected item is hidden from the list (it's already in the trigger),
+ * so there's no duplicate row.
  */
 export default function StoreStep({
   stores,
@@ -40,11 +38,8 @@ export default function StoreStep({
   );
 
   // Strip the longest common WORD-aligned prefix across all store names
-  // so dojo's 'Orange Antwerp Central' / 'Orange Brussels Midi' render as
-  // 'Antwerp Central' / 'Brussels Midi'. Auto-adapts to any client — the
-  // prefix could be 'Orange' or 'Apple Store' or 'Orange Store' depending
-  // on the operator. Falls back to the full name when no common prefix
-  // exists (e.g. mixed-brand store list).
+  // so 'Orange Antwerp Central' / 'Orange Brussels Midi' render as
+  // 'Antwerp Central' / 'Brussels Midi'. Auto-detects per client.
   const commonPrefix = useMemo(() => {
     if (stores.length < 2) return "";
     let prefix = stores[0]!.name;
@@ -56,7 +51,6 @@ export default function StoreStep({
       prefix = prefix.slice(0, i);
       if (!prefix) break;
     }
-    // Trim to the last whole-word boundary so we don't chop mid-word
     const lastSpace = prefix.lastIndexOf(" ");
     return lastSpace > 0 ? prefix.slice(0, lastSpace + 1) : "";
   }, [stores]);
@@ -66,23 +60,24 @@ export default function StoreStep({
       ? name.slice(commonPrefix.length)
       : name;
 
+  const triggerText = hq
+    ? HQ_LABEL
+    : selectedStore
+      ? display(selectedStore.name)
+      : "";
+
   return (
-    <div className="flex flex-col gap-3">
-      {/* Selected display — the Figma 'dropdown trigger' (visual only;
-          list below is always expanded). Chevron is absolute-positioned so
-          the trigger text stays truly centered. */}
-      <div className="relative flex h-[52px] items-center justify-center rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-12 backdrop-blur-md">
+    <div className="flex w-full flex-col gap-3">
+      {/* Dropdown trigger — chevron absolutely positioned so the text
+          centers on the full trigger width regardless of label length. */}
+      <div className="relative h-[52px] w-full rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] backdrop-blur-md">
         <span
           className={cn(
-            "truncate text-center text-[16px] leading-[24px] tracking-[0.08px]",
+            "absolute inset-0 flex items-center justify-center px-12 text-center text-[16px] leading-[24px] tracking-[0.08px]",
             hq || selectedStore ? "text-[#fefefe]" : "text-[#8e8e8e]",
           )}
         >
-          {hq
-            ? "HQ / Not assigned to a store"
-            : selectedStore
-              ? display(selectedStore.name)
-              : ""}
+          <span className="truncate">{triggerText}</span>
         </span>
         <svg
           viewBox="0 0 24 24"
@@ -98,61 +93,46 @@ export default function StoreStep({
         </svg>
       </div>
 
-      {/* Store list — height-capped to 3 rows; remainder scrolls (no fade).
-          Hides the currently-picked store so it's only visible in the
-          trigger above — no duplicate row. */}
-      <div className="relative">
-        <ul
-          className="flex flex-col gap-2 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-          style={{ maxHeight: "180px" }}
-        >
-          {stores.length === 0 ? (
-            <li className="rounded-[24px] border border-[#445158] bg-[rgba(68,81,88,0.1)] px-5 py-3 text-center text-sm text-[#8e8e8e]">
-              No stores configured yet.
-            </li>
-          ) : (
-            stores
-              .filter((s) => hq || s.id !== storeId)
-              .map((s) => {
-                return (
-                  <li key={s.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onHqChange(false);
-                        onStoreChange(s.id);
-                      }}
-                      className={cn(
-                        "flex h-[52px] w-full items-center justify-center rounded-[24px] border border-[#445158] bg-[rgba(68,81,88,0.1)] px-5 text-center text-[#8e8e8e] backdrop-blur-md transition-all duration-200 hover:text-[#fefefe]",
-                      )}
-                    >
-                      <span className="truncate text-[16px] leading-[1.3]">
-                        {display(s.name)}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })
-          )}
-        </ul>
-      </div>
-
-      {/* HQ checkbox — Figma doesn't show this but real HQ users need it.
-          Kept compact + below the list. */}
-      <label
-        className={cn(
-          "mt-1 flex h-[44px] cursor-pointer items-center justify-center gap-2.5 rounded-[22px] border bg-[rgba(68,81,88,0.1)] px-4 text-[13px] text-[#8e8e8e] backdrop-blur-md transition-all duration-200",
-          hq ? "border-[#c1e8fb] text-[#fefefe]" : "border-[#445158]",
-        )}
+      {/* Options list — stores + an HQ row at the end. Picked option is
+          hidden so it only appears in the trigger above. ~3 visible rows;
+          rest scrolls (scrollbar hidden). */}
+      <ul
+        className="flex w-full flex-col gap-2 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        style={{ maxHeight: "240px" }}
       >
-        <input
-          type="checkbox"
-          checked={hq}
-          onChange={(e) => onHqChange(e.target.checked)}
-          className="h-4 w-4 rounded border-white/20 bg-white/[0.04] text-arctic-haze accent-arctic-haze"
-        />
-        <span>I&apos;m not assigned to a store (HQ / other)</span>
-      </label>
+        {stores.length === 0 && !hq && (
+          <li className="rounded-[24px] border border-[#445158] bg-[rgba(68,81,88,0.1)] px-5 py-3 text-center text-sm text-[#8e8e8e]">
+            No stores configured yet.
+          </li>
+        )}
+        {stores
+          .filter((s) => hq || s.id !== storeId)
+          .map((s) => (
+            <li key={s.id} className="w-full">
+              <OptionPill
+                label={display(s.name)}
+                onClick={() => {
+                  onHqChange(false);
+                  onStoreChange(s.id);
+                }}
+              />
+            </li>
+          ))}
+        {/* HQ option — sits at the bottom of the list. Hidden when already
+            picked (it's in the trigger). */}
+        {!hq && (
+          <li className="w-full">
+            <OptionPill
+              label={HQ_LABEL}
+              onClick={() => {
+                onHqChange(true);
+                onStoreChange("");
+              }}
+              variant="muted"
+            />
+          </li>
+        )}
+      </ul>
 
       {error && (
         <p className="mt-1 rounded-[16px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
@@ -160,5 +140,30 @@ export default function StoreStep({
         </p>
       )}
     </div>
+  );
+}
+
+function OptionPill({
+  label,
+  onClick,
+  variant = "default",
+}: {
+  label: string;
+  onClick: () => void;
+  variant?: "default" | "muted";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "block h-[52px] w-full rounded-[24px] border border-[#445158] bg-[rgba(68,81,88,0.1)] px-5 text-center text-[16px] leading-[1.3] backdrop-blur-md transition-colors duration-200",
+        variant === "muted"
+          ? "text-[#8e8e8e]/85 hover:text-[#fefefe]"
+          : "text-[#8e8e8e] hover:text-[#fefefe]",
+      )}
+    >
+      <span className="block truncate">{label}</span>
+    </button>
   );
 }
