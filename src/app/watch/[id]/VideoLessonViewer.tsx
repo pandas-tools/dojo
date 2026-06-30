@@ -2,12 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import MuxPlayer from "@mux/mux-player-react";
-import { Volume2, VolumeX } from "lucide-react";
 import { useLessonTracking } from "@/lib/useLessonTracking";
 
 const COMPLETION_THRESHOLD = 0.9;
-const SOUND_HINT_AUTO_FADE_MS = 3500;
 
+/**
+ * VideoLessonViewer — Mux-backed video viewer used inside the Reels feed.
+ *
+ * Controls live in the parent (ReelsFeed) per the Reels/TikTok pattern:
+ *   - tap toggles mute (parent owns `muted`)
+ *   - press-hold pauses (parent owns `paused`)
+ * There are no in-viewer buttons; the whole shell is the gesture target.
+ */
 export default function VideoLessonViewer({
   lessonId,
   playbackId,
@@ -15,6 +21,8 @@ export default function VideoLessonViewer({
   subtitlesEnabled,
   disableTracking = false,
   active = true,
+  muted,
+  paused,
 }: {
   lessonId: string;
   playbackId: string;
@@ -27,10 +35,12 @@ export default function VideoLessonViewer({
   /** Reels-feed mode: only the active lesson autoplays + emits tracking. Inactive
    *  lessons stay mounted (so swipe-in is instant) but paused and silent. */
   active?: boolean;
+  /** Mute state owned by the parent (tap-to-toggle). Defaults to true. */
+  muted?: boolean;
+  /** Press-hold pause flag owned by the parent. Defaults to false. */
+  paused?: boolean;
 }) {
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(true);
-  const [showSoundHint, setShowSoundHint] = useState(true);
   const playerRef = useRef<HTMLElement | null>(null);
 
   const { emitCompleted } = useLessonTracking({
@@ -61,28 +71,19 @@ export default function VideoLessonViewer({
     [emitCompleted, active],
   );
 
-  useEffect(() => {
-    const id = window.setTimeout(() => setShowSoundHint(false), SOUND_HINT_AUTO_FADE_MS);
-    return () => window.clearTimeout(id);
-  }, []);
-
+  // Drive play/pause from active + paused. Inactive lessons stay paused;
+  // active lessons play unless the user is currently pressing to pause.
   useEffect(() => {
     const el = playerRef.current as unknown as
       | { play?: () => Promise<void>; pause?: () => void }
       | null;
     if (!el) return;
-    if (active) {
+    if (active && !paused) {
       el.play?.().catch(() => {});
     } else {
       el.pause?.();
     }
-  }, [active]);
-
-  function toggleMute(e: React.MouseEvent) {
-    e.stopPropagation();
-    setMuted((m) => !m);
-    setShowSoundHint(false);
-  }
+  }, [active, paused]);
 
   // Mux Player honors `--media-object-fit` on the host element to pass
   // through to the inner video. `contain` makes the video respect its
@@ -105,7 +106,7 @@ export default function VideoLessonViewer({
         metadata={{ video_title: title }}
         accentColor="#10b981"
         autoPlay={active ? "muted" : false}
-        muted={muted}
+        muted={muted ?? true}
         loop
         playsInline
         nohotkeys
@@ -117,23 +118,6 @@ export default function VideoLessonViewer({
         onEnded={() => setPlaying(false)}
         onTimeUpdate={onTimeUpdate}
       />
-      {active && (
-        <>
-          <button
-            type="button"
-            onClick={toggleMute}
-            aria-label={muted ? "Unmute" : "Mute"}
-            className="absolute bottom-24 right-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/50 backdrop-blur text-white pointer-events-auto"
-          >
-            {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-          </button>
-          {showSoundHint && muted && (
-            <div className="absolute bottom-24 right-16 z-30 rounded-full bg-black/60 backdrop-blur px-3 py-1.5 text-xs text-white pointer-events-none">
-              Tap for sound
-            </div>
-          )}
-        </>
-      )}
     </div>
   );
 }

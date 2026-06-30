@@ -18,8 +18,6 @@ import VideoLessonViewer from "./VideoLessonViewer";
 import ImageLessonViewer from "./ImageLessonViewer";
 import CarouselLessonViewer from "./CarouselLessonViewer";
 
-const OVERLAY_AUTO_FADE_MS = 3000;
-
 export type FeedItemContent =
   | {
       type: "video";
@@ -76,9 +74,13 @@ export default function ReelsFeed({
     return i >= 0 ? i : 0;
   }, [items, initialId]);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
-  const [overlayVisible, setOverlayVisible] = useState(true);
   const [notesOpen, setNotesOpen] = useState(false);
-  const fadeTimerRef = useRef<number | null>(null);
+  // TikTok-style gesture state. Tap = mute toggle, press-hold = pause.
+  const [muted, setMuted] = useState(true);
+  const [pausing, setPausing] = useState(false);
+  const pressTimerRef = useRef<number | null>(null);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const pressFiredRef = useRef(false);
   const [upvoted, setUpvoted] = useState<Set<string>>(
     () => new Set(initialUpvoted ?? []),
   );
@@ -140,21 +142,13 @@ export default function ReelsFeed({
     }
   }, [activeIndex, disableTracking, items, upvoted]);
 
-  function armFade() {
-    if (fadeTimerRef.current !== null) window.clearTimeout(fadeTimerRef.current);
-    fadeTimerRef.current = window.setTimeout(() => {
-      setOverlayVisible(false);
-    }, OVERLAY_AUTO_FADE_MS);
-  }
-
   // Scroll to the initial lesson on mount.
   useEffect(() => {
     const el = sectionRefs.current.get(items[initialIndex]?.id ?? "");
     if (el) el.scrollIntoView({ behavior: "auto", block: "start" });
-    armFade();
     return () => {
-      if (fadeTimerRef.current !== null) window.clearTimeout(fadeTimerRef.current);
       if (burstTimerRef.current !== null) window.clearTimeout(burstTimerRef.current);
+      if (pressTimerRef.current !== null) window.clearTimeout(pressTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -176,8 +170,6 @@ export default function ReelsFeed({
         const idx = items.findIndex((it) => it.id === id);
         if (idx < 0) return;
         setActiveIndex(idx);
-        setOverlayVisible(true);
-        armFade();
       },
       {
         root: container,
@@ -228,18 +220,87 @@ export default function ReelsFeed({
     return () => window.removeEventListener("keydown", onKey);
   }, [activeIndex, gotoIndex, router, backHref]);
 
-  function onShellTap() {
-    setOverlayVisible((v) => {
-      const next = !v;
-      if (next) armFade();
-      return next;
-    });
+  // Pointer gesture handling — Reels/TikTok pattern.
+  //   tap (down + up under ~250ms, no drag) → toggle mute
+  //   press-hold (down + held ≥ 250ms) → pause while held; resume on release
+  // Clicks on interactive controls (buttons, links, dialogs) bypass the
+  // shell handler entirely so the chrome stays responsive.
+  const PRESS_HOLD_MS = 250;
+  const TAP_MOVE_PX = 12;
+
+  function clearPressTimer() {
+    if (pressTimerRef.current !== null) {
+      window.clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  }
+
+  function isInteractive(target: EventTarget | null) {
+    if (!(target instanceof HTMLElement)) return false;
+    return !!target.closest(
+      'button, a, input, textarea, [role="button"], [data-no-shell-gesture]',
+    );
+  }
+
+  function onShellPointerDown(e: React.PointerEvent) {
+    if (isInteractive(e.target)) return;
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
+    pressFiredRef.current = false;
+    clearPressTimer();
+    pressTimerRef.current = window.setTimeout(() => {
+      pressFiredRef.current = true;
+      setPausing(true);
+    }, PRESS_HOLD_MS);
+  }
+
+  function onShellPointerMove(e: React.PointerEvent) {
+    if (!pointerStartRef.current) return;
+    const dx = Math.abs(e.clientX - pointerStartRef.current.x);
+    const dy = Math.abs(e.clientY - pointerStartRef.current.y);
+    if (dx > TAP_MOVE_PX || dy > TAP_MOVE_PX) {
+      // User is scrolling — cancel the press intent without firing anything.
+      clearPressTimer();
+      pointerStartRef.current = null;
+      if (pressFiredRef.current) {
+        setPausing(false);
+        pressFiredRef.current = false;
+      }
+    }
+  }
+
+  function onShellPointerUp() {
+    clearPressTimer();
+    const wasPress = pressFiredRef.current;
+    const hadPointer = pointerStartRef.current !== null;
+    pressFiredRef.current = false;
+    pointerStartRef.current = null;
+    if (wasPress) {
+      setPausing(false);
+      return;
+    }
+    if (hadPointer) {
+      // Tap → toggle mute
+      setMuted((m) => !m);
+    }
+  }
+
+  function onShellPointerCancel() {
+    clearPressTimer();
+    if (pressFiredRef.current) setPausing(false);
+    pressFiredRef.current = false;
+    pointerStartRef.current = null;
   }
 
   const current = items[activeIndex];
 
   return (
-    <main className="fixed inset-0 bg-black text-white overflow-hidden touch-none select-none">
+    <main
+      className="fixed inset-0 bg-black text-white overflow-hidden touch-none select-none"
+      onPointerDown={onShellPointerDown}
+      onPointerMove={onShellPointerMove}
+      onPointerUp={onShellPointerUp}
+      onPointerCancel={onShellPointerCancel}
+    >
       <div
         ref={containerRef}
         className="absolute inset-0 overflow-y-scroll snap-y snap-mandatory overscroll-y-contain"
@@ -255,7 +316,6 @@ export default function ReelsFeed({
                 else sectionRefs.current.delete(it.id);
               }}
               data-lesson-id={it.id}
-              onClick={onShellTap}
               className="relative snap-start flex items-center justify-center bg-black"
               style={{ height: "100dvh", width: "100%" }}
             >
@@ -268,6 +328,8 @@ export default function ReelsFeed({
                   aspectRatio={it.content.aspectRatio}
                   active={active}
                   disableTracking={disableTracking}
+                  muted={muted}
+                  paused={active && pausing}
                 />
               )}
               {it.content.type === "image" && (
@@ -296,30 +358,11 @@ export default function ReelsFeed({
         })}
       </div>
 
-      {/* TITLE CHIP — middle-screen quote pill, fades with overlay */}
+      {/* BOTTOM OVERLAY — lesson name + description on left, interaction icons on right.
+          Always visible (no fade). The middle title chip from the prior pass
+          was removed — title now lives inline at the bottom. */}
       <div
-        className={cn(
-          "pointer-events-none fixed inset-x-0 z-40 flex justify-center px-6 transition-opacity duration-300",
-          overlayVisible ? "opacity-100" : "opacity-0",
-        )}
-        style={{ top: "calc(60% - 1rem)" }}
-      >
-        <div
-          className="rounded-[8px] bg-[rgba(14,14,14,0.6)] px-4 py-3 backdrop-blur-md"
-          style={{ maxWidth: "min(90%, 360px)" }}
-        >
-          <p className="text-center text-[18px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
-            {current?.title}
-          </p>
-        </div>
-      </div>
-
-      {/* BOTTOM OVERLAY — lesson name + description on left, interaction icons on right */}
-      <div
-        className={cn(
-          "pointer-events-none fixed inset-x-0 bottom-0 z-50 transition-opacity duration-300",
-          overlayVisible ? "opacity-100" : "opacity-0",
-        )}
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-50"
         style={{
           backgroundImage:
             "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0) 100%)",
@@ -333,21 +376,35 @@ export default function ReelsFeed({
             paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 2.5rem)",
           }}
         >
-          {/* Left column: lesson name + description */}
-          <div className="flex flex-1 flex-col gap-2 text-[#f9fdff]">
-            <p
-              className="text-[20px] font-normal leading-[1.3]"
-              style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
-            >
-              {current?.title}
+          {/* Left column: inline title + description + Learn more (Figma) */}
+          <div
+            className="flex flex-1 flex-col gap-1.5 text-[#f9fdff]"
+            style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
+          >
+            <p className="leading-[1.3]">
+              <span className="text-[18px] font-medium text-[#f9fdff]">
+                {current?.title}
+              </span>
+              {current?.description && (
+                <>
+                  <span className="text-[13px] text-[#b2b2b2]"> </span>
+                  <span className="text-[13px] text-[#b2b2b2]">
+                    {current.description}
+                  </span>
+                </>
+              )}
             </p>
-            {current?.description && (
-              <p
-                className="text-[16px] font-normal leading-[1.3]"
-                style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
+            {current?.notesMarkdown && current.notesMarkdown.trim().length > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNotesOpen(true);
+                }}
+                className="self-start text-[11px] leading-[1.3] text-[#b2b2b2] underline underline-offset-2 transition-colors hover:text-[#f9fdff]"
               >
-                {current.description}
-              </p>
+                Learn more
+              </button>
             )}
           </div>
 
