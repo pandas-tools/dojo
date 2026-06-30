@@ -28,7 +28,7 @@ export default async function EmployeeDetailPage({
   const detail = await getEmployeeDetail(userId);
   if (!detail) notFound();
 
-  const { user, lessons, totals } = detail;
+  const { user, lessons, groupRatings, totals } = detail;
 
   const backHref = user.clientId
     ? `/admin/clients/${user.clientId}`
@@ -156,7 +156,6 @@ export default async function EmployeeDetailPage({
                     <th className="py-2 px-3 font-medium">Lesson</th>
                     <th className="py-2 px-3 font-medium">Opened</th>
                     <th className="py-2 px-3 font-medium">Completed</th>
-                    <th className="py-2 px-3 font-medium">Rating</th>
                     <th className="py-2 px-3 font-medium">Engaged</th>
                     <th className="py-2 px-3 font-medium">Last activity</th>
                   </tr>
@@ -184,14 +183,57 @@ export default async function EmployeeDetailPage({
                       <td className="py-2.5 px-3">
                         {l.completed ? <span className="text-emerald-700">✓</span> : <span className="text-zinc-400">—</span>}
                       </td>
-                      <td className="py-2.5 px-3 text-zinc-700">
-                        {l.rating !== null ? `${l.rating} ★` : "—"}
-                      </td>
                       <td className="py-2.5 px-3 text-zinc-600">
                         {l.totalEngagedMs > 0 ? formatDuration(l.totalEngagedMs) : "—"}
                       </td>
                       <td className="py-2.5 px-3 text-zinc-600 whitespace-nowrap">
                         {l.lastActivityAt ? formatDate(l.lastActivityAt) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Group ratings</CardTitle>
+            <CardDescription>
+              Ratings this user submitted after completing every lesson in a
+              group.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {groupRatings.length === 0 ? (
+            <EmptyState
+              title="No group ratings yet"
+              description="Ratings show up here once the user finishes every lesson in a group and submits a rating."
+            />
+          ) : (
+            <div className="-mx-3 sm:mx-0 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-medium uppercase tracking-wide text-zinc-500 border-b border-zinc-200">
+                    <th className="py-2 px-3 font-medium">Group</th>
+                    <th className="py-2 px-3 font-medium">Rating</th>
+                    <th className="py-2 px-3 font-medium">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupRatings.map((r) => (
+                    <tr
+                      key={r.groupId}
+                      className="border-b last:border-b-0 border-zinc-100"
+                    >
+                      <td className="py-2.5 px-3 text-zinc-900">{r.groupName}</td>
+                      <td className="py-2.5 px-3 text-zinc-700">{r.rating} ★</td>
+                      <td className="py-2.5 px-3 text-zinc-600 whitespace-nowrap">
+                        {formatDate(r.ratedAt)}
                       </td>
                     </tr>
                   ))}

@@ -25,6 +25,35 @@ If you've been dropped into Dojo with no prior context, do these in order:
 - **Whitelisted email domains only.** No passwords. Magic-link sign-in via Resend. Per-client domain allowlist.
 - **Eventual domain:** `learn.pandas.io`. Currently `web-s2cr-production.up.railway.app`.
 
+## Status as of 2026-06-30 (evening — rating model cutover + lesson upvotes)
+
+**Pre-production.** Two engagement signals on the watch surface, both backend-only on the Dex side (Iris owns the visible surfaces):
+
+### Lesson upvotes (shipped 2026-06-30 morning, PR #3)
+
+Per-(user, lesson) "found this helpful" toggle, surfaced as the **Heart button on the Reels right rail**. One row per (user, lesson) = upvoted.
+
+- **Table:** `lesson_upvotes` (PK `(user_id, lesson_id)`, denormalised `client_id`, indexes on user, lesson, and `(client_id, lesson_id)` for per-tenant rollups).
+- **Endpoint:** `POST /api/lessons/[id]/upvote` → `{ ok, upvoted }`. Optimistic client toggle. Tenant-scoped via `scopedDb.upvotes.toggle()` (defence-in-depth: verifies lesson assigned to caller's client before insert).
+- **Hydration:** `GET /watch/[id]` server-component pre-loads via `sdb.upvotes.forUser()` → `Set<lessonId>` passed to the Reels client as `initialUpvoted`.
+- **Audit trail:** every toggle also appends a `lesson_upvoted` / `lesson_unvoted` row to `lesson_events` so the append-only log carries the full toggle history independent of the current-state row.
+- **Analytics:** `/admin/analytics/[clientId]` has an "Upvotes" column on the lesson-breakdown table (`upvoteCount` per lesson). Per-(client × lesson) rollups are query-trivial from the denormalised column.
+
+### Group ratings (shipped 2026-06-30 afternoon, PR #4)
+
+Per-(user, group) 1-5 star rating, **replacing per-lesson rating entirely**. The trigger surface is the group-completion celebration owned by Iris: when an employee finishes the last assigned + published lesson in a group, the watch shell prompts them to rate the group as a whole.
+
+- **Table:** `lesson_group_ratings` (PK `(user_id, group_id)`, denormalised `client_id` NOT NULL, `rating int CHECK 1..5`, `created_at`, `updated_at`).
+- **Detection:** `POST /api/lessons/[id]/event` extended — when a `lesson_completed` event finishes the user's last assigned+published lesson in that lesson's group, the response carries `{ groupCompleted: { groupId, groupName, lessonCount, alreadyRated } }`. Idempotent (re-completion keeps returning the same payload; `alreadyRated` lets the client suppress the rating prompt on subsequent views).
+- **Endpoint:** `POST /api/groups/[id]/rate` (body `{ rating: 1..5 }`) → `{ ok, rating, previousRating }`. Upsert — last write wins. Also writes a `group_rated` row to `lesson_events` with payload `{ groupId, rating, previousRating }`.
+- **Read:** `GET /api/groups/[id]/rate` → `{ rating: number | null }`. Lets Iris pre-fill or hide the rating control.
+- **Edge cases handled:** ungrouped lessons → no fire; unpublished lessons in the group don't count toward "all done"; client-assignment-scoped; orphaned `groupId NULL` (cascade SET NULL on group delete) → no fire; admin / null-clientId callers → no fire (scopedDb constructor refuses); multi-completion of the same lesson → idempotent.
+- **Removed in the same PR (dead code rip):** `lesson_completions` table dropped (migration `0009`); `RatingWidget.tsx`, `POST /api/lessons/[id]/complete`, `scopedDb.completions.*`, `useLessonTracking.emitRating()`. `rating_submitted` event_type stays in the postgres enum for legacy rows but is no longer accepted by `POST /api/lessons/[id]/event`.
+- **Analytics:** `/admin/analytics/[clientId]` now has a "Group ratings" section with per-group avg + response count. Per-lesson Avg-rating column removed from the lesson-breakdown table. Per-store Avg-rating column kept but the data is sourced from group ratings of users at that store. Per-employee drill (`/admin/employees/[userId]`) drops the per-lesson rating column and gains a "Group ratings" section listing every (group, rating, ratedAt). `EmployeeDetail.totals.avgRating` averages the user's group ratings.
+- **Why per-group, not per-lesson:** lessons are small pieces of content; rating each one was over-asking and produced noise. Per-group is the right granularity — one rating per chapter-equivalent. See `decisions.md` entry "Per-group rating replaces per-lesson rating (2026-06-30)".
+
+**Both features are 100% backend on the Dex side.** The Heart-button click handler and the chapter-complete celebration surface are Iris's lane. The data model + signals + endpoints + analytics are stable; she can wire the surfaces independently.
+
 ## Status as of 2026-06-24 (evening — Pandas-universe rebrand)
 
 **Pre-production.** Iris-only session. The whole visual identity was brought into the Pandas universe — token layer rewired, brand fonts in, brand wordmark in, every surface swept (employee + auth + admin).
@@ -117,7 +146,7 @@ If you've been dropped into Dojo with no prior context, do these in order:
 **Pre-production.** No external client employees are using it yet; the public Railway URL is internal-only. Optimised for speed of iteration — direct commits to `main`, no PR review gate, no `develop` branch. This rule lapses when real client employees come online (spec'd in `/apps/dojo/CLAUDE.md`).
 
 **Big lifts shipped in the 2026-06-03 session:**
-- **Reels view (Layout 1)** — `/watch/[id]` is now a full-bleed Instagram-Reels feed: all assigned lessons stacked in one CSS scroll-snap container, swipe-with-momentum between lessons, autoplay-muted with tap-for-sound, persistent back chevron top-left, fading bottom title-description overlay, object-contain everywhere so 9:16 / 1:1 / 16:9 all render at native aspect. Rating widget pulled entirely (placement TBD).
+- **Reels view (Layout 1)** — `/watch/[id]` is now a full-bleed Instagram-Reels feed: all assigned lessons stacked in one CSS scroll-snap container, swipe-with-momentum between lessons, autoplay-muted with tap-for-sound, persistent back chevron top-left, fading bottom title-description overlay, object-contain everywhere so 9:16 / 1:1 / 16:9 all render at native aspect. Rating widget pulled. (Superseded 2026-06-30: rating moved to **per-group** via the chapter-complete celebration. See top-of-file status.)
 - **Library view (Layout 2)** — `/browse` is **untouched** by this session. It's still the pre-Reels card layout. Real client employees would land on `/browse` first; this is the largest outstanding UI lift for the user-facing surface.
 - **Admin batch (8 items shipped, 5 skipped, 1 deferred — original 14 from 2026-06-02 list)** — full audit log, employee drill page, Mux error recovery, resend magic link, bulk ops, preview-as-employee, translation fallback rule, auto re-onboarding triggers. Analytics-exclude-admins shipped alongside as a write-time filter. See "Workflow inventory" below for the full resolution.
 - **Real content seed** — 7 placeholder lessons (3 videos at 9:16, 2 single images, 2 carousels) assigned to Orange Belgium. Old demo lessons deleted + seed.ts updated so they don't re-spawn on deploy.
@@ -175,8 +204,9 @@ Tables (lesson surface):
   - Carousel: `carousel_slides jsonb` — ordered `[{url, alt, caption?}, ...]`.
   - All types: `aspect_ratio real` — width/height (1.7778 for 16:9, 0.5625 for 9:16, 1.0 square). Populated at upload time (image header parse via `image-size`, Mux webhook for video). Nullable for legacy rows.
 - `client_lessons` — junction (which clients see which lessons).
-- `lesson_completions` — kept for legacy rating data (`rating int`, 1–5). Completion status is computed from `lesson_events`, NOT from "row exists in this table." Historical rating rows were backfilled into `lesson_events` as `lesson_completed` so analytics history doesn't disappear.
-- `lesson_events` — append-only event log. Types: `lesson_opened`, `lesson_completed`, `lesson_engagement`, `rating_submitted`. Payload is jsonb. Writes from admin-role users are silently skipped.
+- `lesson_upvotes` — per-(user, lesson) "helpful" toggle. PK `(user_id, lesson_id)`, denormalised `client_id`. Toggled via `POST /api/lessons/[id]/upvote` → `scopedDb.upvotes.toggle`. Each toggle also appends `lesson_upvoted` / `lesson_unvoted` to `lesson_events`. Surfaced on the Reels right rail (Heart) and the lesson-breakdown admin table.
+- `lesson_group_ratings` — per-(user, group) 1-5 star rating. PK `(user_id, group_id)`, denormalised `client_id` NOT NULL, `created_at`, `updated_at`. Written via `POST /api/groups/[id]/rate` → `scopedDb.groupRatings.upsert` after the user finishes every assigned+published lesson in the group. Each upsert appends `group_rated` to `lesson_events`. Replaced the dropped per-lesson `lesson_completions` table on 2026-06-30.
+- `lesson_events` — append-only event log. Types: `lesson_opened`, `lesson_completed`, `lesson_engagement`, `lesson_upvoted`, `lesson_unvoted`, `group_rated`. The legacy `rating_submitted` value is preserved in the postgres enum for historical rows but is no longer accepted at the event route. Payload is jsonb. Writes from admin-role users are silently skipped.
 - `admin_audit_log` — append-only record of every admin write. `actor_user_id, action (namespaced verb), target_type, target_id, payload jsonb, created_at`. Three indexes — actor+created, target_type+target_id+created, action+created — cover the realistic read patterns. Read via `getAuditLog()` helper in `src/lib/audit-log.ts`; admin viewer page at `/admin/audit-log`.
 - `users, clients, client_allowed_domains, client_languages, stores, accounts, sessions, verificationTokens` — Auth.js + tenant infra.
 
@@ -199,9 +229,11 @@ Four event types, content-type-dependent triggers:
 - `lesson_opened` — auto-fires on mount of the viewer (server dedupes per `(user_id, lesson_id)`).
 - `lesson_completed` — caller decides per content-type rules (above).
 - `lesson_engagement` — 15s heartbeats with cumulative `engagedMs`. "Engaged" = visible AND (active in last 30s OR a video is currently playing). Final heartbeat on hook cleanup, `pagehide`, or `visibilitychange-hidden` via `sendBeacon`. Server analytics use `MAX(engagedMs) per lesson` because heartbeats are cumulative.
-- `rating_submitted` — separate from completion. Rating stays 1–5 stars for now (thumbs migration deferred).
+- `lesson_upvoted` / `lesson_unvoted` — written by `scopedDb.upvotes.toggle`, not from the tracker hook.
+- `group_rated` — written by `scopedDb.groupRatings.upsert` (payload `{ groupId, rating, previousRating }`).
+- `rating_submitted` — **legacy / read-only**. The postgres enum value remains for historical rows; new code paths cannot emit it (server rejects it from `POST /api/lessons/[id]/event`, and `scopedDb.events.write`'s TS narrow excludes it).
 
-The hook is `src/lib/useLessonTracking.ts`. Returns `{ emitOpened, emitCompleted, emitRating }`. Honours an `enabled` flag (gated by the Reels feed's active-lesson state — see below) and a `disableTracking` flag (gated for preview surfaces).
+The tracker hook is `src/lib/useLessonTracking.ts`. Returns `{ emitOpened, emitCompleted }`. Honours an `enabled` flag (gated by the Reels feed's active-lesson state — see below) and a `disableTracking` flag (gated for preview surfaces).
 
 ## Reels view (Layout 1) — `/watch/[id]`
 
@@ -218,7 +250,7 @@ Behaviour:
 - **Carousels swipe horizontally** within their lesson section — TikTok pattern. Bottom-center dot indicators with varying-size pulses; `N / total` pill top-right.
 - **`object-fit: contain` on every viewer** — 9:16 fills flush, 1:1 letterboxes top/bottom with the section's black background, 16:9 letterboxes top/bottom. Mux Player honors `--media-object-fit: contain` via inline style.
 - **Keyboard nav:** ↑/↓ / PageUp/PageDown / Space = prev/next; Esc = back to `/browse`. Desktop-only side arrow buttons mid-right.
-- **No rating widget.** Pulled entirely in this pass. Placement is a known gap (see "Pending").
+- **No per-lesson rating widget.** Rating is **per-group** as of 2026-06-30 — the watch shell receives a `groupCompleted` signal from `POST /api/lessons/[id]/event` and Iris owns the celebration surface that submits to `POST /api/groups/[id]/rate`.
 - **No sign-out / no top nav bar** — just the persistent back chevron.
 
 Wrong-shaped lessons (preferred language exists but media is missing) silently fall back to English via the media-aware rule in `scopedDb.translations.forLesson` / `forLessons`. Only fires a "not ready" banner if even English has no media — true edge case.
@@ -322,7 +354,7 @@ Preview surfaces pass `disableTracking={true}` to every viewer. No events fire. 
 | `/admin/members` | Admin email allowlist. DB-managed + `ADMIN_ALLOWLIST` env-bootstrap (latter flagged "bootstrap"). |
 | `/admin/employees/[userId]` | Per-employee drill (NEW 2026-06-03). Profile card · 5-stat row (Assigned / Opened / Completed / Avg rating / Engaged time) · per-lesson history table. **"Resend magic link" button** in the header (two-click arm pattern to avoid stray double-clicks). |
 | `/admin/audit-log` | Filterable table of every admin write (NEW 2026-06-03). When · actor · action · target · payload (expandable). "Load older entries" via `before` cursor. |
-| `/admin/analytics`, `/admin/analytics/[clientId]` | Store activation %, trained employees %, avg rating, training funnel, per-store completion, per-lesson breakdown, employee list, 30-day activity timeline. **Reads completion status from `lesson_events`, not `lesson_completions`.** Admin events filtered out at write time — no read-side filter needed. |
+| `/admin/analytics`, `/admin/analytics/[clientId]` | Store activation %, trained employees %, avg group rating, training funnel, per-store completion, per-lesson breakdown (completion + upvote count), per-group ratings section, employee list, 30-day activity timeline. **Reads completion status from `lesson_events.lesson_completed`. Rating data comes from `lesson_group_ratings` (per-group, denormalised `client_id`).** Admin events filtered out at write time — no read-side filter needed. |
 
 UI primitives at `src/components/ui/`: Button, Dialog, Input, Label, Textarea, Select, Switch, Card, Badge, EmptyState, PageHeader, Sheet, Toaster.
 
@@ -518,7 +550,7 @@ The original 27-existing-13-missing list locked 2026-06-02 has been resolved by 
 - Hook is the single source of truth for client-side event emission. Components consume; nobody calls `/api/lessons/[id]/event` directly.
 - Engagement heuristic mirrors `pandas-dynamic-lander`'s landing-page tracker — visible AND (active in last 30s OR a video playing). Final heartbeat fires via `sendBeacon` on `pagehide` / `visibilitychange-hidden` so a tab close doesn't lose the count.
 - All event POSTs are fire-and-forget — the tracker never blocks or breaks the UI.
-- Server dedupes `lesson_opened` and `lesson_completed` per `(user_id, lesson_id)`. `lesson_engagement` and `rating_submitted` always insert. Server also silently no-ops events when `session.user.role === "admin"`.
+- Server dedupes `lesson_opened` and `lesson_completed` per `(user_id, lesson_id)`. `lesson_engagement` always inserts. `lesson_upvoted` / `lesson_unvoted` / `group_rated` are written from their own dedicated scoped helpers, not through this path. Server also silently no-ops events when `session.user.role === "admin"`.
 - Hook respects `enabled` flag — gated by the Reels feed's `active` state (only the visible lesson emits) + `disableTracking` flag (gated for preview surfaces).
 
 ### Audit log pattern
@@ -570,8 +602,8 @@ When a message arrives, route mentally to the right project context. The dojo gr
 
 ## Naming quirks worth knowing
 
-- **`/api/lessons/[id]/complete`** is the legacy rating endpoint. Writes a `lesson_completions` row AND emits a `rating_submitted` event. The "complete" in the name is historical — it writes the rating, not the completion. Completions go through `/api/lessons/[id]/event` with `type: "lesson_completed"`.
-- **`lesson_completions` table** also historical — rating data lives here (1–5 stars + `completed_at`). Completion status is read from `lesson_events`, not from this table.
+- **`POST /api/groups/[id]/rate`** is the rating endpoint (since 2026-06-30). Body `{ rating: 1..5 }`. Upserts into `lesson_group_ratings` and appends a `group_rated` event. The legacy `POST /api/lessons/[id]/complete` route was deleted in PR #4; the `lesson_completions` table was dropped in migration `0009`.
+- **`lesson_group_ratings` table** holds the current-state row per (user, group). PK `(user_id, group_id)`, denormalised `client_id`, `rating 1..5`, `created_at`, `updated_at`. The audit trail (re-rates, the previous value) is captured by the `group_rated` events in `lesson_events`.
 - **`createLesson` server action** in `src/app/admin/lessons/actions.ts` is dead code. New Lesson dialog uses `createLessonFromUpload` / `createImageLesson` / `createCarouselLesson` exclusively.
 - **`dojo-media` bucket auto-name** is actually `efficient-cornucopia-yWES` in the Railway dashboard. An orphan bucket from a failed first attempt (id `36eb98b4-…`) is still in the project blocking the human-readable name. Functionally fine — the Tigris-side bucket name in the creds is what S3 cares about.
 - **Migration `0002_admin_audit_log.sql`** also adds three indexes. **`0003_mux_error_message.sql`** is the column for surfacing failures. **`0004_aspect_ratio.sql`** is the real-precision width/height ratio. All four migrations land on every deploy via the `release` startCommand.

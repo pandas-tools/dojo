@@ -4,6 +4,38 @@ Running ADR for `dojo`. New decisions go at the top with a date and status. See 
 
 ---
 
+## 2026-06-30 — Per-group rating replaces per-lesson rating; per-lesson upvote added
+
+**Status:** Decided. Shipped in PRs #3 (upvotes) and #4 (group ratings).
+
+**Decision:** Two changes to the engagement layer on the watch surface.
+
+1. **Per-lesson rating is dropped entirely.** The `lesson_completions` table (which held a 1-5 rating under a misleading name; completion itself moved to `lesson_events` earlier in 2026-06) is removed. The `POST /api/lessons/[id]/complete` route, `RatingWidget.tsx`, `scopedDb.completions.*`, and `useLessonTracking.emitRating` are deleted.
+
+2. **Per-(user, group) rating** is the new rating model. New table `lesson_group_ratings` (PK `(user_id, group_id)`, denormalised `client_id`, `rating 1..5`, timestamps). New endpoint `POST /api/groups/[id]/rate` upserts; `GET` reads the current rating. `scopedDb.groupRatings.{forUser, upsert, forGroup, statsByGroupForClient}` and `scopedDb.groupCompletion.detectForLesson` are the helpers. `POST /api/lessons/[id]/event` carries a `groupCompleted` payload on the response when a `lesson_completed` event finishes every assigned+published lesson in that lesson's group for the user. Iris owns the celebration surface that uses the signal.
+
+3. **Per-lesson "upvote"** (PR #3, 2026-06-30 morning) — Heart button on the Reels right rail, backed by `lesson_upvotes` (PK `(user_id, lesson_id)`, denormalised `client_id`). Distinct from rating: upvote is per-lesson, lightweight, non-mandatory. Rating is per-group, deliberate, once-per-completion. Both signals coexist.
+
+**Why per-group, not per-lesson.** Dimi's call: lessons are short pieces of content. Asking the user to rate each one is too much. A group (editorial "chapter" — `lesson_groups`) is the right granularity — one rating per finished chapter. The rating widget was never actually wired into the live watch flow before this cutover, so no production rating data was lost.
+
+**Why drop the table, not soft-deprecate.** Dojo is still pre-production. The old name `lesson_completions` was already misleading (the table held *ratings*, not completion state — completion moved to events earlier). Cleaning it up keeps the data model honest. Per-lesson rating *data* was already discarded by the schema; only the shape was dropped here.
+
+**Audit trail.** Each `groupRatings.upsert` writes a `group_rated` row to `lesson_events` with payload `{ groupId, rating, previousRating }`. Mirrors the `lesson_upvoted` / `lesson_unvoted` audit-trail pattern. The current-state row in `lesson_group_ratings` is upsert (last-write-wins); the events table is the time series.
+
+**Edge cases the detector handles** (`scopedDb.groupCompletion.detectForLesson`):
+- Ungrouped lessons (`group_id IS NULL`) — never fires.
+- Unpublished lessons in the group — excluded from the "all done" check.
+- Lessons not assigned to user's client — excluded.
+- Orphan groupId (cascade SET NULL on group delete) — never fires.
+- Admin / null-clientId — `scopedDb` refuses to construct, so detector never runs.
+- Multi-completion of the same lesson — idempotent (still fires the signal, with `alreadyRated: true` so the client can suppress the rating prompt).
+
+**Trade-off.** Per-lesson rating *granularity* is gone. If we ever want it back (e.g., for a specific spotlight lesson), we'd add a separate `lesson_ratings` table — but that's not in scope. The lesson breakdown table in `/admin/analytics/[clientId]` keeps completion + upvote columns to compensate.
+
+**Trade-off (cutover).** The migration drops `lesson_completions` *before* the new container takes traffic. During Railway's cutover window (~2-3 minutes), the old container still references the dropped table for `/admin/analytics`. Acceptable for pre-prod; admin requests during the window will 500 once. Pre-production policy makes this a non-event.
+
+---
+
 ## 2026-06-24 — Dynamic "New lessons" rail at top of `/browse`
 
 **Status:** Decided.

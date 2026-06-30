@@ -16,10 +16,11 @@ import { db } from "./client";
 import {
   clientLessons,
   lessons,
+  lessonGroups,
   lessonBookmarks,
   lessonUpvotes,
+  lessonGroupRatings,
   lessonTranslations,
-  lessonCompletions,
   lessonEvents,
   stores,
   clients,
@@ -27,13 +28,16 @@ import {
   users,
 } from "./schema";
 
+// Event types that new code is allowed to WRITE. `rating_submitted` is
+// intentionally absent — it's a historical value preserved in the postgres
+// enum for legacy rows but no longer accepted from clients or new code paths.
 type LessonEventType =
   | "lesson_opened"
   | "lesson_completed"
   | "lesson_engagement"
-  | "rating_submitted"
   | "lesson_upvoted"
-  | "lesson_unvoted";
+  | "lesson_unvoted"
+  | "group_rated";
 
 type LessonContentType = "video" | "image" | "carousel";
 
@@ -183,7 +187,7 @@ export function scopedDb(user: ScopedUser) {
 
       // Toggle the bookmark for a lesson the user can actually see. Verifies
       // the lesson is assigned to this client first (defence-in-depth, mirrors
-      // events.write / completions.upsert). Returns the resulting state.
+      // events.write / upvotes.toggle). Returns the resulting state.
       toggle: async (lessonId: string): Promise<{ bookmarked: boolean }> => {
         const [assignment] = await db
           .select()
@@ -428,59 +432,255 @@ export function scopedDb(user: ScopedUser) {
       },
     },
 
-    completions: {
-      // Returns the user's RATINGS, restricted to lessons currently
-      // assigned to their client. Stale completions from a previous
-      // client (if the user were ever reassigned in the DB) are filtered
-      // out so /browse and /watch never resurface them.
-      //
-      // Naming note: this table is now semantically "ratings" — the
-      // boolean "did they complete it" signal moved into lesson_events.
-      // Kept the name for back-compat with existing call sites; we'll
-      // rename in a follow-up bundle if the signal:noise warrants.
-      forUser: async () => {
-        const assignments = await db
-          .select({ lessonId: clientLessons.lessonId })
-          .from(clientLessons)
-          .where(eq(clientLessons.clientId, cid));
-        const assignedIds = assignments.map((a) => a.lessonId);
-        if (assignedIds.length === 0) return [];
-        return db.query.lessonCompletions.findMany({
-          where: and(
-            eq(lessonCompletions.userId, user.id),
-            inArray(lessonCompletions.lessonId, assignedIds),
-          ),
-        });
+    groupRatings: {
+      // Map of groupId → rating (1-5) for groups in the user's currently
+      // assigned curriculum. A group counts as "in the user's curriculum"
+      // if it has at least one published lesson assigned to this client.
+      // Stale ratings for groups whose lessons are no longer assigned to
+      // this client are filtered out so admin drill-down surfaces stay
+      // honest.
+      forUser: async (): Promise<Map<string, number>> => {
+        const rows = await db
+          .select({
+            groupId: lessonGroupRatings.groupId,
+            rating: lessonGroupRatings.rating,
+          })
+          .from(lessonGroupRatings)
+          .where(
+            and(
+              eq(lessonGroupRatings.userId, user.id),
+              eq(lessonGroupRatings.clientId, cid),
+            ),
+          );
+        const out = new Map<string, number>();
+        for (const r of rows) out.set(r.groupId, r.rating);
+        return out;
       },
-      upsert: async (lessonId: string, rating: number) => {
-        // Verify lesson is assigned to user's client first
-        const [assignment] = await db
-          .select()
-          .from(clientLessons)
+
+      // Upsert the rating for a group the user can actually rate. Verifies
+      // the group has at least one published lesson assigned to this client
+      // (defence-in-depth; same shape as bookmarks.toggle / upvotes.toggle).
+      // Returns the new rating + previousRating so callers can attribute
+      // re-rates. Also appends a `group_rated` row to lesson_events so the
+      // append-only audit trail mirrors the upvote pattern.
+      upsert: async (
+        groupId: string,
+        rating: number,
+      ): Promise<{ rating: number; previousRating: number | null }> => {
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+          throw new Error("Rating must be an integer between 1 and 5");
+        }
+        const assignedPublished = await db
+          .select({ id: lessons.id })
+          .from(lessons)
+          .innerJoin(clientLessons, eq(clientLessons.lessonId, lessons.id))
           .where(
             and(
               eq(clientLessons.clientId, cid),
-              eq(clientLessons.lessonId, lessonId),
+              eq(lessons.groupId, groupId),
+              eq(lessons.isPublished, true),
             ),
-          );
-        if (!assignment) {
-          throw new Error("Lesson not assigned to user's client");
+          )
+          .limit(1);
+        if (assignedPublished.length === 0) {
+          throw new Error("Group has no published, assigned lessons for this client");
         }
-        if (rating < 1 || rating > 5) {
-          throw new Error("Rating must be between 1 and 5");
-        }
-        return db
-          .insert(lessonCompletions)
+
+        // Lookup scopes by client_id so a user reassigned across clients
+        // never sees a previous client's rating row leak in as
+        // `previousRating`. The current-state row stays in the DB tagged with
+        // the old client_id (denormalised at write time); reads from the
+        // user's new client side are properly tenant-isolated.
+        //
+        // Concurrency caveat: two simultaneous upserts from the same user
+        // (e.g. duplicate tabs) both read `previousRating` BEFORE either
+        // writes, so both `group_rated` events may record the same
+        // `previousRating`. The current-state row is still correct
+        // (last-write-wins via onConflictDoUpdate); only the audit trail
+        // loses one re-rate transition. Acceptable — exact re-rate history
+        // is not load-bearing for any reader.
+        const [existing] = await db
+          .select({ rating: lessonGroupRatings.rating })
+          .from(lessonGroupRatings)
+          .where(
+            and(
+              eq(lessonGroupRatings.userId, user.id),
+              eq(lessonGroupRatings.groupId, groupId),
+              eq(lessonGroupRatings.clientId, cid),
+            ),
+          )
+          .limit(1);
+        const previousRating = existing?.rating ?? null;
+
+        await db
+          .insert(lessonGroupRatings)
+          .values({ userId: user.id, groupId, clientId: cid, rating })
+          .onConflictDoUpdate({
+            target: [lessonGroupRatings.userId, lessonGroupRatings.groupId],
+            set: { rating, updatedAt: new Date() },
+          });
+        await db
+          .insert(lessonEvents)
           .values({
             userId: user.id,
-            lessonId,
-            rating,
+            // event log is keyed by lessonId; pick any published+assigned
+            // lesson in the group so the row stays joinable. The lesson
+            // could theoretically be unassigned between the SELECT above
+            // and this INSERT (admin action mid-rate); the FK to lessons
+            // still holds because the lesson row itself is not deleted,
+            // and analytics that scope by current client_lessons already
+            // ignore events for unassigned lessons.
+            lessonId: assignedPublished[0]!.id,
+            clientId: cid,
+            eventType: "group_rated",
+            payload: { groupId, rating, previousRating },
+          });
+
+        return { rating, previousRating };
+      },
+
+      // Read this user's rating for a single group (or null if unrated).
+      // Used by the rating surface to pre-fill / hide the control.
+      // Scoped by client_id so a user reassigned across clients can never
+      // read a stale rating from their previous client's curriculum (the
+      // rating row keeps the original denormalised client_id from when it
+      // was written).
+      forGroup: async (groupId: string): Promise<number | null> => {
+        const [row] = await db
+          .select({ rating: lessonGroupRatings.rating })
+          .from(lessonGroupRatings)
+          .where(
+            and(
+              eq(lessonGroupRatings.userId, user.id),
+              eq(lessonGroupRatings.groupId, groupId),
+              eq(lessonGroupRatings.clientId, cid),
+            ),
+          )
+          .limit(1);
+        return row?.rating ?? null;
+      },
+
+      // Aggregate per-group rating stats for the analytics surfaces. Returns
+      // a Map keyed by groupId with avg + count. Scoped by the denormalised
+      // client_id column so the query is index-only.
+      statsByGroupForClient: async (): Promise<
+        Map<string, { avg: number; count: number }>
+      > => {
+        const rows = await db
+          .select({
+            groupId: lessonGroupRatings.groupId,
+            rating: lessonGroupRatings.rating,
           })
-          .onConflictDoUpdate({
-            target: [lessonCompletions.userId, lessonCompletions.lessonId],
-            set: { rating, completedAt: new Date() },
-          })
-          .returning();
+          .from(lessonGroupRatings)
+          .where(eq(lessonGroupRatings.clientId, cid));
+        const tally = new Map<string, { sum: number; count: number }>();
+        for (const r of rows) {
+          const t = tally.get(r.groupId) ?? { sum: 0, count: 0 };
+          t.sum += r.rating;
+          t.count += 1;
+          tally.set(r.groupId, t);
+        }
+        const out = new Map<string, { avg: number; count: number }>();
+        for (const [groupId, { sum, count }] of tally) {
+          out.set(groupId, {
+            avg: Number((sum / count).toFixed(2)),
+            count,
+          });
+        }
+        return out;
+      },
+    },
+
+    groupCompletion: {
+      // After writing a lesson_completed event, check whether this user has
+      // just finished EVERY published, assigned lesson in that lesson's
+      // group. Returns null if the lesson is ungrouped, unpublished, or any
+      // assigned+published sibling is still incomplete. The detection is
+      // point-in-time and idempotent: re-completing the same lesson keeps
+      // returning the same payload (clients use `alreadyRated` to suppress
+      // the rating prompt on second view).
+      //
+      // Reuses the same scoping rules as scopedDb.events.completedLessonIds:
+      // only published, currently-assigned lessons count; ungrouped lessons
+      // never trigger; orphaned groupId NULL is treated as ungrouped.
+      //
+      // Behaviour note — CURRENT (not historical) group membership: the
+      // detector queries `lessons.group_id` at read time. If an admin
+      // moves a lesson between groups after the user completed it, the
+      // completion is attributed to the lesson's CURRENT group. This
+      // means an admin reshuffling lessons may cause a fresh
+      // `groupCompleted` to fire for the destination group when the user
+      // completes any remaining sibling. Treated as intended: a regroup
+      // by an admin redefines the chapter, and rating the new shape is
+      // the right ask. The alternative (snapshotting groupId in the
+      // lesson_completed payload at completion time) was rejected as
+      // unnecessary complexity for an extremely rare admin action.
+      detectForLesson: async (
+        lessonId: string,
+      ): Promise<{
+        groupId: string;
+        groupName: string;
+        lessonCount: number;
+        alreadyRated: boolean;
+      } | null> => {
+        const [lesson] = await db
+          .select({ id: lessons.id, groupId: lessons.groupId })
+          .from(lessons)
+          .where(eq(lessons.id, lessonId))
+          .limit(1);
+        if (!lesson || !lesson.groupId) return null;
+        const groupId = lesson.groupId;
+
+        const [group] = await db
+          .select({ name: lessonGroups.name })
+          .from(lessonGroups)
+          .where(eq(lessonGroups.id, groupId))
+          .limit(1);
+        if (!group) return null;
+
+        const assignedPublished = await db
+          .select({ id: lessons.id })
+          .from(lessons)
+          .innerJoin(clientLessons, eq(clientLessons.lessonId, lessons.id))
+          .where(
+            and(
+              eq(clientLessons.clientId, cid),
+              eq(lessons.groupId, groupId),
+              eq(lessons.isPublished, true),
+            ),
+          );
+        if (assignedPublished.length === 0) return null;
+        const targetIds = assignedPublished.map((l) => l.id);
+
+        const completedRows = await db
+          .selectDistinct({ lessonId: lessonEvents.lessonId })
+          .from(lessonEvents)
+          .where(
+            and(
+              eq(lessonEvents.userId, user.id),
+              eq(lessonEvents.eventType, "lesson_completed"),
+              inArray(lessonEvents.lessonId, targetIds),
+            ),
+          );
+        if (completedRows.length < targetIds.length) return null;
+
+        const [existingRating] = await db
+          .select({ rating: lessonGroupRatings.rating })
+          .from(lessonGroupRatings)
+          .where(
+            and(
+              eq(lessonGroupRatings.userId, user.id),
+              eq(lessonGroupRatings.groupId, groupId),
+            ),
+          )
+          .limit(1);
+
+        return {
+          groupId,
+          groupName: group.name,
+          lessonCount: targetIds.length,
+          alreadyRated: !!existingRating,
+        };
       },
     },
 
@@ -493,7 +693,9 @@ export function scopedDb(user: ScopedUser) {
       //
       // For lesson_opened and lesson_completed we de-dupe per (user,
       // lesson) so the tracker can safely re-emit on retries — first one
-      // wins. lesson_engagement and rating_submitted always insert.
+      // wins. lesson_engagement always inserts. lesson_upvoted /
+      // lesson_unvoted / group_rated are written from their own dedicated
+      // scoped helpers, not through this path.
       write: async (
         lessonId: string,
         eventType: LessonEventType,

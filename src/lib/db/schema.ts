@@ -40,9 +40,12 @@ export const lessonContentTypeEnum = pgEnum("lesson_content_type", [
 
 // Append-only event log for tracking employee interaction with a lesson.
 // One row per discrete event. Completion status is derived from this table
-// (a lesson_completed row for a user+lesson means they completed it) — the
-// lesson_completions table holds RATING data only now, decoupled from
-// completion.
+// (a lesson_completed row for a user+lesson means they completed it).
+// Rating is now PER-GROUP (see `lesson_group_ratings`). The historical
+// `rating_submitted` value is kept in the enum so legacy rows stay queryable;
+// new clients can no longer write it (server rejects it at the event route).
+// `group_rated` is the current audit-trail value, written alongside each
+// upsert into `lesson_group_ratings`.
 export const lessonEventTypeEnum = pgEnum("lesson_event_type", [
   "lesson_opened",
   "lesson_completed",
@@ -50,6 +53,7 @@ export const lessonEventTypeEnum = pgEnum("lesson_event_type", [
   "rating_submitted",
   "lesson_upvoted",
   "lesson_unvoted",
+  "group_rated",
 ]);
 
 // Admin audit log — append-only record of every admin write action. Reads
@@ -331,32 +335,6 @@ export const clientLessons = pgTable(
   }),
 );
 
-export const lessonCompletions = pgTable(
-  "lesson_completions",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    lessonId: uuid("lesson_id")
-      .notNull()
-      .references(() => lessons.id, { onDelete: "cascade" }),
-    rating: integer("rating").notNull(),
-    completedAt: timestamp("completed_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (t) => ({
-    uniqUserLesson: unique().on(t.userId, t.lessonId),
-    ratingRange: check(
-      "rating_1_to_5",
-      sql`${t.rating} >= 1 AND ${t.rating} <= 5`,
-    ),
-    userIdx: index("idx_lesson_completions_user_id").on(t.userId),
-    lessonIdx: index("idx_lesson_completions_lesson_id").on(t.lessonId),
-  }),
-);
-
 // Per-user lesson bookmarks ("save for later"). One row per (user, lesson);
 // row present = bookmarked. Toggled by the employee from /browse. Not tenant-
 // scoped at the table level — the toggle path verifies the lesson is assigned
@@ -412,6 +390,48 @@ export const lessonUpvotes = pgTable(
     clientLessonIdx: index("idx_lesson_upvotes_client_lesson").on(
       t.clientId,
       t.lessonId,
+    ),
+  }),
+);
+
+// Per-(user, group) rating, 1-5 stars. Replaces the per-lesson rating from
+// the removed `lesson_completions` table. The trigger surface is the
+// group-completion celebration: when an employee finishes the last assigned,
+// published lesson in a group, the watch shell prompts them to rate the
+// whole group. `client_id` is denormalised at write time so per-tenant
+// rollups (per group, per (client, group), per store) join nothing.
+// `updated_at` tracks re-rates separately from the first submission.
+export const lessonGroupRatings = pgTable(
+  "lesson_group_ratings",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => lessonGroups.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    rating: integer("rating").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.groupId] }),
+    ratingRange: check(
+      "lesson_group_ratings_rating_1_to_5",
+      sql`${t.rating} >= 1 AND ${t.rating} <= 5`,
+    ),
+    userIdx: index("idx_lesson_group_ratings_user_id").on(t.userId),
+    groupIdx: index("idx_lesson_group_ratings_group_id").on(t.groupId),
+    clientGroupIdx: index("idx_lesson_group_ratings_client_group").on(
+      t.clientId,
+      t.groupId,
     ),
   }),
 );
@@ -538,8 +558,9 @@ export type LessonBookmark = typeof lessonBookmarks.$inferSelect;
 export type NewLessonBookmark = typeof lessonBookmarks.$inferInsert;
 export type LessonUpvote = typeof lessonUpvotes.$inferSelect;
 export type NewLessonUpvote = typeof lessonUpvotes.$inferInsert;
+export type LessonGroupRating = typeof lessonGroupRatings.$inferSelect;
+export type NewLessonGroupRating = typeof lessonGroupRatings.$inferInsert;
 export type Store = typeof stores.$inferSelect;
-export type LessonCompletion = typeof lessonCompletions.$inferSelect;
 export type LessonEvent = typeof lessonEvents.$inferSelect;
 export type NewLessonEvent = typeof lessonEvents.$inferInsert;
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;

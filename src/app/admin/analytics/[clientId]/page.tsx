@@ -6,6 +6,7 @@ import {
   type FunnelStage,
   type StoreRow,
   type LessonRow,
+  type GroupRow,
   type EmployeeRow,
   type TimelinePoint,
 } from "@/lib/analytics-detail";
@@ -60,6 +61,10 @@ export default async function ClientDetailAnalyticsPage({
 
       <Section title="Lesson breakdown">
         <LessonsTable rows={data.lessons} />
+      </Section>
+
+      <Section title="Group ratings">
+        <GroupsTable rows={data.groups} />
       </Section>
 
       <Section title="Employees">
@@ -274,7 +279,6 @@ function LessonsTable({ rows }: { rows: LessonRow[] }) {
             <th className="px-3 py-2">Lesson</th>
             <th className="px-3 py-2 text-right">Completions</th>
             <th className="px-3 py-2 text-right">Completion %</th>
-            <th className="px-3 py-2 text-right">Avg rating</th>
             <th className="px-3 py-2 text-right">Upvotes</th>
             <th className="px-3 py-2"></th>
           </tr>
@@ -292,11 +296,6 @@ function LessonsTable({ rows }: { rows: LessonRow[] }) {
               <td className="px-3 py-2 text-right">
                 {Math.round(r.completionPct * 100)}%
               </td>
-              <td className="px-3 py-2 text-right">
-                {r.avgRating !== null
-                  ? `${r.avgRating} (${r.ratingCount})`
-                  : "—"}
-              </td>
               <td className="px-3 py-2 text-right">{r.upvoteCount}</td>
               <td className="px-3 py-2 text-right">
                 <Link
@@ -306,6 +305,42 @@ function LessonsTable({ rows }: { rows: LessonRow[] }) {
                   Manage →
                 </Link>
               </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function GroupsTable({ rows }: { rows: GroupRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <p className="text-sm text-zinc-500 rounded-md border border-zinc-200 bg-white p-4">
+        No lesson groups with published, assigned lessons for this client yet.
+      </p>
+    );
+  }
+  return (
+    <div className="rounded-md border border-zinc-200 bg-white overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500">
+          <tr>
+            <th className="px-3 py-2">Group</th>
+            <th className="px-3 py-2 text-right">Lessons</th>
+            <th className="px-3 py-2 text-right">Avg rating</th>
+            <th className="px-3 py-2 text-right">Responses</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.groupId} className="border-t border-zinc-200">
+              <td className="px-3 py-2 font-medium">{r.name}</td>
+              <td className="px-3 py-2 text-right">{r.assignedLessonCount}</td>
+              <td className="px-3 py-2 text-right">
+                {r.avgRating !== null ? r.avgRating : "—"}
+              </td>
+              <td className="px-3 py-2 text-right">{r.ratingCount}</td>
             </tr>
           ))}
         </tbody>

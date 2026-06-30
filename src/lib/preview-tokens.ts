@@ -12,9 +12,11 @@
 // quick QA pass across a few lessons stays inside one token's life.
 //
 // Preview tokens do NOT carry a userId. Anything that requires a user
-// (the tracker, the rating widget) MUST refuse to write when running
-// under preview mode — see /api/lessons/[id]/event for the role-based
-// no-op and the preview pages for the UI gating.
+// (the event tracker, the upvote toggle, the group-rating endpoint) MUST
+// refuse to write when running under preview mode — see
+// /api/lessons/[id]/event for the role-based no-op and the preview pages
+// for the UI gating (the Reels shell takes `disableTracking` so the
+// upvote button stays read-only).
 
 import crypto from "node:crypto";
 

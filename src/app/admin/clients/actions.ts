@@ -115,8 +115,9 @@ export async function deleteClient(clientId: string) {
     return { error: "forbidden" };
   }
   // Cascade is set on FKs (allowed_domains, languages, stores, etc.) so
-  // a single delete is sufficient. lesson_completions belong to users —
-  // those are also FK'd to users.client_id so they go with the users.
+  // a single delete is sufficient. lesson_group_ratings cascade through
+  // both users.client_id and the denormalised client_id column on the
+  // rating row itself; lesson_upvotes cascade the same way.
   const [snapshot] = await db
     .select({ name: clients.name, slug: clients.slug })
     .from(clients)
