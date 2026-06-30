@@ -319,7 +319,7 @@ function BackButton({
       disabled={disabled}
       aria-label="Back"
       className={cn(
-        "flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#c1e8fb] bg-white/20 text-[#fefefe] backdrop-blur-md transition-all duration-200 hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-40",
+        "flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#c1e8fb] bg-near-black/40 text-[#c1e8fb] backdrop-blur-md transition-all duration-200 hover:bg-near-black/60 disabled:cursor-not-allowed disabled:opacity-40",
       )}
     >
       <svg
