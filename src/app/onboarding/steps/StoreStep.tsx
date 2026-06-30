@@ -69,11 +69,12 @@ export default function StoreStep({
   return (
     <div className="flex flex-col gap-3">
       {/* Selected display — the Figma 'dropdown trigger' (visual only;
-          list below is always expanded). */}
-      <div className="flex h-[52px] items-center gap-3 rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-5 backdrop-blur-md">
+          list below is always expanded). Chevron is absolute-positioned so
+          the trigger text stays truly centered. */}
+      <div className="relative flex h-[52px] items-center justify-center rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-12 backdrop-blur-md">
         <span
           className={cn(
-            "flex-1 truncate text-center text-[16px] leading-[24px] tracking-[0.08px]",
+            "truncate text-center text-[16px] leading-[24px] tracking-[0.08px]",
             hq || selectedStore ? "text-[#fefefe]" : "text-[#8e8e8e]",
           )}
         >
@@ -90,21 +91,20 @@ export default function StoreStep({
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="h-5 w-5 shrink-0 text-[#8e8e8e]"
+          className="pointer-events-none absolute right-5 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8e8e8e]"
           aria-hidden
         >
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </div>
 
-      {/* Store list — height-capped to ~3 rows so the remainder fades out
-          of view (52px row + 8px gap × 3 ≈ 180px + a hint of the 4th).
+      {/* Store list — height-capped to 3 rows; remainder scrolls (no fade).
           Hides the currently-picked store so it's only visible in the
           trigger above — no duplicate row. */}
       <div className="relative">
         <ul
-          className="flex flex-col gap-2 overflow-y-auto pr-1 [scrollbar-width:thin]"
-          style={{ maxHeight: "192px" }}
+          className="flex flex-col gap-2 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          style={{ maxHeight: "180px" }}
         >
           {stores.length === 0 ? (
             <li className="rounded-[24px] border border-[#445158] bg-[rgba(68,81,88,0.1)] px-5 py-3 text-center text-sm text-[#8e8e8e]">
@@ -135,17 +135,6 @@ export default function StoreStep({
               })
           )}
         </ul>
-        {/* Soft bottom fade — signals 'scroll for more' without a hard cut */}
-        {stores.length > 3 && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-10"
-            style={{
-              backgroundImage:
-                "linear-gradient(to top, rgba(14,14,14,0.85) 0%, rgba(14,14,14,0) 100%)",
-            }}
-          />
-        )}
       </div>
 
       {/* HQ checkbox — Figma doesn't show this but real HQ users need it.
