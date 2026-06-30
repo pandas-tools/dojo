@@ -54,13 +54,14 @@ export default function LessonCard({ card }: { card: BrowseCard }) {
           }}
         />
 
-        {/* Centered play circle — only for ready Video */}
+        {/* Play affordance — bottom-left corner so it doesn't bury the
+            thumbnail's title/copy in the middle. Only for ready Video. */}
         {isVideo && card.ready && (
           <div
             aria-hidden
-            className="absolute left-1/2 top-1/2 flex h-[60px] w-[60px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 backdrop-blur-md ring-1 ring-white/20"
+            className="absolute bottom-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm"
           >
-            <Play className="h-6 w-6 translate-x-0.5 text-white" fill="currentColor" />
+            <Play className="h-3.5 w-3.5 translate-x-px text-white" fill="currentColor" />
           </div>
         )}
 
