@@ -1,14 +1,11 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { Bookmark } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
-import { shapeBrowseData, type BrowseCard } from "@/lib/browse-shape";
-import BookmarkButton from "../browse/BookmarkButton";
+import { shapeBrowseData } from "@/lib/browse-shape";
 import BottomNav from "@/components/BottomNav";
-import DojoMark from "@/components/DojoMark";
-import BrandAtmosphere from "@/components/BrandAtmosphere";
-import LessonTypeChip from "@/components/LessonTypeChip";
+import LibraryAtmosphere from "@/components/LibraryAtmosphere";
+import { LessonCardLink } from "@/components/LessonCard";
 
 export const metadata = { title: "Saved · Dojo" };
 export const dynamic = "force-dynamic";
@@ -38,8 +35,6 @@ export default async function SavedPage() {
     session.user.preferredLanguage,
   );
 
-  // Reuse the same shaping the /browse page consumes so the cards are
-  // identical in shape; then flatten and filter to bookmarked.
   const groups = shapeBrowseData({
     lessons,
     groups: groupRows.map((g) => ({
@@ -66,35 +61,26 @@ export default async function SavedPage() {
 
   return (
     <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white selection:bg-arctic-haze/30">
-      <BrandAtmosphere variant="halo" />
+      <LibraryAtmosphere />
 
-      <header className="relative z-10 flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
-        <Link
-          href="/browse"
-          aria-label="Dojo home"
-          className="text-white transition-opacity hover:opacity-80"
-        >
-          <DojoMark variant="wordmark" className="h-7 w-auto sm:h-8" />
-        </Link>
-      </header>
-      <div className="relative z-10 px-5 pt-10 pb-8 text-center sm:pt-12">
-        <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">
-          Saved
+      <header className="relative z-10 mx-auto max-w-[360px] px-6 pt-14 text-center">
+        <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
+          Bookmarks
         </h1>
-        <p className="mt-2 font-mono text-xs uppercase tracking-wider text-white/55">
+        <p className="mt-2 text-[14px] font-medium leading-[22px] tracking-[0.07px] text-[#f9fdff]/85">
           {savedCards.length === 0
-            ? "Nothing saved yet"
-            : `${savedCards.length} ${savedCards.length === 1 ? "lesson" : "lessons"}`}
+            ? "Tap the bookmark on any lesson to save it here."
+            : `${savedCards.length} saved ${savedCards.length === 1 ? "lesson" : "lessons"}`}
         </p>
-      </div>
+      </header>
 
       {savedCards.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="relative z-10 px-5 pb-36 sm:px-8">
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="relative z-10 mt-10 px-6 pb-36">
+          <div className="mx-auto flex max-w-[330px] flex-wrap content-start gap-x-4 gap-y-6">
             {savedCards.map((card) => (
-              <SavedCard key={card.id} card={card} />
+              <LessonCardLink key={card.id} card={card} />
             ))}
           </div>
         </div>
@@ -105,65 +91,9 @@ export default async function SavedPage() {
   );
 }
 
-function SavedCard({ card }: { card: BrowseCard }) {
-  const inner = (
-    <>
-      <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-zinc-900">
-        {card.ready && card.thumbnail ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={card.thumbnail}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-            decoding="async"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-white/30">
-            {card.ready ? "No preview" : "Processing"}
-          </div>
-        )}
-
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-
-        {card.completed && (
-          <div className="absolute left-2 top-2 rounded-full bg-arctic-haze px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-near-black">
-            Done
-          </div>
-        )}
-
-        {card.ready && (
-          <div className="absolute bottom-2 left-2">
-            <LessonTypeChip
-              contentType={card.contentType}
-              durationSeconds={card.durationSeconds}
-            />
-          </div>
-        )}
-
-        <div className="absolute bottom-1.5 right-1.5">
-          <BookmarkButton lessonId={card.id} initialBookmarked={card.isBookmarked} />
-        </div>
-      </div>
-
-      <h3 className="pt-3 text-[13px] font-medium text-white line-clamp-2 leading-snug">
-        {card.title}
-      </h3>
-    </>
-  );
-
-  return card.ready ? (
-    <Link href={`/watch/${card.id}`} className="group block">
-      {inner}
-    </Link>
-  ) : (
-    <div className="opacity-60">{inner}</div>
-  );
-}
-
 function EmptyState() {
   return (
-    <div className="mx-auto max-w-md px-6 py-20 text-center">
+    <div className="relative z-10 mx-auto mt-20 max-w-md px-6 text-center">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white/5">
         <Bookmark className="h-5 w-5 text-white/40" />
       </div>
