@@ -86,9 +86,9 @@ export default function VideoLessonViewer({
   }, [active, paused]);
 
   // Mux Player honors `--media-object-fit` on the host element to pass
-  // through to the inner video. `contain` makes the video respect its
-  // native aspect and letterbox the rest with the section's black
-  // background.
+  // through to the inner video. `cover` fills the reels container edge-to-
+  // edge and crops anything outside the container's aspect — desired for
+  // vertical reel content whose native ratio is ~9:16.
   //
   // `--controls: none` (from media-chrome) suppresses the entire default
   // control bar (mute, scrubber, fullscreen, etc.). The shell gestures
@@ -97,7 +97,7 @@ export default function VideoLessonViewer({
   const playerStyle: Record<string, string> = {
     height: "100%",
     width: "100%",
-    "--media-object-fit": "contain",
+    "--media-object-fit": "cover",
     "--controls": "none",
   };
 
