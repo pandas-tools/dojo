@@ -88,11 +88,17 @@ export default function VideoLessonViewer({
   // Mux Player honors `--media-object-fit` on the host element to pass
   // through to the inner video. `contain` makes the video respect its
   // native aspect and letterbox the rest with the section's black
-  // background. The cast keeps Mux's narrowed prop type happy.
+  // background.
+  //
+  // `--controls: none` (from media-chrome) suppresses the entire default
+  // control bar (mute, scrubber, fullscreen, etc.). The shell gestures
+  // own all interaction — tap = mute, press-hold = pause. The cast keeps
+  // Mux's narrowed prop type happy.
   const playerStyle: Record<string, string> = {
     height: "100%",
     width: "100%",
     "--media-object-fit": "contain",
+    "--controls": "none",
   };
 
   return (
