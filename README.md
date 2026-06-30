@@ -5,9 +5,9 @@ Internal training portal for retail employees on Pandas Vision AI + platform. Ev
 ## What it does
 
 1. **Employee onboarding.** A retail employee enters their work email. If the email's domain is allowlisted for a Pandas client (e.g., Orange Belgium), they get a magic-link login.
-2. **Training videos.** They go through a Reels-style flow watching short training videos (Vision AI, platform usage, etc.). Each lesson ends with a 1–5 rating.
+2. **Training videos.** They go through a Reels-style flow watching short training videos (Vision AI, platform usage, etc.). Each lesson can be upvoted ("helpful") via the Heart button on the right rail. When they finish every lesson in a group, the watch surface prompts for a 1–5 group rating.
 3. **Multi-language.** Videos are available in multiple languages — dubbed via HeyGen/ElevenLabs or subtitled via Mux's Whisper auto-captions.
-4. **Admin panel.** Pandas team manages clients, lessons (Mux uploads), stores, and views completion analytics per client.
+4. **Admin panel.** Pandas team manages clients, lessons (Mux uploads), stores, and views completion + upvote + group-rating analytics per client.
 
 ## Stack
 

@@ -43,8 +43,6 @@ export type UseLessonTrackingResult = {
   // mount, but Reels-shell variants that mount a viewer before the
   // user has actually started consuming it can defer this.
   emitOpened: () => void;
-  // Emit a rating event. Used by RatingWidget.
-  emitRating: (rating: number) => void;
 };
 
 const ENGAGEMENT_HEARTBEAT_MS = 15_000;
@@ -59,11 +57,7 @@ const INPUT_EVENTS = [
 
 function sendEvent(
   lessonId: string,
-  type:
-    | "lesson_opened"
-    | "lesson_completed"
-    | "lesson_engagement"
-    | "rating_submitted",
+  type: "lesson_opened" | "lesson_completed" | "lesson_engagement",
   payload: Record<string, unknown> | null,
   beacon = false,
 ) {
@@ -201,9 +195,6 @@ export function useLessonTracking(
       if (openedRef.current) return;
       openedRef.current = true;
       sendEvent(lessonId, "lesson_opened", { contentType });
-    },
-    emitRating: (rating: number) => {
-      sendEvent(lessonId, "rating_submitted", { rating, contentType });
     },
   };
 }

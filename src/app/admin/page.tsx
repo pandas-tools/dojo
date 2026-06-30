@@ -1,13 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { count, eq } from "drizzle-orm";
+import { count, countDistinct, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import {
-  clients,
-  lessons,
-  lessonCompletions,
-  users,
-} from "@/lib/db/schema";
+import { clients, lessons, lessonEvents, users } from "@/lib/db/schema";
 import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -19,11 +14,21 @@ export default async function AdminHome() {
   const session = await auth();
   if (!session?.user || session.user.role !== "admin") notFound();
 
+  // Completion count = distinct (user, lesson) pairs that have a
+  // lesson_completed event. Replaces the pre-cutover count of
+  // lesson_completions rows (table dropped in migration 0009).
   const [clientList, [lessonStat], [completionStat], [userStat]] =
     await Promise.all([
       db.select().from(clients).orderBy(clients.name),
       db.select({ value: count() }).from(lessons),
-      db.select({ value: count() }).from(lessonCompletions),
+      db
+        .select({
+          value: countDistinct(
+            sql`(${lessonEvents.userId}, ${lessonEvents.lessonId})`,
+          ),
+        })
+        .from(lessonEvents)
+        .where(eq(lessonEvents.eventType, "lesson_completed")),
       db
         .select({ value: count() })
         .from(users)

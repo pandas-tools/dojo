@@ -8,18 +8,23 @@
 //
 // Most paths are called from `navigator.sendBeacon` on pagehide /
 // visibilitychange-hidden, so the response must be small and the handler
-// fast — no DB reads beyond the assignment check.
+// fast — no DB reads beyond the assignment check, except when a
+// lesson_completed event triggers the group-completion detector below.
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
 
+// Event types accepted from clients. `rating_submitted` was the legacy
+// per-lesson rating signal and is no longer accepted — rating now lives in
+// POST /api/groups/[id]/rate. Per-lesson upvote/unvote writes go through
+// /api/lessons/[id]/upvote, not this endpoint. `group_rated` is written by
+// the rate endpoint, not from client beacons.
 const KNOWN_EVENTS = [
   "lesson_opened",
   "lesson_completed",
   "lesson_engagement",
-  "rating_submitted",
 ] as const;
 
 const bodySchema = z.object({
@@ -62,6 +67,20 @@ export async function POST(
       role: "employee",
     });
     await sdb.events.write(id, parsed.data.type, parsed.data.payload ?? null);
+
+    // After a successful lesson_completed write, surface a groupCompleted
+    // signal so the watch shell can navigate to the group-rating
+    // celebration. Detection is point-in-time and idempotent: re-completing
+    // the same lesson keeps returning the same payload; the client uses
+    // `alreadyRated` to suppress the rating prompt on subsequent views.
+    // Returns null when the lesson is ungrouped, unpublished, the group has
+    // unfinished siblings, or no assigned+published lessons exist.
+    if (parsed.data.type === "lesson_completed") {
+      const groupCompleted = await sdb.groupCompletion.detectForLesson(id);
+      if (groupCompleted) {
+        return NextResponse.json({ ok: true, groupCompleted });
+      }
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -64,6 +64,13 @@
       "when": 1782918000000,
       "tag": "0008_lesson_upvotes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1782930000000,
+      "tag": "0009_drop_lesson_completions_add_group_ratings",
+      "breakpoints": true
     }
   ]
 }

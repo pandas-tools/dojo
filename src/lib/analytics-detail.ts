@@ -1,6 +1,11 @@
 // Per-client analytics detail. Funnel + store table + lesson breakdown +
-// employee list. All from the same in-memory aggregation pass; one query
-// per source table.
+// group ratings + employee list. All from the same in-memory aggregation
+// pass; one query per source table.
+//
+// Rating model (post-2026-06-30): ratings are PER GROUP (lesson_groups),
+// not per lesson. The per-lesson rating table (lesson_completions) was
+// dropped; rating data now lives in lesson_group_ratings. Completion is
+// still derived from lesson_events.lesson_completed.
 
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "./db/client";
@@ -10,11 +15,12 @@ import {
   users,
   clientLessons,
   lessons,
+  lessonGroups,
   lessonTranslations,
-  lessonCompletions,
   lessonEvents,
   lessonBookmarks,
   lessonUpvotes,
+  lessonGroupRatings,
 } from "./db/schema";
 
 export type FunnelStage = {
@@ -31,6 +37,8 @@ export type StoreRow = {
   employeesLoggedIn: number;
   completedAll: number;
   completionPct: number; // 0..1
+  // Average + count of GROUP ratings submitted by employees at this store
+  // (the per-lesson rating was removed in 2026-06-30 cutover).
   avgRating: number | null;
   ratingCount: number;
   status: "no-activity" | "low-completion" | "on-track" | "no-data";
@@ -42,9 +50,23 @@ export type LessonRow = {
   title: string;
   completionCount: number;
   completionPct: number; // 0..1
+  upvoteCount: number;
+};
+
+// Per-group rating rollup for this client. Surfaced on the client-detail
+// analytics page as the "Group ratings" section. avgRating + ratingCount
+// aggregate every (user, group) rating row whose user belongs to this
+// client (denormalised via lesson_group_ratings.client_id).
+export type GroupRow = {
+  groupId: string;
+  name: string;
+  sortOrder: number;
+  // Lessons in this group that are CURRENTLY assigned + published for this
+  // client. Drives the "how many people could possibly rate this group"
+  // denominator and confirms the group is even visible to the client.
+  assignedLessonCount: number;
   avgRating: number | null;
   ratingCount: number;
-  upvoteCount: number;
 };
 
 export type EmployeeRow = {
@@ -75,6 +97,10 @@ export type ClientDetailAnalytics = {
   funnel: FunnelStage[];
   stores: StoreRow[];
   lessons: LessonRow[];
+  // Per-group rating breakdown — only includes groups that have at least one
+  // currently assigned+published lesson for this client. Sorted by the
+  // group's editorial sort_order.
+  groups: GroupRow[];
   employees: EmployeeRow[];
   // Completion count per day for the last 30 days. Always exactly 30
   // points, oldest first, even when most buckets are zero — keeps the
@@ -92,7 +118,7 @@ export async function getClientDetailAnalytics(
     .limit(1);
   if (!client) return null;
 
-  const [storeRows, employeeRows, clientLessonRows, upvoteRows] =
+  const [storeRows, employeeRows, clientLessonRows, upvoteRows, groupRows] =
     await Promise.all([
       db.select().from(stores).where(eq(stores.clientId, clientId)),
       db
@@ -107,6 +133,7 @@ export async function getClientDetailAnalytics(
         .select({ lessonId: lessonUpvotes.lessonId })
         .from(lessonUpvotes)
         .where(eq(lessonUpvotes.clientId, clientId)),
+      db.select().from(lessonGroups),
     ]);
 
   const upvoteCountByLesson = new Map<string, number>();
@@ -118,60 +145,58 @@ export async function getClientDetailAnalytics(
   }
 
   const assignedLessonIds = clientLessonRows.map((cl) => cl.lessonId);
-  const [lessonRows, translationRows, ratingRows, completionEventRows] =
-    await Promise.all([
-      assignedLessonIds.length > 0
-        ? db.query.lessons.findMany({
-            where: (l, { inArray: inArr }) => inArr(l.id, assignedLessonIds),
-            orderBy: (l, { asc }) => [asc(l.sortOrder)],
+  const [
+    lessonRows,
+    translationRows,
+    groupRatingRows,
+    completionEventRows,
+  ] = await Promise.all([
+    assignedLessonIds.length > 0
+      ? db.query.lessons.findMany({
+          where: (l, { inArray: inArr }) => inArr(l.id, assignedLessonIds),
+          orderBy: (l, { asc }) => [asc(l.sortOrder)],
+        })
+      : Promise.resolve([] as (typeof lessons.$inferSelect)[]),
+    assignedLessonIds.length > 0
+      ? db
+          .select()
+          .from(lessonTranslations)
+          .where(inArray(lessonTranslations.lessonId, assignedLessonIds))
+      : Promise.resolve([] as (typeof lessonTranslations.$inferSelect)[]),
+    // Group ratings (lesson_group_ratings table) — scoped by the
+    // denormalised client_id so the query is index-only. Drives avg-rating
+    // for the per-store and per-group rollups.
+    db
+      .select({
+        userId: lessonGroupRatings.userId,
+        groupId: lessonGroupRatings.groupId,
+        rating: lessonGroupRatings.rating,
+      })
+      .from(lessonGroupRatings)
+      .where(eq(lessonGroupRatings.clientId, clientId)),
+    // Completion events (lesson_events table) — drives "did they finish."
+    employeeRows.length > 0 && assignedLessonIds.length > 0
+      ? db
+          .select({
+            userId: lessonEvents.userId,
+            lessonId: lessonEvents.lessonId,
+            createdAt: lessonEvents.createdAt,
           })
-        : Promise.resolve([] as (typeof lessons.$inferSelect)[]),
-      assignedLessonIds.length > 0
-        ? db
-            .select()
-            .from(lessonTranslations)
-            .where(inArray(lessonTranslations.lessonId, assignedLessonIds))
-        : Promise.resolve([] as (typeof lessonTranslations.$inferSelect)[]),
-      // Ratings (lesson_completions table) — for avg-rating + response count.
-      employeeRows.length > 0 && assignedLessonIds.length > 0
-        ? db
-            .select()
-            .from(lessonCompletions)
-            .where(
-              and(
-                inArray(
-                  lessonCompletions.userId,
-                  employeeRows.map((u) => u.id),
-                ),
-                inArray(lessonCompletions.lessonId, assignedLessonIds),
+          .from(lessonEvents)
+          .where(
+            and(
+              eq(lessonEvents.eventType, "lesson_completed"),
+              inArray(
+                lessonEvents.userId,
+                employeeRows.map((u) => u.id),
               ),
-            )
-        : Promise.resolve([] as (typeof lessonCompletions.$inferSelect)[]),
-      // Completion events (lesson_events table) — drives "did they finish."
-      // Historical ratings backfilled here at migration time so pre-cutover
-      // completion counts are preserved.
-      employeeRows.length > 0 && assignedLessonIds.length > 0
-        ? db
-            .select({
-              userId: lessonEvents.userId,
-              lessonId: lessonEvents.lessonId,
-              createdAt: lessonEvents.createdAt,
-            })
-            .from(lessonEvents)
-            .where(
-              and(
-                eq(lessonEvents.eventType, "lesson_completed"),
-                inArray(
-                  lessonEvents.userId,
-                  employeeRows.map((u) => u.id),
-                ),
-                inArray(lessonEvents.lessonId, assignedLessonIds),
-              ),
-            )
-        : Promise.resolve(
-            [] as { userId: string; lessonId: string; createdAt: Date }[],
-          ),
-    ]);
+              inArray(lessonEvents.lessonId, assignedLessonIds),
+            ),
+          )
+      : Promise.resolve(
+          [] as { userId: string; lessonId: string; createdAt: Date }[],
+        ),
+  ]);
 
   const assignedCount = assignedLessonIds.length;
   const enTitleByLessonId = new Map<string, string>();
@@ -196,21 +221,17 @@ export async function getClientDetailAnalytics(
     completedUsersByLesson.set(e.lessonId, lessonSet);
   }
 
-  // Ratings — indexed for avg-rating and response-count metrics. Kept
-  // distinct from completion data so a user who completed without rating,
-  // or rated without completing (legacy data), is counted correctly in
-  // each.
-  const ratingsByUser = new Map<string, typeof ratingRows>();
-  for (const r of ratingRows) {
-    const arr = ratingsByUser.get(r.userId) ?? [];
-    arr.push(r);
-    ratingsByUser.set(r.userId, arr);
-  }
-  const ratingsByLesson = new Map<string, typeof ratingRows>();
-  for (const r of ratingRows) {
-    const arr = ratingsByLesson.get(r.lessonId) ?? [];
-    arr.push(r);
-    ratingsByLesson.set(r.lessonId, arr);
+  // Group ratings — indexed for the per-store (via user) and per-group
+  // rollups. Each row is one (user, group) rating.
+  const ratingsByUser = new Map<string, number[]>();
+  const ratingsByGroup = new Map<string, number[]>();
+  for (const r of groupRatingRows) {
+    const u = ratingsByUser.get(r.userId) ?? [];
+    u.push(r.rating);
+    ratingsByUser.set(r.userId, u);
+    const g = ratingsByGroup.get(r.groupId) ?? [];
+    g.push(r.rating);
+    ratingsByGroup.set(r.groupId, g);
   }
 
   // FUNNEL — based on completion events, not ratings.
@@ -263,9 +284,9 @@ export async function getClientDetailAnalytics(
         loggedAtStore > 0 && assignedCount > 0
           ? completedAtStore / loggedAtStore
           : 0;
-      const ratings = usersAtStore
-        .flatMap((u) => ratingsByUser.get(u.id) ?? [])
-        .map((r) => r.rating);
+      const ratings = usersAtStore.flatMap(
+        (u) => ratingsByUser.get(u.id) ?? [],
+      );
       const avgRating =
         ratings.length > 0
           ? Number(
@@ -300,32 +321,55 @@ export async function getClientDetailAnalytics(
       return b.completionPct - a.completionPct;
     });
 
-  // LESSONS
+  // LESSONS — completion + upvote stats only (per-lesson rating removed
+  // in 2026-06-30 cutover; see the GroupRow section below for ratings).
   const lessonRowsOut: LessonRow[] = lessonRows.map((l): LessonRow => {
     const completedUsers = completedUsersByLesson.get(l.id);
     const completionCount = completedUsers?.size ?? 0;
     const completionPct = loggedIn > 0 ? completionCount / loggedIn : 0;
-    const lessonRatings = ratingsByLesson.get(l.id) ?? [];
-    const ratingValues = lessonRatings.map((r) => r.rating);
-    const avgRating =
-      ratingValues.length > 0
-        ? Number(
-            (
-              ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length
-            ).toFixed(2),
-          )
-        : null;
     return {
       lessonId: l.id,
       internalName: l.internalName,
       title: enTitleByLessonId.get(l.id) ?? l.internalName,
       completionCount,
       completionPct,
-      avgRating,
-      ratingCount: ratingValues.length,
       upvoteCount: upvoteCountByLesson.get(l.id) ?? 0,
     };
   });
+
+  // GROUPS — only surface groups that have at least one currently
+  // assigned + published lesson for this client. assignedLessonCount is
+  // the rateable surface area (groups with 0 published-assigned lessons
+  // can't be rated, so they don't belong here).
+  const assignedSet = new Set(assignedLessonIds);
+  const publishedAssignedByGroup = new Map<string, number>();
+  for (const l of lessonRows) {
+    if (!l.groupId || !l.isPublished || !assignedSet.has(l.id)) continue;
+    publishedAssignedByGroup.set(
+      l.groupId,
+      (publishedAssignedByGroup.get(l.groupId) ?? 0) + 1,
+    );
+  }
+  const groupRowsOut: GroupRow[] = groupRows
+    .filter((g) => (publishedAssignedByGroup.get(g.id) ?? 0) > 0)
+    .map((g): GroupRow => {
+      const ratings = ratingsByGroup.get(g.id) ?? [];
+      const avgRating =
+        ratings.length > 0
+          ? Number(
+              (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(2),
+            )
+          : null;
+      return {
+        groupId: g.id,
+        name: g.name,
+        sortOrder: g.sortOrder,
+        assignedLessonCount: publishedAssignedByGroup.get(g.id) ?? 0,
+        avgRating,
+        ratingCount: ratings.length,
+      };
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   // EMPLOYEES
   const employeeRowsOut: EmployeeRow[] = employeeRows
@@ -411,6 +455,7 @@ export async function getClientDetailAnalytics(
     funnel,
     stores: storeRowsOut,
     lessons: lessonRowsOut,
+    groups: groupRowsOut,
     employees: employeeRowsOut,
     timeline,
   };
@@ -426,9 +471,16 @@ export type EmployeeLessonHistory = {
   title: string;
   opened: boolean;
   completed: boolean;
-  rating: number | null;
   totalEngagedMs: number;
   lastActivityAt: string | null; // ISO
+};
+
+// One group rating row for the employee drill, sorted newest-first.
+export type EmployeeGroupRating = {
+  groupId: string;
+  groupName: string;
+  rating: number; // 1-5
+  ratedAt: string; // ISO — updatedAt (= createdAt on first rate, bumps on re-rate)
 };
 
 export type EmployeeProfile = {
@@ -454,11 +506,17 @@ export type EmployeeDetail = {
   // per-lesson activity merged in. Admins viewing themselves get an empty
   // array (they don't have an assigned-lessons list).
   lessons: EmployeeLessonHistory[];
-  // Coarse-grained totals across lessons.
+  // Group ratings this user has submitted. Empty when the user has never
+  // finished + rated a group. Sorted newest-first by ratedAt.
+  groupRatings: EmployeeGroupRating[];
+  // Coarse-grained totals across lessons + group ratings.
   totals: {
     opened: number;
     completed: number;
     assigned: number;
+    // Average of this user's group ratings (1-5), or null if they haven't
+    // rated any group. Source of truth shifted from per-lesson rating in
+    // the 2026-06-30 cutover.
     avgRating: number | null;
     totalEngagedMs: number;
     bookmarked: number;
@@ -467,10 +525,10 @@ export type EmployeeDetail = {
 
 /**
  * Aggregate everything Pandas-team admins need to investigate a single user:
- * profile + per-lesson timeline (open/complete/rate/engagement) + totals.
- * Returns null if the user doesn't exist. One pass, four queries: user +
- * lesson_events + lesson_completions + client_lessons join lessons join
- * translations.
+ * profile + per-lesson timeline (open/complete/engagement) + group ratings +
+ * totals. Returns null if the user doesn't exist. One pass, parallel queries:
+ * user + lesson_events + lesson_group_ratings + lesson_bookmarks +
+ * client_lessons join lessons join translations join lesson_groups.
  */
 export async function getEmployeeDetail(
   userId: string,
@@ -520,25 +578,27 @@ export async function getEmployeeDetail(
     updatedAt: user.updatedAt.toISOString(),
   };
 
+  const emptyTotals = {
+    opened: 0,
+    completed: 0,
+    assigned: 0,
+    avgRating: null,
+    totalEngagedMs: 0,
+    bookmarked: 0,
+  } as const;
+
   // No clientId → no lessons to merge in.
   if (!user.clientId) {
     return {
       user: profile,
       lessons: [],
-      totals: {
-        opened: 0,
-        completed: 0,
-        assigned: 0,
-        avgRating: null,
-        totalEngagedMs: 0,
-        bookmarked: 0,
-      },
+      groupRatings: [],
+      totals: { ...emptyTotals },
     };
   }
 
-  // Pull assigned lessons + this user's activity + ratings + bookmarks in
-  // parallel.
-  const [assignmentRows, eventRows, completionRows, bookmarkRows] =
+  // Pull assigned lessons + this user's activity + group ratings + bookmarks.
+  const [assignmentRows, eventRows, groupRatingRows, bookmarkRows] =
     await Promise.all([
       db
         .select()
@@ -546,9 +606,13 @@ export async function getEmployeeDetail(
         .where(eq(clientLessons.clientId, user.clientId)),
       db.select().from(lessonEvents).where(eq(lessonEvents.userId, userId)),
       db
-        .select()
-        .from(lessonCompletions)
-        .where(eq(lessonCompletions.userId, userId)),
+        .select({
+          groupId: lessonGroupRatings.groupId,
+          rating: lessonGroupRatings.rating,
+          updatedAt: lessonGroupRatings.updatedAt,
+        })
+        .from(lessonGroupRatings)
+        .where(eq(lessonGroupRatings.userId, userId)),
       db
         .select({ lessonId: lessonBookmarks.lessonId })
         .from(lessonBookmarks)
@@ -560,14 +624,8 @@ export async function getEmployeeDetail(
     return {
       user: profile,
       lessons: [],
-      totals: {
-        opened: 0,
-        completed: 0,
-        assigned: 0,
-        avgRating: null,
-        totalEngagedMs: 0,
-        bookmarked: 0,
-      },
+      groupRatings: [],
+      totals: { ...emptyTotals },
     };
   }
 
@@ -577,7 +635,7 @@ export async function getEmployeeDetail(
     assignedSet.has(b.lessonId),
   ).length;
 
-  const [lessonRows, translationRows] = await Promise.all([
+  const [lessonRows, translationRows, groupNameRows] = await Promise.all([
     db
       .select()
       .from(lessons)
@@ -586,6 +644,17 @@ export async function getEmployeeDetail(
       .select()
       .from(lessonTranslations)
       .where(inArray(lessonTranslations.lessonId, assignedIds)),
+    groupRatingRows.length > 0
+      ? db
+          .select({ id: lessonGroups.id, name: lessonGroups.name })
+          .from(lessonGroups)
+          .where(
+            inArray(
+              lessonGroups.id,
+              groupRatingRows.map((r) => r.groupId),
+            ),
+          )
+      : Promise.resolve([] as { id: string; name: string }[]),
   ]);
 
   // Pick translation title by preferred lang with EN fallback.
@@ -630,11 +699,6 @@ export async function getEmployeeDetail(
     }
   }
 
-  const ratingByLesson = new Map<string, number>();
-  for (const c of completionRows) {
-    ratingByLesson.set(c.lessonId, c.rating);
-  }
-
   const lessonsOut: EmployeeLessonHistory[] = lessonRows
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((l) => {
@@ -645,24 +709,39 @@ export async function getEmployeeDetail(
         title: titleFor(l.id),
         opened: !!b?.opened,
         completed: !!b?.completed,
-        rating: ratingByLesson.get(l.id) ?? null,
         totalEngagedMs: b?.engagedMs ?? 0,
         lastActivityAt: b?.lastActivity?.toISOString() ?? null,
       };
     });
 
+  const groupNameById = new Map<string, string>();
+  for (const g of groupNameRows) groupNameById.set(g.id, g.name);
+  const groupRatingsOut: EmployeeGroupRating[] = groupRatingRows
+    .map((r): EmployeeGroupRating => ({
+      groupId: r.groupId,
+      groupName: groupNameById.get(r.groupId) ?? "(unknown group)",
+      rating: r.rating,
+      ratedAt: r.updatedAt.toISOString(),
+    }))
+    .sort((a, b) => b.ratedAt.localeCompare(a.ratedAt));
+
   const completedCount = lessonsOut.filter((l) => l.completed).length;
   const openedCount = lessonsOut.filter((l) => l.opened).length;
-  const ratings = lessonsOut.map((l) => l.rating).filter((r): r is number => r !== null);
+  const ratingValues = groupRatingsOut.map((r) => r.rating);
   const avgRating =
-    ratings.length === 0
+    ratingValues.length === 0
       ? null
-      : ratings.reduce((a, b) => a + b, 0) / ratings.length;
+      : Number(
+          (
+            ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length
+          ).toFixed(2),
+        );
   const totalEngagedMs = lessonsOut.reduce((a, l) => a + l.totalEngagedMs, 0);
 
   return {
     user: profile,
     lessons: lessonsOut,
+    groupRatings: groupRatingsOut,
     totals: {
       opened: openedCount,
       completed: completedCount,

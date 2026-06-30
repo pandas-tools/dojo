@@ -19,6 +19,7 @@ import {
   clientAllowedDomains,
   clientLessons,
   lessons,
+  lessonGroups,
   lessonTranslations,
   users,
 } from "@/lib/db/schema";
@@ -37,6 +38,8 @@ describe.skipIf(skipReason !== null)("tenant isolation", () => {
   let userA: typeof users.$inferSelect;
   let lessonA: typeof lessons.$inferSelect;
   let lessonB: typeof lessons.$inferSelect;
+  let groupA: typeof lessonGroups.$inferSelect;
+  let groupB: typeof lessonGroups.$inferSelect;
 
   beforeAll(async () => {
     sql = postgres(DB_URL!, { max: 2, prepare: false });
@@ -67,12 +70,19 @@ describe.skipIf(skipReason !== null)("tenant isolation", () => {
       })
       .returning();
 
+    // Group A + a single published, assigned lesson — drives the happy-path
+    // group-rating tests (one-lesson groups complete on first lesson).
+    [groupA] = await db
+      .insert(lessonGroups)
+      .values({ name: `Group A ${Date.now()}` })
+      .returning();
     [lessonA] = await db
       .insert(lessons)
       .values({
         internalName: "Lesson A",
         isPublished: true,
         sortOrder: 10,
+        groupId: groupA.id,
       })
       .returning();
     await db.insert(lessonTranslations).values({
@@ -86,12 +96,19 @@ describe.skipIf(skipReason !== null)("tenant isolation", () => {
       .insert(clientLessons)
       .values({ clientId: clientA.id, lessonId: lessonA.id });
 
+    // Group B + lesson B belong to client B only — used to prove userA
+    // cannot rate B's group from their scoped wrapper.
+    [groupB] = await db
+      .insert(lessonGroups)
+      .values({ name: `Group B ${Date.now()}` })
+      .returning();
     [lessonB] = await db
       .insert(lessons)
       .values({
         internalName: "Lesson B",
         isPublished: true,
         sortOrder: 20,
+        groupId: groupB.id,
       })
       .returning();
     await db.insert(lessonTranslations).values({
@@ -109,6 +126,10 @@ describe.skipIf(skipReason !== null)("tenant isolation", () => {
     // Cleanup
     if (lessonA) await db.delete(lessons).where(eq(lessons.id, lessonA.id));
     if (lessonB) await db.delete(lessons).where(eq(lessons.id, lessonB.id));
+    if (groupA)
+      await db.delete(lessonGroups).where(eq(lessonGroups.id, groupA.id));
+    if (groupB)
+      await db.delete(lessonGroups).where(eq(lessonGroups.id, groupB.id));
     if (userA) await db.delete(users).where(eq(users.id, userA.id));
     if (clientA) await db.delete(clients).where(eq(clients.id, clientA.id));
     if (clientB) await db.delete(clients).where(eq(clients.id, clientB.id));
@@ -145,15 +166,86 @@ describe.skipIf(skipReason !== null)("tenant isolation", () => {
     expect(got).toBeNull();
   });
 
-  it("userA's scoped completions.upsert(B, 5) throws", async () => {
+  it("userA's scoped groupRatings.upsert on B's group throws", async () => {
     const sdb = scopedDb({
       id: userA.id,
       clientId: clientA.id,
       role: "employee",
     });
-    await expect(sdb.completions.upsert(lessonB.id, 5)).rejects.toThrow(
-      /not assigned/i,
+    await expect(sdb.groupRatings.upsert(groupB.id, 5)).rejects.toThrow(
+      /no published, assigned lessons/i,
     );
+  });
+
+  it("userA's scoped groupRatings.upsert rejects out-of-range rating", async () => {
+    const sdb = scopedDb({
+      id: userA.id,
+      clientId: clientA.id,
+      role: "employee",
+    });
+    await expect(sdb.groupRatings.upsert(groupB.id, 0)).rejects.toThrow(
+      /between 1 and 5/i,
+    );
+    await expect(sdb.groupRatings.upsert(groupB.id, 6)).rejects.toThrow(
+      /between 1 and 5/i,
+    );
+  });
+
+  it("userA's scoped groupCompletion.detectForLesson(B) returns null", async () => {
+    const sdb = scopedDb({
+      id: userA.id,
+      clientId: clientA.id,
+      role: "employee",
+    });
+    const result = await sdb.groupCompletion.detectForLesson(lessonB.id);
+    expect(result).toBeNull();
+  });
+
+  it("userA's scoped groupRatings.upsert + forGroup happy path", async () => {
+    const sdb = scopedDb({
+      id: userA.id,
+      clientId: clientA.id,
+      role: "employee",
+    });
+
+    // First rate
+    const first = await sdb.groupRatings.upsert(groupA.id, 4);
+    expect(first).toEqual({ rating: 4, previousRating: null });
+
+    const readBack = await sdb.groupRatings.forGroup(groupA.id);
+    expect(readBack).toBe(4);
+
+    // Re-rate updates previousRating + current state
+    const second = await sdb.groupRatings.upsert(groupA.id, 5);
+    expect(second).toEqual({ rating: 5, previousRating: 4 });
+    const readBack2 = await sdb.groupRatings.forGroup(groupA.id);
+    expect(readBack2).toBe(5);
+  });
+
+  it("userA's scoped groupCompletion.detectForLesson(A) returns groupCompleted after the only lesson is completed", async () => {
+    const sdb = scopedDb({
+      id: userA.id,
+      clientId: clientA.id,
+      role: "employee",
+    });
+
+    // Pre-state: no lesson_completed event yet → detector returns null.
+    const before = await sdb.groupCompletion.detectForLesson(lessonA.id);
+    expect(before).toBeNull();
+
+    // Record the completion via the same scoped path the event route uses.
+    await sdb.events.write(lessonA.id, "lesson_completed", null);
+
+    const after = await sdb.groupCompletion.detectForLesson(lessonA.id);
+    expect(after).not.toBeNull();
+    expect(after!.groupId).toBe(groupA.id);
+    expect(after!.groupName).toBe(groupA.name);
+    expect(after!.lessonCount).toBe(1);
+    // alreadyRated is a boolean reflecting whether userA has a rating row
+    // for groupA at detection time. Not asserting a specific value here
+    // because earlier tests may have written one — the contract under test
+    // is just that the field is set and the rest of the payload is right.
+    expect(typeof after!.alreadyRated).toBe("boolean");
   });
 
   it("userA's scoped translations.forLesson(B) returns null", async () => {

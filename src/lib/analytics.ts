@@ -9,7 +9,7 @@ import {
   stores,
   users,
   clientLessons,
-  lessonCompletions,
+  lessonGroupRatings,
   lessonEvents,
 } from "./db/schema";
 
@@ -29,30 +29,37 @@ export type ClientAnalytics = {
   // Lessons + completions
   assignedLessonCount: number;
   completionCount: number;
-  // Ratings
+  // Group ratings (per-lesson rating was removed in 2026-06-30 cutover).
+  // avgRating averages across every group rating an employee of this
+  // client has submitted; responseCount is the number of group ratings.
   avgRating: number | null;
   responseCount: number;
 };
 
 export async function getClientAnalytics(): Promise<ClientAnalytics[]> {
-  // Completion is now derived from lesson_events (event_type =
-  // 'lesson_completed'). Rating data still lives in lesson_completions;
-  // the two are decoupled. Historical rating-rows were backfilled into
-  // lesson_events at migration time so pre-cutover completion counts
-  // remain visible.
+  // Completion is derived from lesson_events (event_type =
+  // 'lesson_completed'). Rating data lives in lesson_group_ratings
+  // (per-lesson rating was deprecated in 2026-06-30). client_id is
+  // denormalised on lesson_group_ratings so we can attribute ratings
+  // without joining through users.
   const [
     clientRows,
     storeRows,
     employeeRows,
     clientLessonRows,
-    ratingRows,
+    groupRatingRows,
     completedEventRows,
   ] = await Promise.all([
     db.select().from(clients),
     db.select().from(stores),
     db.select().from(users).where(eq(users.role, "employee")),
     db.select().from(clientLessons),
-    db.select().from(lessonCompletions),
+    db
+      .select({
+        clientId: lessonGroupRatings.clientId,
+        rating: lessonGroupRatings.rating,
+      })
+      .from(lessonGroupRatings),
     db
       .select({
         userId: lessonEvents.userId,
@@ -109,18 +116,15 @@ export async function getClientAnalytics(): Promise<ClientAnalytics[]> {
     completedUserIdsByClient.set(cid, completedSet);
   }
 
-  // Ratings are still tracked separately — average / response count come
-  // from the rating table, scoped the same way (only ratings for lessons
-  // currently assigned to the user's client count).
+  // Group ratings: pre-aggregated per client via the denormalised
+  // client_id column. Each row is one (user, group) rating; we collect
+  // them per client so the avg/count below is a flat "ratings from this
+  // client's employees" metric.
   const ratingsByClient = new Map<string, number[]>();
-  for (const r of ratingRows) {
-    const cid = userToClient.get(r.userId);
-    if (!cid) continue;
-    const assignedToClient = assignedLessonsByClient.get(cid);
-    if (!assignedToClient?.has(r.lessonId)) continue;
-    const ratings = ratingsByClient.get(cid) ?? [];
-    ratings.push(r.rating);
-    ratingsByClient.set(cid, ratings);
+  for (const r of groupRatingRows) {
+    const arr = ratingsByClient.get(r.clientId) ?? [];
+    arr.push(r.rating);
+    ratingsByClient.set(r.clientId, arr);
   }
 
   return clientRows.map((c): ClientAnalytics => {

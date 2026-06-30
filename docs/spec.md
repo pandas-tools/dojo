@@ -173,22 +173,25 @@ Assignment table — which lessons are assigned to which client.
 | lesson_id | uuid, FK → lessons | |
 | **PK** | | (client_id, lesson_id) |
 
-### `lesson_completions`
+### Completion + rating model (revised 2026-06-30)
 
-Tracks which employee completed which lesson, with their rating.
+**Completion** is recorded as an append-only `lesson_completed` row in
+`lesson_events` (one per first completion; subsequent re-completions of the
+same lesson are de-duped by `scopedDb.events.write`). Progress is the count
+of distinct `lesson_completed` events for a user filtered to lessons
+currently assigned to their client.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid, PK | |
-| user_id | uuid, FK → users | |
-| lesson_id | uuid, FK → lessons | |
-| rating | integer, NOT NULL | Quick Check rating (1-5 scale). CHECK constraint: rating >= 1 AND rating <= 5 |
-| completed_at | timestamptz | |
-| **unique** | | (user_id, lesson_id) |
+**Rating** is **per-group**, not per-lesson. When an employee finishes every
+assigned, published lesson in a group, the server emits a `groupCompleted`
+signal on the event response so the watch surface can prompt for a 1-5 star
+rating of the group as a whole. See `lesson_group_ratings` in the "Tables
+added since the original spec" section below.
 
-Completion is per lesson, not per translation. An employee who watches "Vision AI Retail" in French has the same completion record as one who watches it in English. Progress is calculated from the relationship: count of completions for a user vs. count of lessons assigned to their client.
-
-**Re-rating:** If an employee re-watches a lesson, they can update their rating. The `POST /api/lessons/[id]/complete` endpoint performs an upsert — if a completion already exists, it updates the rating and `completed_at` timestamp.
+The legacy `lesson_completions` table — which held per-lesson ratings 1-5
+under the misleading name — was dropped in migration `0009` on 2026-06-30.
+Historical completion data was preserved by an earlier backfill into
+`lesson_events.lesson_completed`. Per-lesson rating data was discarded
+because dojo had not yet shipped to real client employees.
 
 ### Relationships
 
@@ -205,9 +208,10 @@ lesson_tiers (client_id nullable; client_id NULL = global default ladder)
 lessons ──┬── lesson_translations (1:many, one per language)
           └── client_lessons ──┘ (many:many assignment)
 
-users ── lesson_completions   ── lessons (legacy ratings table; completions read from lesson_events)
-users ── lesson_bookmarks     ── lessons (per-user save)
-users ── lesson_events        ── lessons (append-only event log: opened/completed/engagement/rating)
+users ── lesson_bookmarks       ── lessons (per-user save)
+users ── lesson_upvotes         ── lessons (per-user "helpful", denormalised client_id)
+users ── lesson_group_ratings   ── lesson_groups (per-(user, group) 1-5, denormalised client_id)
+users ── lesson_events          ── lessons (append-only event log)
 ```
 
 ### Tables added since the original spec
@@ -219,6 +223,9 @@ The following tables (and the columns noted) shipped after this spec was origina
 - `lesson_tiers` — gamification ladder. `id, client_id NULLABLE, name, emoji, min_pct (0..1), sort_order, is_active, timestamps`. `client_id NULL` = global default (used by every client). Seeded with the original 3 (🌱 / ⚡ / 🏆). Admin at `/admin/tiers`. Read via `getBrowseTierData` in `src/lib/tiers-data.ts`.
 - `lessons.group_id` (nullable FK → `lesson_groups`, `ON DELETE SET NULL`), `lessons.group_sort_order` (within-group order), `lessons.published_at` (set on first publish, backfilled = `created_at`).
 - `users.last_new_lessons_checked_at` (per-user high-water mark for the dynamic "New lessons" rail).
+- `lesson_upvotes` — per-user "helpful" toggle on a lesson. PK `(user_id, lesson_id)`, denormalised `client_id`, `created_at`. Toggled via `POST /api/lessons/[id]/upvote` → `scopedDb.upvotes.toggle(lessonId)`. Each toggle also appends a `lesson_upvoted` / `lesson_unvoted` row to `lesson_events` so the append-only audit trail stays complete. Surfaced on the Reels right rail (Heart button) and on `/admin/analytics/[clientId]` as an "Upvotes" column on the lesson breakdown.
+- `lesson_group_ratings` — per-(user, group) rating 1-5 with NOT NULL `client_id` denormalised at write time. PK `(user_id, group_id)`. Replaces the dropped `lesson_completions.rating`. Written via `POST /api/groups/[id]/rate` → `scopedDb.groupRatings.upsert`. Each upsert also appends a `group_rated` event with `{groupId, rating, previousRating}` payload to `lesson_events`. The trigger is the **group-completion celebration**: when the user completes the last assigned+published lesson in a group, `POST /api/lessons/[id]/event` returns `{groupCompleted: {groupId, groupName, lessonCount, alreadyRated}}` for the watch shell to surface the rating prompt. See [`decisions.md` — "Per-group rating replaces per-lesson rating"](decisions.md).
+- `lesson_events` enum values added with these features: `lesson_upvoted`, `lesson_unvoted`, `group_rated`. The legacy `rating_submitted` value is preserved in the postgres enum for historical rows but is no longer accepted from any client (the event route's `KNOWN_EVENTS` allow-list excludes it).
 
 ## 5. Auth Flow
 
@@ -355,7 +362,16 @@ POST /api/auth/callback           → Handle magic link redirect
 
 GET  /api/lessons                 → Lessons for current user (respects language + client)
 GET  /api/lessons/[id]            → Single lesson with translation in preferred language
-POST /api/lessons/[id]/complete   → Mark complete + submit rating
+POST /api/lessons/[id]/event      → Write lesson_opened / lesson_completed / lesson_engagement.
+                                     On a lesson_completed that finishes every assigned+published
+                                     lesson in the group, returns
+                                     { groupCompleted: { groupId, groupName, lessonCount, alreadyRated } }
+                                     so the watch surface can prompt for the group rating.
+POST /api/lessons/[id]/upvote     → Toggle this user's "helpful" upvote on the lesson.
+                                     Returns { upvoted: boolean }.
+GET  /api/groups/[id]/rate        → Read this user's 1-5 rating for the group (null if unrated).
+POST /api/groups/[id]/rate        → Upsert this user's 1-5 rating for the group. Returns
+                                     { rating, previousRating: number | null }.
 
 PATCH /api/user/profile           → Update language, store, subtitles preference
 
@@ -481,7 +497,7 @@ Training activity over time (logins or completions per day/week). Shows the adop
 
 ### Data Source
 
-All analytics are derived from existing tables — no separate analytics tables or pre-aggregation needed at this scale. Queries run against `users`, `lesson_completions`, `client_lessons`, and `stores` with standard aggregations (COUNT, AVG, GROUP BY).
+All analytics are derived from existing tables — no separate analytics tables or pre-aggregation needed at this scale. Queries run against `users`, `lesson_events` (completion), `lesson_group_ratings` (rating), `lesson_upvotes` (engagement signal), `client_lessons`, and `stores` with standard aggregations (COUNT, AVG, GROUP BY). Ratings are scoped via the denormalised `client_id` column on `lesson_group_ratings` and `lesson_upvotes` so per-tenant rollups never need to join through `users`.
 
 ## 10. MVP Scope
 
@@ -492,7 +508,9 @@ All analytics are derived from existing tables — no separate analytics tables 
 - Store re-confirmation every 30 days
 - Lessons: video playback via Mux with auto-generated subtitles
 - Multi-language: translations per lesson, language picker scoped to client
-- Completion tracking with Quick Check rating
+- Completion tracking (via `lesson_events.lesson_completed`)
+- Per-group rating (1-5 stars) triggered on group completion via the watch shell
+- Per-lesson upvote ("helpful") signal on the Reels right rail
 - Browse shell (Netflix grid) for returning users
 - Reels shell (TikTok/Stories) for video playback
 - Admin panel: client CRUD, lesson + translation management, Mux upload, store management (CSV + manual), analytics dashboard, admin member management
