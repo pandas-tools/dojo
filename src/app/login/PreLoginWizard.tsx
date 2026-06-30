@@ -78,8 +78,9 @@ export default function PreLoginWizard() {
 
       setStores(body.stores);
       setLanguages(body.languages);
-      setLanguage(body.languages[0] ?? "en");
-      if (body.stores[0]) setStoreId(body.stores[0].id);
+      // No auto-select — Figma shows the trigger empty until the user picks.
+      // Pre-selecting causes the trigger to mirror the first list row, which
+      // reads as a duplicated entry.
       setStep("store");
     } catch (err) {
       setError("Something went wrong. Please try again.");
@@ -130,14 +131,15 @@ export default function PreLoginWizard() {
         : step === "language"
           ? "Select your Language"
           : "Check your inbox";
+  // Subtitle only on email + sent steps. Store + Language drop the subtitle
+  // per Figma (the heading is self-explanatory and avoids overlap with the
+  // content column below).
   const subtitle =
     step === "email"
       ? "Sign in to keep training on Pandas Vision AI."
-      : step === "store"
-        ? `Pick where you're based. We'll re-check every 30 days.`
-        : step === "language"
-          ? "We'll translate your training when available."
-          : `We sent a sign-in link to ${email}. Valid for 24 hours.`;
+      : step === "sent"
+        ? `We sent a sign-in link to ${email}. Valid for 24 hours.`
+        : null;
 
   return (
     <div className="relative z-10 mx-auto h-dvh w-full max-w-[402px]">
@@ -148,9 +150,11 @@ export default function PreLoginWizard() {
           <h1 className="text-balance text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
             {heading}
           </h1>
-          <p className="text-balance text-[14px] font-medium leading-[22px] tracking-[0.07px] text-[#f9fdff]/85">
-            {subtitle}
-          </p>
+          {subtitle && (
+            <p className="text-balance text-[14px] font-medium leading-[22px] tracking-[0.07px] text-[#f9fdff]/85">
+              {subtitle}
+            </p>
+          )}
         </div>
       </div>
 
