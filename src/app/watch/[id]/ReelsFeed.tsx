@@ -393,8 +393,8 @@ export default function ReelsFeed({
                 <div
                   className={cn(
                     "relative h-full w-full bg-black",
-                    "lg:h-auto lg:w-auto",
-                    "lg:aspect-[9/16] lg:max-h-[min(90vh,880px)] lg:max-w-[80vw]",
+                    "lg:h-[min(90vh,880px)] lg:w-auto",
+                    "lg:aspect-[9/16] lg:max-w-[80vw]",
                     "lg:overflow-hidden lg:rounded-2xl",
                     "lg:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)]",
                     "lg:ring-1 lg:ring-white/10",
