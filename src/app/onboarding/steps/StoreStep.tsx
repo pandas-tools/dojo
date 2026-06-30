@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { cn } from "@/lib/cn";
 
 type StoreRow = { id: string; name: string; city: string | null };
@@ -20,41 +19,13 @@ export default function StoreStep({
   onHqChange: (v: boolean) => void;
   error: string | null;
 }) {
-  const selectedStore = useMemo(
-    () => stores.find((s) => s.id === storeId) ?? null,
-    [stores, storeId],
-  );
-
   return (
     <div className="flex flex-col gap-2">
-      {/* Selected display (the Figma "dropdown trigger") */}
-      <div className="flex h-[52px] items-center gap-3 rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-4 backdrop-blur-md">
-        <span
-          className={cn(
-            "flex-1 truncate text-[16px] leading-[24px] tracking-[0.08px]",
-            hq || selectedStore ? "text-[#fefefe]" : "text-[#8e8e8e]",
-          )}
-        >
-          {hq
-            ? "HQ / Not assigned to a store"
-            : (selectedStore?.name ?? "Select a store…")}
-        </span>
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-5 w-5 text-[#8e8e8e]"
-          aria-hidden
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </div>
-
-      {/* Store list — Figma shows ~6 items fading out as they go down */}
-      <ul className="flex max-h-[340px] flex-col gap-2 overflow-y-auto pr-1">
+      {/* Store list — Figma shows ~6 items fading out as they go down.
+          (The Figma had a separate 'dropdown trigger' at the top, but
+          showing both the trigger AND the always-expanded list duplicates
+          the selected row visually — list-only is cleaner.) */}
+      <ul className="flex max-h-[420px] flex-col gap-2 overflow-y-auto pr-1">
         {stores.length === 0 ? (
           <li className="rounded-[24px] border border-[#445158] bg-[rgba(68,81,88,0.1)] px-4 py-3 text-center text-sm text-[#8e8e8e]">
             No stores configured yet.

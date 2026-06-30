@@ -144,11 +144,11 @@ export default function PreLoginWizard() {
       {/* HEADER */}
       <div className="absolute left-0 right-0 top-[13.3%] flex flex-col items-center gap-10 px-6">
         {showProgress && <StepProgress current={segmentIndex} total={3} />}
-        <div className="space-y-2 text-center">
-          <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
+        <div className="w-full max-w-[327px] space-y-2 text-center">
+          <h1 className="text-balance text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
             {heading}
           </h1>
-          <p className="text-[14px] font-medium leading-[22px] tracking-[0.07px] text-[#f9fdff]/85">
+          <p className="text-balance text-[14px] font-medium leading-[22px] tracking-[0.07px] text-[#f9fdff]/85">
             {subtitle}
           </p>
         </div>
