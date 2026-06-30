@@ -95,9 +95,9 @@ export default function StoreStep({
 
       {/* Options list — stores + an HQ row at the end. Picked option is
           hidden so it only appears in the trigger above. ~3 visible rows;
-          rest scrolls (scrollbar hidden). */}
+          rest scrolls with a thin arctic-haze scrollbar for affordance. */}
       <ul
-        className="flex w-full flex-col gap-2 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        className="flex w-full flex-col gap-2 overflow-y-auto pr-1.5 [scrollbar-width:thin] [scrollbar-color:rgba(193,232,251,0.3)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(193,232,251,0.3)] [&::-webkit-scrollbar-thumb:hover]:bg-[rgba(193,232,251,0.5)]"
         style={{ maxHeight: "240px" }}
       >
         {stores.length === 0 && !hq && (
