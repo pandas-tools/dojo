@@ -264,6 +264,13 @@ export default function PreLoginWizard() {
                 ? "Send sign-in link"
                 : "Continue"}
           </button>
+          {/* Symmetric spacer on the right balances the BackButton on the
+              left so the main Continue button reads CENTERED on the wizard
+              column (otherwise it ends up shifted right by 48+gap pixels
+              and misaligns with the heading + list items above). */}
+          {step !== "email" && (
+            <div aria-hidden className="h-12 w-12 shrink-0" />
+          )}
         </div>
       )}
     </div>
