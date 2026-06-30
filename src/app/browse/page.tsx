@@ -9,6 +9,7 @@ import BottomNav from "@/components/BottomNav";
 import LibraryAtmosphere from "@/components/LibraryAtmosphere";
 import TierStrip from "@/components/TierStrip";
 import { LessonCardLink } from "@/components/LessonCard";
+import { cn } from "@/lib/cn";
 
 export const metadata = { title: "Lessons · Dojo" };
 export const dynamic = "force-dynamic";
@@ -124,7 +125,7 @@ function FeaturedRail({ group }: { group: BrowseGroup }) {
   return (
     <section className="px-6">
       <div
-        className="relative overflow-hidden rounded-[16px] border border-white/60 px-4 py-6"
+        className="relative overflow-hidden rounded-[16px] border border-white/60 py-6 pl-4"
         style={{
           // Figma uses an SVG-embedded radial gradient (grey/white at 0.2
           // opacity) over a 0.2 black overlay — gives a 'frosted' texture
@@ -167,24 +168,35 @@ function FeaturedRail({ group }: { group: BrowseGroup }) {
 
 function GroupRail({ group }: { group: BrowseGroup }) {
   return (
-    <section className="px-6">
-      <h2 className="mb-4 text-[20px] font-medium leading-[1.2] tracking-tight text-white">
+    <section>
+      <h2 className="mb-4 px-6 text-[20px] font-medium leading-[1.2] tracking-tight text-white">
         {group.name}
       </h2>
-      <HorizontalRail group={group} />
+      <HorizontalRail group={group} edgeToEdge />
     </section>
   );
 }
 
-function HorizontalRail({ group }: { group: BrowseGroup }) {
+/**
+ * HorizontalRail — horizontal scroll. When `edgeToEdge` is true (default for
+ * standalone rails), the rail starts with pl-6 to align the first card with
+ * the section header padding and flows past the right edge with just a small
+ * pr-2 hint. When false, no padding — the parent (e.g. FeaturedRail's
+ * bordered card) controls the alignment.
+ */
+function HorizontalRail({
+  group,
+  edgeToEdge = false,
+}: {
+  group: BrowseGroup;
+  edgeToEdge?: boolean;
+}) {
   return (
     <div
-      className="
-        flex gap-4 overflow-x-auto pb-2
-        snap-x snap-mandatory
-        [scrollbar-width:none] [-ms-overflow-style:none]
-        [&::-webkit-scrollbar]:hidden
-      "
+      className={cn(
+        "flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+        edgeToEdge && "pl-6 pr-2",
+      )}
     >
       {group.cards.map((card) => (
         <LessonCardLink key={card.id} card={card} />
