@@ -59,9 +59,12 @@ export default async function BrowsePage() {
       <div className="relative z-10 px-6 pt-4">
         {currentTier && (
           <TierStrip
-            currentTierLabel={currentTier.name}
+            currentTier={{ id: currentTier.id, name: currentTier.name }}
             nextTierLabel={nextTier?.name}
             lessonsToNext={lessonsToNext}
+            tiers={tierData.tiers.map((t) => ({ id: t.id, name: t.name }))}
+            completed={tierData.me.completed}
+            total={tierData.me.total}
           />
         )}
       </div>
