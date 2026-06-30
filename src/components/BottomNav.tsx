@@ -2,39 +2,43 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, Home, Play } from "lucide-react";
+import { FolderOpen, Play, Bookmark, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 
+/**
+ * BottomNav — primary nav pill, fixed to the bottom of every in-app surface.
+ * Matches the Figma file (node I111:2149) — rounded-[100px] glass pill
+ * with 4 × 48px icon buttons (Library, Reels, Saved, Profile) and a
+ * gradient fade from the page bg to near-black above the pill.
+ */
 type Item = {
   href: string;
-  /** Active when the current pathname starts with this prefix. */
   matchPrefix: string;
   label: string;
   icon: LucideIcon;
 };
 
 const STATIC_ITEMS: Item[] = [
-  { href: "/browse", matchPrefix: "/browse", label: "Library", icon: Home },
-  // Reels href is injected per-page so the link goes straight to /watch/[id]
-  // and skips the /watch redirect — that's what was causing the white flash
-  // (double-navigation revealed body bg between transitions).
+  { href: "/browse", matchPrefix: "/browse", label: "Library", icon: FolderOpen },
   { href: "/watch", matchPrefix: "/watch", label: "Reels", icon: Play },
   { href: "/saved", matchPrefix: "/saved", label: "Saved", icon: Bookmark },
+  { href: "/profile", matchPrefix: "/profile", label: "Profile", icon: User },
 ];
 
 export default function BottomNav({
   userInitial,
   reelsHref,
-  overlay = false,
 }: {
-  userInitial: string;
-  /** Direct /watch/[id] link to skip the redirect hop; falls back to /watch. */
+  /** Kept for API parity; the Figma nav uses a User icon, not an avatar. */
+  userInitial?: string;
+  /** Direct /watch/[id] link to skip the /watch redirect hop. */
   reelsHref?: string;
-  /** When true, render with a heavier backdrop so the bar reads against video. */
-  overlay?: boolean;
 }) {
   const pathname = usePathname();
+  // `userInitial` is intentionally unused now — the Figma navbar uses the
+  // generic User icon. Kept in the prop list for backwards compatibility.
+  void userInitial;
   const items = STATIC_ITEMS.map((item) =>
     item.label === "Reels" && reelsHref ? { ...item, href: reelsHref } : item,
   );
@@ -42,77 +46,43 @@ export default function BottomNav({
   return (
     <nav
       aria-label="Primary"
-      className={cn(
-        "fixed inset-x-0 bottom-0 z-40 pointer-events-none",
-        "pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2",
-      )}
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-40"
+      style={{
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)",
+        paddingTop: "2.5rem",
+        backgroundImage:
+          "linear-gradient(to top, #111 30%, rgba(17,17,17,0.7) 60%, rgba(17,17,17,0) 100%)",
+      }}
     >
-      <div className="mx-auto flex max-w-sm justify-center px-4">
-        <div
-          className={cn(
-            "pointer-events-auto inline-flex items-center gap-2.5 rounded-full",
-            "px-2.5 py-2",
-            overlay
-              ? "bg-zinc-900/80 backdrop-blur-md ring-1 ring-white/10"
-              : "bg-zinc-900/95 ring-1 ring-white/10 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]",
-          )}
-        >
+      <div className="mx-auto flex justify-center px-4">
+        <div className="pointer-events-auto inline-flex items-center gap-4 rounded-[100px] bg-[rgba(14,16,21,0.55)] p-2 backdrop-blur-xl ring-1 ring-white/10">
           {items.map((item) => {
             const Icon = item.icon;
             const active = pathname.startsWith(item.matchPrefix);
             return (
               <Link
-                key={item.href}
+                key={item.label}
                 href={item.href}
                 aria-label={item.label}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex h-11 w-16 items-center justify-center rounded-full",
+                  "flex h-12 w-12 items-center justify-center rounded-full",
                   "transition-colors",
                   active
-                    ? "bg-white/10 text-white"
-                    : "text-white/70 hover:text-white",
+                    ? "bg-white/10 text-[#f9fdff]"
+                    : "text-[#f9fdff]/70 hover:bg-white/[0.06] hover:text-[#f9fdff]",
                 )}
               >
                 <Icon
                   className="h-5 w-5"
-                  strokeWidth={active ? 2.25 : 1.85}
+                  strokeWidth={active ? 2.25 : 2}
                   fill={active && item.label === "Saved" ? "currentColor" : "none"}
                 />
               </Link>
             );
           })}
-
-          <ProfileSlot
-            active={pathname.startsWith("/profile")}
-            initial={userInitial}
-          />
         </div>
       </div>
     </nav>
-  );
-}
-
-function ProfileSlot({
-  active,
-  initial,
-}: {
-  active: boolean;
-  initial: string;
-}) {
-  return (
-    <Link
-      href="/profile"
-      aria-label="Profile"
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "relative flex h-11 w-11 items-center justify-center rounded-full",
-        active ? "ring-2 ring-white" : "ring-1 ring-white/20",
-        "bg-white text-black text-sm font-semibold",
-        "transition-shadow",
-      )}
-    >
-      <span>{initial}</span>
-    </Link>
   );
 }

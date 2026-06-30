@@ -1,18 +1,14 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { auth } from "@/lib/auth";
 import {
   getBrowseData,
-  type BrowseCard,
   type BrowseGroup,
 } from "@/lib/browse";
 import { getBrowseTierData } from "@/lib/tiers-data";
-import BookmarkButton from "./BookmarkButton";
-import TierHeroCard from "./TierHeroCard";
 import BottomNav from "@/components/BottomNav";
-import DojoMark from "@/components/DojoMark";
-import BrandAtmosphere from "@/components/BrandAtmosphere";
-import LessonTypeChip from "@/components/LessonTypeChip";
+import LibraryAtmosphere from "@/components/LibraryAtmosphere";
+import TierStrip from "@/components/TierStrip";
+import { LessonCardLink } from "@/components/LessonCard";
 
 export const metadata = { title: "Lessons · Dojo" };
 export const dynamic = "force-dynamic";
@@ -38,13 +34,14 @@ export default async function BrowsePage() {
     completed: data.totals.completed,
   });
 
-  const groupProgress = data.groups
-    .filter((g) => g.cards.length > 0)
-    .map((g) => ({
-      name: g.name,
-      completed: g.cards.filter((c) => c.completed).length,
-      total: g.cards.length,
-    }));
+  // Compute next-tier hint for the TierStrip
+  const currentTier = tierData.tiers.find((t) => t.id === tierData.me.tierId);
+  const currentIdx = tierData.tiers.findIndex((t) => t.id === tierData.me.tierId);
+  const nextTier =
+    currentIdx >= 0 ? (tierData.tiers[currentIdx + 1] ?? null) : null;
+  const lessonsToNext = nextTier
+    ? Math.max(0, Math.ceil(nextTier.minPct * tierData.me.total) - tierData.me.completed)
+    : undefined;
 
   const userInitial = (session.user.email ?? "?").charAt(0).toUpperCase();
   const allCards = data.groups.flatMap((g) => g.cards);
@@ -57,35 +54,34 @@ export default async function BrowsePage() {
 
   return (
     <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white selection:bg-arctic-haze/30">
-      <BrandAtmosphere variant="halo" />
+      <LibraryAtmosphere />
 
-      <header className="relative z-10 flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
-        <Link
-          href="/browse"
-          aria-label="Dojo home"
-          className="text-white transition-opacity hover:opacity-80"
-        >
-          <DojoMark variant="wordmark" className="h-7 w-auto sm:h-8" />
-        </Link>
-      </header>
-
-      <div className="relative z-10 px-5 pt-6 sm:px-8 sm:pt-8">
-        {data.totals.lessons > 0 && (
-          <div className="mx-auto max-w-2xl">
-            <TierHeroCard
-              tierData={tierData}
-              userInitial={userInitial}
-              groupProgress={groupProgress}
-            />
-          </div>
+      <div className="relative z-10 px-6 pt-4">
+        {currentTier && (
+          <TierStrip
+            currentTierLabel={currentTier.name}
+            nextTierLabel={nextTier?.name}
+            lessonsToNext={lessonsToNext}
+          />
         )}
       </div>
+
+      <header className="relative z-10 mx-auto mt-12 max-w-[320px] px-6 text-center">
+        <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
+          Lesson library
+        </h1>
+        <p className="mt-2 text-[14px] font-medium leading-[22px] tracking-[0.07px] text-[#f9fdff]/85">
+          Browse lessons assigned to your store, save the ones you want to revisit.
+        </p>
+      </header>
 
       {data.totals.lessons === 0 ? (
         <EmptyState />
       ) : (
-        <div className="pt-10 pb-36 space-y-10 sm:pt-12 sm:space-y-14">
-          {data.newRail && <GroupRail key="__new" group={data.newRail} />}
+        <div className="relative z-10 mt-10 space-y-8 pb-36">
+          {data.newRail && (
+            <FeaturedRail group={data.newRail} />
+          )}
           {data.groups.map((group) => (
             <GroupRail key={group.id ?? "__ungrouped"} group={group} />
           ))}
@@ -97,89 +93,70 @@ export default async function BrowsePage() {
   );
 }
 
-function GroupRail({ group }: { group: BrowseGroup }) {
+/**
+ * FeaturedRail — the FIRST rail ("New lessons"). Wrapped in a glassy
+ * bordered card with subtle internal glow blobs per the Figma design.
+ */
+function FeaturedRail({ group }: { group: BrowseGroup }) {
   return (
-    <section>
-      <h2 className="mb-4 px-5 text-xl font-medium tracking-tight text-white sm:mb-5 sm:px-8 sm:text-2xl">
-        {group.name}
-      </h2>
-      <div
-        className="
-          flex gap-2 overflow-x-auto pb-2
-          px-5 sm:px-8 sm:gap-3
-          snap-x snap-mandatory
-          scroll-pl-5 sm:scroll-pl-8
-          [scrollbar-width:none] [-ms-overflow-style:none]
-          [&::-webkit-scrollbar]:hidden
-        "
-      >
-        {group.cards.map((card) => (
-          <LessonCard key={card.id} card={card} />
-        ))}
+    <section className="px-6">
+      <div className="relative overflow-hidden rounded-[16px] border border-white/15 bg-[rgba(14,14,14,0.4)] px-4 py-6 backdrop-blur-md">
+        {/* Internal glow blobs — match Figma's ellipse decoration */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-32 -top-20 h-[400px] w-[400px] rounded-full opacity-30"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(193,232,251,0.4) 0%, rgba(193,232,251,0) 60%)",
+            filter: "blur(40px)",
+          }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-24 -right-20 h-[360px] w-[360px] rounded-full opacity-25"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(159,191,207,0.4) 0%, rgba(159,191,207,0) 60%)",
+            filter: "blur(40px)",
+          }}
+        />
+
+        <div className="relative">
+          <h2 className="mb-4 text-[20px] font-medium leading-[1.2] tracking-tight text-white">
+            {group.name}
+          </h2>
+          <HorizontalRail group={group} />
+        </div>
       </div>
     </section>
   );
 }
 
-function LessonCard({ card }: { card: BrowseCard }) {
-  const cardShell =
-    "snap-start shrink-0 block w-[38vw] max-w-[200px] sm:w-44 md:w-48 lg:w-52";
-
-  const inner = (
-    <>
-      <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-zinc-900">
-        {card.ready && card.thumbnail ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={card.thumbnail}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-            decoding="async"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-white/30">
-            {card.ready ? "No preview" : "Processing"}
-          </div>
-        )}
-
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-
-        {card.completed && (
-          <div className="absolute left-2 top-2 rounded-full bg-arctic-haze px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-near-black">
-            Done
-          </div>
-        )}
-
-        {card.ready && (
-          <div className="absolute bottom-2 left-2">
-            <LessonTypeChip
-              contentType={card.contentType}
-              durationSeconds={card.durationSeconds}
-            />
-          </div>
-        )}
-
-        <div className="absolute bottom-1.5 right-1.5">
-          <BookmarkButton
-            lessonId={card.id}
-            initialBookmarked={card.isBookmarked}
-          />
-        </div>
-      </div>
-
-      <h3 className="pt-3 text-[13px] font-medium text-white line-clamp-2 leading-snug">
-        {card.title}
-      </h3>
-    </>
+function GroupRail({ group }: { group: BrowseGroup }) {
+  return (
+    <section className="px-6">
+      <h2 className="mb-4 text-[20px] font-medium leading-[1.2] tracking-tight text-white">
+        {group.name}
+      </h2>
+      <HorizontalRail group={group} />
+    </section>
   );
+}
 
-  return card.ready ? (
-    <Link href={`/watch/${card.id}`} className={`${cardShell} group`}>
-      {inner}
-    </Link>
-  ) : (
-    <div className={`${cardShell} opacity-60`}>{inner}</div>
+function HorizontalRail({ group }: { group: BrowseGroup }) {
+  return (
+    <div
+      className="
+        flex gap-4 overflow-x-auto pb-2
+        snap-x snap-mandatory
+        [scrollbar-width:none] [-ms-overflow-style:none]
+        [&::-webkit-scrollbar]:hidden
+      "
+    >
+      {group.cards.map((card) => (
+        <LessonCardLink key={card.id} card={card} />
+      ))}
+    </div>
   );
 }
 

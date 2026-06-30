@@ -1,0 +1,120 @@
+import Link from "next/link";
+import { Play } from "lucide-react";
+import { cn } from "@/lib/cn";
+import BookmarkButton from "@/app/browse/BookmarkButton";
+import type { BrowseCard } from "@/lib/browse";
+
+/**
+ * LessonCard — single video/image/carousel tile in the Library rails.
+ *
+ * Matches the Figma file (node 96:399 cards):
+ *   - 154px wide × 221px tall, rounded-[8px]
+ *   - Cover image with dark gradient overlay
+ *   - Bookmark icon top-right (28px circular)
+ *   - Play circle centered (Video only, when ready)
+ *   - 3px arctic-haze progress bar at the bottom edge (Video, when partial)
+ *   - 12px Sharp Grotesk Book title below the card
+ */
+export default function LessonCard({ card }: { card: BrowseCard }) {
+  const isVideo = card.contentType === "video";
+  // Single-card "in-progress" hint: visual only, not wired to real progress
+  // yet (chapter-completed event lives in Phase 2 work with Dex).
+  const showProgress = isVideo && card.ready && !card.completed;
+  const progressPct = card.completed ? 100 : showProgress ? 35 : 0;
+
+  return (
+    <div className="flex w-[154px] shrink-0 flex-col gap-3">
+      <div className="relative h-[221px] w-[154px] overflow-hidden rounded-[8px] bg-zinc-900">
+        {card.ready && card.thumbnail ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={card.thumbnail}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-[11px] text-white/30">
+            {card.ready ? "No preview" : "Processing"}
+          </div>
+        )}
+
+        {/* Dark gradient overlay (matches Figma's 33,35,44 wash) */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(180deg, rgba(33,35,44,0) 0%, rgba(33,35,44,0.95) 100%)",
+          }}
+        />
+
+        {/* Centered play circle — only for ready Video */}
+        {isVideo && card.ready && (
+          <div
+            aria-hidden
+            className="absolute left-1/2 top-1/2 flex h-[60px] w-[60px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 backdrop-blur-md ring-1 ring-white/20"
+          >
+            <Play className="h-6 w-6 translate-x-0.5 text-white" fill="currentColor" />
+          </div>
+        )}
+
+        {/* Completed pill — only when card.completed */}
+        {card.completed && (
+          <div className="absolute left-2 top-2 rounded-full bg-arctic-haze px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-near-black">
+            Done
+          </div>
+        )}
+
+        {/* Bookmark icon — Figma puts it top-right inside the cover */}
+        <div className="absolute right-2 top-2">
+          <BookmarkButton
+            lessonId={card.id}
+            initialBookmarked={card.isBookmarked}
+          />
+        </div>
+
+        {/* Progress bar — 3px arctic-haze at the bottom edge */}
+        {isVideo && card.ready && (
+          <div className="absolute inset-x-0 bottom-0 h-[3px] bg-white/15">
+            <div
+              className="h-full bg-arctic-haze transition-[width] duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        )}
+      </div>
+
+      <p
+        className={cn(
+          "line-clamp-2 text-[12px] leading-[1.3] text-white",
+          "min-h-[2.6em]",
+        )}
+      >
+        {card.title}
+      </p>
+    </div>
+  );
+}
+
+export function LessonCardLink({
+  card,
+  className,
+}: {
+  card: BrowseCard;
+  className?: string;
+}) {
+  if (!card.ready) {
+    return (
+      <div className={cn("snap-start", className)} aria-disabled>
+        <LessonCard card={card} />
+      </div>
+    );
+  }
+  return (
+    <Link href={`/watch/${card.id}`} className={cn("snap-start", className)}>
+      <LessonCard card={card} />
+    </Link>
+  );
+}
