@@ -424,11 +424,11 @@ export default function ReelsFeed({
                         style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
                       >
                         <p className="leading-[1.3]">
-                          <span className="text-[22px] font-medium text-[#f9fdff]">
+                          <span className="text-[22px] font-medium text-[#f9fdff] lg:text-[15px]">
                             {it.title}
                           </span>
                           {it.description && (
-                            <span className="text-[13px] text-[#b2b2b2]">
+                            <span className="text-[13px] text-[#b2b2b2] lg:text-[12px]">
                               {" "}
                               {it.description}
                             </span>
