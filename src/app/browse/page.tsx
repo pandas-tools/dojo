@@ -90,12 +90,24 @@ export default async function BrowsePage() {
         <EmptyState />
       ) : (
         <div className="relative z-10 mt-10 space-y-8 pb-36">
-          {data.newRail && (
-            <FeaturedRail group={data.newRail} />
-          )}
-          {data.groups.map((group) => (
-            <GroupRail key={group.id ?? "__ungrouped"} group={group} />
-          ))}
+          {(() => {
+            // The Figma always shows a featured/highlighted section at the
+            // top. Real `newRail` data is one-shot per fresh batch (checkpoint
+            // bumps on every load), so fall back to the first regular group
+            // styled the same way — keeps the layout consistent for any user.
+            const featured = data.newRail ?? data.groups[0];
+            const remainingGroups = data.newRail
+              ? data.groups
+              : data.groups.slice(1);
+            return (
+              <>
+                {featured && <FeaturedRail group={featured} />}
+                {remainingGroups.map((group) => (
+                  <GroupRail key={group.id ?? "__ungrouped"} group={group} />
+                ))}
+              </>
+            );
+          })()}
         </div>
       )}
 
