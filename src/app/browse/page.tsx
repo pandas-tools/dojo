@@ -195,7 +195,10 @@ function HorizontalRail({
     <div
       className={cn(
         "flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
-        edgeToEdge && "pl-6 pr-2",
+        // scroll-pl-6 tells snap-mandatory the snap port starts 24px in, so the
+        // first card stays indented at rest and only flows under the title edge
+        // once the user scrolls.
+        edgeToEdge && "pl-6 pr-2 scroll-pl-6",
       )}
     >
       {group.cards.map((card) => (
