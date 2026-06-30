@@ -3,27 +3,28 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import TierIcon from "./TierIcon";
 
 /**
  * TierProgressPopup — modal showing the user's tier ladder + a progress bar
  * to the next tier. Matches the Figma file (node 122:3489 — Library_Progress
- * Popup). Triggered from the TierStrip pill in the header of /browse and
- * /saved.
+ * Popup). Triggered from the TierStrip pill in /browse and /saved.
  *
- * NOTE: Figma uses emerald (#00c9a7) accents for the CURRENT tier ring + CTA.
- * This codebase's brand directive is "strictly cool palette" (see persona
- * memory feedback_pandas_palette_is_strictly_cool). I've swapped the emerald
- * for arctic-haze so the popup ships brand-safe. If Dimi confirms emerald is
- * the new direction, swap the `ACCENT_*` constants below.
+ * Color treatment: the Figma uses emerald (#00C9A7 → #006353) for the
+ * active tier ring + CTA gradient. We honor that here per Dimi's direction;
+ * the progress bar fill itself stays arctic-haze (Figma keeps it cyan with
+ * just the emerald glow shadow).
  */
-const ACCENT_BG_FROM = "#C1E8FB"; // arctic-haze (was #00C9A7 emerald in Figma)
-const ACCENT_BG_TO = "#54646C"; // steel-harbor (was #006353 deep teal)
-const ACCENT_RING = "rgba(193,232,251,0.6)"; // (was rgba(0,201,167,0.6))
-const ACCENT_GLOW = "rgba(193,232,251,0.25)"; // (was rgba(0,201,167,0.2))
+const ACCENT = "#00C9A7"; // emerald — Figma's tier accent
+const ACCENT_DEEP = "#006353"; // deep teal — Figma's CTA endpoint
+const ACCENT_RGBA_TINT = "rgba(0,201,167,0.1)";
+const ACCENT_RGBA_GLOW = "rgba(0,201,167,0.2)";
 
 export type TierStanding = {
   id: string;
   name: string;
+  /** Display order in the tier ladder (0-indexed) — drives icon mapping. */
+  sortOrder: number;
 };
 
 export default function TierProgressPopup({
@@ -86,12 +87,15 @@ export default function TierProgressPopup({
           <Dialog.Title className="sr-only">Tier progress</Dialog.Title>
 
           <div className="flex flex-col gap-8">
-            {/* Tier ladder row — equal-width slots so current sits visually
-                centered in its column regardless of edge position. */}
+            {/* Tier ladder — grid so each tier sits in an equal-width slot */}
             <div className="grid grid-cols-3 items-center">
               {visibleTiers.map((t) => (
                 <div key={t.id} className="flex justify-center">
-                  <TierCircle name={t.name} variant={t.position} />
+                  <TierCircle
+                    name={t.name}
+                    sortOrder={t.sortOrder}
+                    variant={t.position}
+                  />
                 </div>
               ))}
             </div>
@@ -107,8 +111,8 @@ export default function TierProgressPopup({
                   className="absolute inset-y-0 left-0 rounded-[10px] transition-[width] duration-500 ease-out"
                   style={{
                     width: `${pct}%`,
-                    background: ACCENT_BG_FROM,
-                    boxShadow: `0 0 12px 0 ${ACCENT_GLOW}`,
+                    background: "#C1E8FB",
+                    boxShadow: `0 0 12px 0 ${ACCENT_RGBA_GLOW}`,
                   }}
                 />
               </div>
@@ -123,10 +127,10 @@ export default function TierProgressPopup({
           <button
             type="button"
             onClick={() => onOpenChange?.(false)}
-            className="mt-[72px] flex h-[56px] w-full items-center justify-center rounded-[28px] text-[16px] font-medium leading-[1.3] text-[#f9fdff] shadow-[0px_0px_18px_0px_rgba(193,232,251,0.2),0px_10px_24px_0px_rgba(193,232,251,0.2)] transition-opacity hover:opacity-90"
+            className="mt-[72px] flex h-[56px] w-full items-center justify-center rounded-[28px] text-[16px] font-medium leading-[1.3] text-[#f9fdff] transition-opacity hover:opacity-90"
             style={{
-              backgroundImage: `linear-gradient(90deg, ${ACCENT_BG_FROM} 0%, ${ACCENT_BG_TO} 100%)`,
-              color: "#0e0e0e",
+              backgroundImage: `linear-gradient(90deg, ${ACCENT} 0%, ${ACCENT_DEEP} 100%)`,
+              boxShadow: `0px 0px 18px 0px rgba(193,232,251,0.2), 0px 10px 24px 0px ${ACCENT_RGBA_GLOW}`,
             }}
           >
             {ctaLabel}
@@ -158,33 +162,34 @@ export default function TierProgressPopup({
 
 function TierCircle({
   name,
+  sortOrder,
   variant,
 }: {
   name: string;
+  sortOrder: number;
   variant: "past" | "current" | "future";
 }) {
   const isCurrent = variant === "current";
-  const size = isCurrent ? "h-20 w-20" : "h-16 w-16";
+  const circleSize = isCurrent ? "h-20 w-20" : "h-16 w-16";
+  const iconSize = isCurrent ? "h-8 w-8" : "h-7 w-7";
   return (
     <div
       className={cn(
         "flex flex-col items-center gap-2",
         variant === "future" && "opacity-50",
       )}
-      style={{ width: isCurrent ? 100 : 80 }}
     >
       <div
         className={cn(
           "flex items-center justify-center rounded-[40px] border-2",
-          size,
+          circleSize,
         )}
         style={
           isCurrent
             ? {
-                borderColor: ACCENT_RING,
-                backgroundImage:
-                  "linear-gradient(90deg, rgba(193,232,251,0.1) 0%, rgba(193,232,251,0.1) 100%), linear-gradient(90deg, #1B1F20 0%, #1B1F20 100%)",
-                boxShadow: `0 0 9px 0 rgba(193,232,251,0.15), 0 12px 12px 0 ${ACCENT_GLOW}`,
+                borderColor: ACCENT,
+                backgroundImage: `linear-gradient(90deg, ${ACCENT_RGBA_TINT} 0%, ${ACCENT_RGBA_TINT} 100%), linear-gradient(90deg, #1B1F20 0%, #1B1F20 100%)`,
+                filter: `drop-shadow(0px 0px 9px ${ACCENT_RGBA_GLOW}) drop-shadow(0px 12px 12px ${ACCENT_RGBA_GLOW})`,
               }
             : {
                 background: "#0e0e0e",
@@ -192,9 +197,11 @@ function TierCircle({
               }
         }
       >
-        <span className="text-2xl" aria-hidden>
-          {tierGlyph(name)}
-        </span>
+        <TierIcon
+          sortOrder={sortOrder}
+          name={name}
+          className={iconSize}
+        />
       </div>
       <p
         className={cn(
@@ -208,13 +215,4 @@ function TierCircle({
       </p>
     </div>
   );
-}
-
-function tierGlyph(name: string) {
-  const k = name.toLowerCase();
-  if (k.includes("appren") || k.includes("white")) return "🥋";
-  if (k.includes("special") || k.includes("blue")) return "🌊";
-  if (k.includes("expert") || k.includes("black")) return "🥇";
-  if (k.includes("master") || k.includes("brown")) return "🏆";
-  return "⭐";
 }
