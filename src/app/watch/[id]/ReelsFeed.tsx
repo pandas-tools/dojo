@@ -9,7 +9,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronUp, ChevronDown, Heart, MessageSquare } from "lucide-react";
+import { ChevronLeft, ChevronUp, ChevronDown, Heart } from "lucide-react";
 import VideoNotesSheet from "@/components/VideoNotesSheet";
 import UpvoteBurst from "@/components/UpvoteBurst";
 import { cn } from "@/lib/cn";
@@ -424,17 +424,6 @@ export default function ReelsFeed({
                 )}
                 strokeWidth={2}
               />
-            </button>
-            <button
-              type="button"
-              aria-label="Open notes"
-              onClick={(e) => {
-                e.stopPropagation();
-                setNotesOpen(true);
-              }}
-              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
-            >
-              <MessageSquare className="h-5 w-5" strokeWidth={2} />
             </button>
           </div>
         </div>
