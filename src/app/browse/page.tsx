@@ -123,9 +123,9 @@ export default async function BrowsePage() {
  */
 function FeaturedRail({ group }: { group: BrowseGroup }) {
   return (
-    <section className="px-6">
+    <section>
       <div
-        className="relative overflow-hidden rounded-[16px] border border-white/60 py-6 pl-4"
+        className="relative overflow-hidden border-y border-white/60 py-6 pl-6"
         style={{
           // Figma uses an SVG-embedded radial gradient (grey/white at 0.2
           // opacity) over a 0.2 black overlay — gives a 'frosted' texture
