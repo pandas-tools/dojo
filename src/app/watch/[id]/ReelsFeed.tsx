@@ -347,8 +347,8 @@ export default function ReelsFeed({
                   <img
                     src={glowSrc}
                     alt=""
-                    className="absolute left-1/2 top-1/2 h-[120%] w-[120%] max-w-none -translate-x-1/2 -translate-y-1/2 object-cover opacity-50"
-                    style={{ filter: "blur(80px) saturate(1.4)" }}
+                    className="absolute left-1/2 top-1/2 h-[130%] w-[130%] max-w-none -translate-x-1/2 -translate-y-1/2 object-cover opacity-20"
+                    style={{ filter: "blur(120px) saturate(0.5)" }}
                     draggable={false}
                   />
                 </div>
