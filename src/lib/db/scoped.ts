@@ -17,6 +17,7 @@ import {
   clientLessons,
   lessons,
   lessonBookmarks,
+  lessonUpvotes,
   lessonTranslations,
   lessonCompletions,
   lessonEvents,
@@ -30,7 +31,9 @@ type LessonEventType =
   | "lesson_opened"
   | "lesson_completed"
   | "lesson_engagement"
-  | "rating_submitted";
+  | "rating_submitted"
+  | "lesson_upvoted"
+  | "lesson_unvoted";
 
 type LessonContentType = "video" | "image" | "carousel";
 
@@ -220,6 +223,109 @@ export function scopedDb(user: ScopedUser) {
           .values({ userId: user.id, lessonId })
           .onConflictDoNothing();
         return { bookmarked: true };
+      },
+    },
+
+    upvotes: {
+      // Set of lesson IDs this user has upvoted, restricted to lessons
+      // currently assigned to their client so an upvote on a since-unassigned
+      // lesson never resurfaces. Mirrors bookmarks.forUser exactly.
+      forUser: async (): Promise<Set<string>> => {
+        const assignments = await db
+          .select({ lessonId: clientLessons.lessonId })
+          .from(clientLessons)
+          .where(eq(clientLessons.clientId, cid));
+        const assignedIds = assignments.map((a) => a.lessonId);
+        if (assignedIds.length === 0) return new Set();
+        const rows = await db
+          .select({ lessonId: lessonUpvotes.lessonId })
+          .from(lessonUpvotes)
+          .where(
+            and(
+              eq(lessonUpvotes.userId, user.id),
+              inArray(lessonUpvotes.lessonId, assignedIds),
+            ),
+          );
+        return new Set(rows.map((r) => r.lessonId));
+      },
+
+      // Toggle the upvote for a lesson the user can actually see. Verifies
+      // the lesson is assigned to this client first (defence-in-depth, mirrors
+      // bookmarks.toggle). Also appends an entry to lesson_events so the
+      // append-only log carries the audit trail (who upvoted/unvoted when),
+      // independent of the current-state row in lesson_upvotes. Returns the
+      // resulting state.
+      toggle: async (lessonId: string): Promise<{ upvoted: boolean }> => {
+        const [assignment] = await db
+          .select()
+          .from(clientLessons)
+          .where(
+            and(
+              eq(clientLessons.clientId, cid),
+              eq(clientLessons.lessonId, lessonId),
+            ),
+          );
+        if (!assignment) {
+          throw new Error("Lesson not assigned to user's client");
+        }
+        const [existing] = await db
+          .select({ userId: lessonUpvotes.userId })
+          .from(lessonUpvotes)
+          .where(
+            and(
+              eq(lessonUpvotes.userId, user.id),
+              eq(lessonUpvotes.lessonId, lessonId),
+            ),
+          )
+          .limit(1);
+        if (existing) {
+          await db
+            .delete(lessonUpvotes)
+            .where(
+              and(
+                eq(lessonUpvotes.userId, user.id),
+                eq(lessonUpvotes.lessonId, lessonId),
+              ),
+            );
+          await db
+            .insert(lessonEvents)
+            .values({
+              userId: user.id,
+              lessonId,
+              clientId: cid,
+              eventType: "lesson_unvoted",
+            });
+          return { upvoted: false };
+        }
+        await db
+          .insert(lessonUpvotes)
+          .values({ userId: user.id, lessonId, clientId: cid })
+          .onConflictDoNothing();
+        await db
+          .insert(lessonEvents)
+          .values({
+            userId: user.id,
+            lessonId,
+            clientId: cid,
+            eventType: "lesson_upvoted",
+          });
+        return { upvoted: true };
+      },
+
+      // Count of upvotes per lesson, scoped to this user's client. Returns
+      // a Map keyed by lessonId. Used by /admin/analytics to surface the
+      // per-lesson upvote column in the client detail view. Lessons with
+      // zero upvotes are absent from the map (caller defaults to 0).
+      countsByLessonForClient: async (): Promise<Map<string, number>> => {
+        const rows = await db
+          .select({ lessonId: lessonUpvotes.lessonId })
+          .from(lessonUpvotes)
+          .where(eq(lessonUpvotes.clientId, cid));
+        const counts = new Map<string, number>();
+        for (const r of rows) {
+          counts.set(r.lessonId, (counts.get(r.lessonId) ?? 0) + 1);
+        }
+        return counts;
       },
     },
 

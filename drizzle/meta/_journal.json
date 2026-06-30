@@ -57,6 +57,13 @@
       "when": 1782309790739,
       "tag": "0007_new_lessons_rail",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782918000000,
+      "tag": "0008_lesson_upvotes",
+      "breakpoints": true
     }
   ]
 }
