@@ -111,24 +111,34 @@ export default async function BrowsePage() {
 function FeaturedRail({ group }: { group: BrowseGroup }) {
   return (
     <section className="px-6">
-      <div className="relative overflow-hidden rounded-[16px] border border-white/15 bg-[rgba(14,14,14,0.4)] px-4 py-6 backdrop-blur-md">
-        {/* Internal glow blobs — match Figma's ellipse decoration */}
+      <div
+        className="relative overflow-hidden rounded-[16px] border border-white/40 px-4 py-6"
+        style={{
+          // Layered: subtle frosted-fjord wash + arctic-haze radial highlight +
+          // dark base. Produces the 'distinct colored section' the Figma uses
+          // to set this rail apart from the unwrapped rails below.
+          backgroundImage:
+            "radial-gradient(120% 100% at 20% 0%, rgba(193,232,251,0.18) 0%, rgba(193,232,251,0) 55%), radial-gradient(100% 100% at 90% 100%, rgba(159,191,207,0.22) 0%, rgba(159,191,207,0) 60%), linear-gradient(180deg, rgba(68,81,88,0.35) 0%, rgba(14,14,14,0.5) 100%)",
+        }}
+      >
+        {/* Large soft-cyan accent blob top-left — matches Figma's Ellipse 102 */}
         <div
           aria-hidden
-          className="pointer-events-none absolute -left-32 -top-20 h-[400px] w-[400px] rounded-full opacity-30"
+          className="pointer-events-none absolute -left-40 -top-32 h-[520px] w-[520px] rounded-full opacity-55"
           style={{
             background:
-              "radial-gradient(circle, rgba(193,232,251,0.4) 0%, rgba(193,232,251,0) 60%)",
-            filter: "blur(40px)",
+              "radial-gradient(circle, rgba(193,232,251,0.5) 0%, rgba(193,232,251,0) 65%)",
+            filter: "blur(50px)",
           }}
         />
+        {/* Second accent blob bottom-right — matches Figma's Ellipse 103 */}
         <div
           aria-hidden
-          className="pointer-events-none absolute -bottom-24 -right-20 h-[360px] w-[360px] rounded-full opacity-25"
+          className="pointer-events-none absolute -bottom-32 -right-32 h-[460px] w-[460px] rounded-full opacity-50"
           style={{
             background:
-              "radial-gradient(circle, rgba(159,191,207,0.4) 0%, rgba(159,191,207,0) 60%)",
-            filter: "blur(40px)",
+              "radial-gradient(circle, rgba(159,191,207,0.55) 0%, rgba(159,191,207,0) 60%)",
+            filter: "blur(50px)",
           }}
         />
 

@@ -30,7 +30,10 @@ export default function LessonCard({ card }: { card: BrowseCard }) {
           <img
             src={card.thumbnail}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover"
+            // object-contain so landscape thumbnails are never cropped —
+            // the card's portrait aspect would otherwise crop the sides.
+            // Letterboxing top/bottom is the acceptable trade.
+            className="absolute inset-0 h-full w-full object-contain"
             loading="lazy"
             decoding="async"
           />
@@ -40,13 +43,14 @@ export default function LessonCard({ card }: { card: BrowseCard }) {
           </div>
         )}
 
-        {/* Dark gradient overlay (matches Figma's 33,35,44 wash) */}
+        {/* Soft bottom gradient — keeps the bookmark + progress-bar area
+            readable against any thumbnail content (only ~30% of card height) */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[40%]"
           style={{
             backgroundImage:
-              "linear-gradient(180deg, rgba(33,35,44,0) 0%, rgba(33,35,44,0.95) 100%)",
+              "linear-gradient(180deg, rgba(14,16,21,0) 0%, rgba(14,16,21,0.85) 100%)",
           }}
         />
 
