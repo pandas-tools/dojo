@@ -5,16 +5,16 @@ import { motion } from "motion/react";
 /**
  * AuthAtmosphere — backdrop for the Figma auth surfaces.
  *
- * The horizon glow is a single wide radial gradient anchored to the bottom-
- * center of the viewport. Brightest at the bottom-center, fades up and to
- * the sides. Stops are tuned per the Figma color palette:
- *   #FFFFFF → #DBF3FF → #C1E8FB → #9FBFCF → #445158 → transparent
+ * Bottom dome glow per the Figma reference: a CONTAINED bright focal
+ * point at bottom-center that falls off into dark, not a wide horizon
+ * wash across the whole bottom. Anchors the brand moment without lifting
+ * the rest of the page into a gray haze.
  *
- * Wrapped in a motion.div that breathes slowly (scale + opacity) so the
- * scene feels alive. A secondary cyan accent drifts horizontally on
- * mix-blend-mode: screen to add atmospheric motion.
+ * Stops use the Pandas cool palette:
+ *   #FFFFFF → #DBF3FF → #C1E8FB → #9FBFCF → near-black → transparent
  *
- * Reduced-motion is suppressed via the global CSS rule.
+ * Slow opacity breathe keeps it alive. Reduced-motion is suppressed via
+ * the global CSS rule.
  */
 export default function AuthAtmosphere() {
   return (
@@ -32,37 +32,18 @@ export default function AuthAtmosphere() {
         }}
       />
 
-      {/* HORIZON BAND — wide radial centered at the bottom, breathing */}
+      {/* BOTTOM DOME GLOW — contained focal point at bottom-center.
+            Narrower ellipse (55% width vs prior 90%) so the glow doesn't
+            wash horizontally; harder falloff so the surrounding area stays
+            properly dark instead of bleeding into gray haze. */}
       <motion.div
-        className="absolute inset-x-0 bottom-0"
-        style={{ height: "65vh" }}
+        className="absolute inset-x-0 bottom-0 h-[55vh] aurora-layer-a"
+        style={{
+          background:
+            "radial-gradient(ellipse 55% 90% at 50% 100%, rgba(255,255,255,0.95) 0%, rgba(219,243,255,0.8) 14%, rgba(193,232,251,0.5) 32%, rgba(159,191,207,0.18) 55%, rgba(68,81,88,0.05) 75%, transparent 90%)",
+        }}
         animate={{ opacity: [0.92, 1, 0.92] }}
         transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(ellipse 90% 100% at 50% 100%, rgba(255,255,255,0.95) 0%, rgba(219,243,255,0.85) 10%, rgba(193,232,251,0.7) 25%, rgba(159,191,207,0.4) 45%, rgba(68,81,88,0.15) 68%, transparent 85%)",
-          }}
-        />
-      </motion.div>
-
-      {/* Quiet cyan accent that drifts horizontally — adds atmospheric motion
-          without changing the horizon's overall shape. */}
-      <motion.div
-        className="absolute inset-x-0 bottom-0 mx-auto rounded-[100%]"
-        style={{
-          width: "120vw",
-          height: "35vh",
-          marginLeft: "-10vw",
-          background: "#C1E8FB",
-          filter: "blur(90px)",
-          mixBlendMode: "screen",
-          opacity: 0.18,
-        }}
-        animate={{ x: ["-3%", "3%", "-3%"] }}
-        transition={{ duration: 24, repeat: Infinity, ease: "easeInOut" }}
       />
     </div>
   );
