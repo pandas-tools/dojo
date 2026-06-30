@@ -48,23 +48,24 @@ export default function TierProgressPopup({
   trigger?: ReactNode;
 }) {
   const currentIdx = tiers.findIndex((t) => t.id === currentTierId);
-  // Display window: previous tier + current tier + next tier.
-  // Edge cases: if current is first, show [current, next, after-next?];
-  // if current is last, show [previous-previous?, previous, current].
-  const visibleTiers =
-    currentIdx >= 0
-      ? tiers
-          .slice(Math.max(0, currentIdx - 1), currentIdx + 2)
-          .map((t, i, arr) => ({
-            ...t,
-            position:
-              tiers[currentIdx]?.id === t.id
-                ? "current"
-                : arr.indexOf(t) < arr.findIndex((x) => x.id === currentTierId)
-                  ? "past"
-                  : "future",
-          }))
-      : [];
+  // Always show up to 3 tiers, centered on the current when possible.
+  // Edge: current at idx 0 → [0,1,2]; current at last idx → [n-3,n-2,n-1].
+  const targetCount = Math.min(3, tiers.length);
+  const start =
+    currentIdx < 0
+      ? 0
+      : Math.max(0, Math.min(currentIdx - 1, tiers.length - targetCount));
+  const visibleTiers = tiers.slice(start, start + targetCount).map((t) => {
+    const tierIdx = tiers.findIndex((x) => x.id === t.id);
+    return {
+      ...t,
+      position: (tierIdx < currentIdx
+        ? "past"
+        : tierIdx === currentIdx
+          ? "current"
+          : "future") as "past" | "current" | "future",
+    };
+  });
   const pct = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
 
   return (
@@ -85,14 +86,13 @@ export default function TierProgressPopup({
           <Dialog.Title className="sr-only">Tier progress</Dialog.Title>
 
           <div className="flex flex-col gap-8">
-            {/* Tier ladder row */}
-            <div className="flex items-center justify-between">
+            {/* Tier ladder row — equal-width slots so current sits visually
+                centered in its column regardless of edge position. */}
+            <div className="grid grid-cols-3 items-center">
               {visibleTiers.map((t) => (
-                <TierCircle
-                  key={t.id}
-                  name={t.name}
-                  variant={t.position as "past" | "current" | "future"}
-                />
+                <div key={t.id} className="flex justify-center">
+                  <TierCircle name={t.name} variant={t.position} />
+                </div>
               ))}
             </div>
 

@@ -113,7 +113,7 @@ export default function ReelsFeed({
       burstTimerRef.current = window.setTimeout(() => {
         setBurstLessonId(null);
         burstTimerRef.current = null;
-      }, 700);
+      }, 1100);
     }
 
     try {
