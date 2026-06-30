@@ -32,15 +32,15 @@ export default function AuthAtmosphere() {
         }}
       />
 
-      {/* BOTTOM DOME GLOW — contained focal point at bottom-center.
-            Narrower ellipse (55% width vs prior 90%) so the glow doesn't
-            wash horizontally; harder falloff so the surrounding area stays
-            properly dark instead of bleeding into gray haze. */}
+      {/* BOTTOM DOME GLOW — circular radial sized by vh so the dome shape
+            stays CIRCULAR regardless of viewport aspect (the prior ellipse
+            got squashed wide on mobile portrait viewports). Centered at
+            the bottom edge of the viewport so we see a half-circle arc. */}
       <motion.div
-        className="absolute inset-x-0 bottom-0 h-[55vh] aurora-layer-a"
+        className="absolute inset-0 aurora-layer-a"
         style={{
           background:
-            "radial-gradient(ellipse 55% 90% at 50% 100%, rgba(255,255,255,0.95) 0%, rgba(219,243,255,0.8) 14%, rgba(193,232,251,0.5) 32%, rgba(159,191,207,0.18) 55%, rgba(68,81,88,0.05) 75%, transparent 90%)",
+            "radial-gradient(circle 70vh at 50% 100%, rgba(255,255,255,0.95) 0%, rgba(219,243,255,0.75) 14%, rgba(193,232,251,0.48) 30%, rgba(159,191,207,0.2) 50%, rgba(68,81,88,0.06) 70%, transparent 88%)",
         }}
         animate={{ opacity: [0.92, 1, 0.92] }}
         transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
