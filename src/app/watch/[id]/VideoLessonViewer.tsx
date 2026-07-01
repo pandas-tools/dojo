@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import MuxPlayer from "@mux/mux-player-react";
-import { useLessonTracking } from "@/lib/useLessonTracking";
+import {
+  useLessonTracking,
+  type LessonCompletedResponse,
+} from "@/lib/useLessonTracking";
 
 const COMPLETION_THRESHOLD = 0.9;
 
@@ -25,6 +28,7 @@ export default function VideoLessonViewer({
   paused,
   onProgress,
   onSeekReady,
+  onLessonCompleted,
 }: {
   lessonId: string;
   playbackId: string;
@@ -50,6 +54,10 @@ export default function VideoLessonViewer({
     lessonId: string,
     seek: ((pct: number) => void) | null,
   ) => void;
+  /** Bubbled from the tracker after the server accepts a lesson_completed —
+   *  gives the shell the `groupCompleted` payload so it can show the
+   *  group-rating celebration. */
+  onLessonCompleted?: (r: LessonCompletedResponse) => void;
 }) {
   const [playing, setPlaying] = useState(false);
   const playerRef = useRef<HTMLElement | null>(null);
@@ -59,6 +67,7 @@ export default function VideoLessonViewer({
     contentType: "video",
     videoPlaying: playing && active,
     enabled: !disableTracking && active,
+    onCompleted: onLessonCompleted,
   });
 
   const completedRef = useRef(false);

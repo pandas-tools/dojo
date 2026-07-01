@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLessonTracking } from "@/lib/useLessonTracking";
+import {
+  useLessonTracking,
+  type LessonCompletedResponse,
+} from "@/lib/useLessonTracking";
 import { cn } from "@/lib/cn";
 
 type Slide = { url: string; alt: string; caption?: string };
@@ -18,6 +21,7 @@ export default function CarouselLessonViewer({
   disableTracking = false,
   active = true,
   onProgress,
+  onLessonCompleted,
 }: {
   lessonId: string;
   slides: Slide[];
@@ -28,11 +32,14 @@ export default function CarouselLessonViewer({
   active?: boolean;
   /** Emitted on slide change; pct is (index+1)/slides.length. */
   onProgress?: (lessonId: string, pct: number) => void;
+  /** Bubbled from the tracker after the server accepts a lesson_completed. */
+  onLessonCompleted?: (r: LessonCompletedResponse) => void;
 }) {
   const { emitCompleted } = useLessonTracking({
     lessonId,
     contentType: "carousel",
     enabled: !disableTracking && active,
+    onCompleted: onLessonCompleted,
   });
 
   const containerRef = useRef<HTMLDivElement | null>(null);

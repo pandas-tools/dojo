@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import { useLessonTracking } from "@/lib/useLessonTracking";
+import {
+  useLessonTracking,
+  type LessonCompletedResponse,
+} from "@/lib/useLessonTracking";
 
 const COMPLETION_DWELL_MS = 5_000;
 
@@ -12,6 +15,7 @@ export default function ImageLessonViewer({
   disableTracking = false,
   active = true,
   onProgress,
+  onLessonCompleted,
 }: {
   lessonId: string;
   imageUrl: string;
@@ -25,11 +29,14 @@ export default function ImageLessonViewer({
   active?: boolean;
   /** Emitted as the dwell timer ticks; 0..1 over COMPLETION_DWELL_MS. */
   onProgress?: (lessonId: string, pct: number) => void;
+  /** Bubbled from the tracker after the server accepts a lesson_completed. */
+  onLessonCompleted?: (r: LessonCompletedResponse) => void;
 }) {
   const { emitCompleted } = useLessonTracking({
     lessonId,
     contentType: "image",
     enabled: !disableTracking && active,
+    onCompleted: onLessonCompleted,
   });
 
   useEffect(() => {

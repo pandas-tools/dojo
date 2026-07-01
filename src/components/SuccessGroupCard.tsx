@@ -14,10 +14,10 @@ import { cn } from "@/lib/cn";
  * #445158 (steel-harbor). Per the strictly-cool palette rule the selected
  * state uses the brand cyan rather than an emoji color shift.
  */
-export type GroupRating = "angry" | "meh" | "good" | "amazing";
+export type GroupRating = "bad" | "meh" | "good" | "amazing";
 
 const RATINGS: { id: GroupRating; emoji: string; label: string }[] = [
-  { id: "angry", emoji: "😡", label: "Angry" },
+  { id: "bad", emoji: "😢", label: "Bad" },
   { id: "meh", emoji: "😐", label: "Meh" },
   { id: "good", emoji: "😊", label: "Good" },
   { id: "amazing", emoji: "🤩", label: "Amazing" },
@@ -34,6 +34,7 @@ export default function SuccessGroupCard({
 }) {
   const [rating, setRating] = useState<GroupRating | null>(null);
   const [comment, setComment] = useState("");
+  const [commentOpen, setCommentOpen] = useState(false);
 
   return (
     <motion.div
@@ -97,16 +98,32 @@ export default function SuccessGroupCard({
         </div>
       </div>
 
-      <label className="flex w-full flex-col gap-2">
-        <span className="sr-only">Add a comment</span>
-        <textarea
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder="Add a comment…"
-          rows={3}
-          className="w-full resize-none rounded-[8px] border border-[#445158] bg-[rgba(68,81,88,0.2)] px-4 py-3 text-[12px] leading-4 text-[#fefefe] placeholder:text-[#b2b2b2] focus:border-arctic-haze/60 focus:outline-none focus:ring-2 focus:ring-arctic-haze/30"
-        />
-      </label>
+      {commentOpen ? (
+        <motion.label
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          className="flex w-full flex-col gap-2"
+        >
+          <span className="sr-only">Add a comment</span>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Add a comment…"
+            rows={3}
+            autoFocus
+            className="w-full resize-none rounded-[8px] border border-[#445158] bg-[rgba(68,81,88,0.2)] px-4 py-3 text-[12px] leading-4 text-[#fefefe] placeholder:text-[#b2b2b2] focus:border-arctic-haze/60 focus:outline-none focus:ring-2 focus:ring-arctic-haze/30"
+          />
+        </motion.label>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setCommentOpen(true)}
+          className="self-start text-[12px] leading-4 text-[#f9fdff]/60 underline underline-offset-2 transition-colors hover:text-arctic-haze"
+        >
+          Add a comment
+        </button>
+      )}
 
       {onSubmit && (
         <button

@@ -21,6 +21,16 @@ import { useEffect, useRef } from "react";
 // All requests fire-and-forget — the tracker never blocks UI. Final
 // engagement heartbeat uses sendBeacon so the count survives a tab close.
 
+export type LessonCompletedResponse = {
+  ok: true;
+  groupCompleted?: {
+    groupId: string;
+    groupName: string;
+    lessonCount: number;
+    alreadyRated: boolean;
+  };
+};
+
 export type UseLessonTrackingOptions = {
   lessonId: string;
   contentType: "video" | "image" | "carousel";
@@ -30,6 +40,10 @@ export type UseLessonTrackingOptions = {
   videoPlaying?: boolean;
   // Disable the hook entirely — useful in admin preview surfaces.
   enabled?: boolean;
+  // Invoked with the parsed server response after a lesson_completed
+  // POST succeeds. The shell uses this to react to `groupCompleted` and
+  // surface the group-rating celebration.
+  onCompleted?: (response: LessonCompletedResponse) => void;
 };
 
 export type UseLessonTrackingResult = {
@@ -60,6 +74,7 @@ function sendEvent(
   type: "lesson_opened" | "lesson_completed" | "lesson_engagement",
   payload: Record<string, unknown> | null,
   beacon = false,
+  onResponse?: (body: LessonCompletedResponse) => void,
 ) {
   const url = `/api/lessons/${lessonId}/event`;
   const body = JSON.stringify({ type, payload });
@@ -72,14 +87,29 @@ function sendEvent(
       // fall through to fetch
     }
   }
-  fetch(url, {
+  const req = fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body,
     keepalive: true,
-  }).catch(() => {
-    // swallow — tracker must never break the UI
   });
+  if (onResponse) {
+    req
+      .then(async (res) => {
+        if (!res.ok) return;
+        const json = (await res.json().catch(() => null)) as
+          | LessonCompletedResponse
+          | null;
+        if (json && json.ok) onResponse(json);
+      })
+      .catch(() => {
+        // swallow — tracker must never break the UI
+      });
+  } else {
+    req.catch(() => {
+      // swallow — tracker must never break the UI
+    });
+  }
 }
 
 export function useLessonTracking(
@@ -96,6 +126,12 @@ export function useLessonTracking(
   // without re-running the effect on every re-render.
   const videoPlayingRef = useRef<boolean>(!!opts.videoPlaying);
   videoPlayingRef.current = !!opts.videoPlaying;
+  // Mirror of opts.onCompleted so emitCompleted can call the latest
+  // handler without re-registering the effect / closure churn.
+  const onCompletedRef = useRef<
+    ((r: LessonCompletedResponse) => void) | undefined
+  >(opts.onCompleted);
+  onCompletedRef.current = opts.onCompleted;
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
@@ -186,10 +222,13 @@ export function useLessonTracking(
     emitCompleted: (payload?: Record<string, unknown>) => {
       if (completedRef.current) return;
       completedRef.current = true;
-      sendEvent(lessonId, "lesson_completed", {
-        contentType,
-        ...(payload ?? {}),
-      });
+      sendEvent(
+        lessonId,
+        "lesson_completed",
+        { contentType, ...(payload ?? {}) },
+        false,
+        (body) => onCompletedRef.current?.(body),
+      );
     },
     emitOpened: () => {
       if (openedRef.current) return;
