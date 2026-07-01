@@ -1,4 +1,4 @@
-# Auto-advance to next unwatched after group celebration
+# Auto-advance + training-complete copy on the Expert tier modal
 
 **Date:** 2026-07-01
 **Status:** Draft (design)
@@ -6,18 +6,27 @@
 
 ## Problem
 
-When a user completes the last lesson in a group, the current UX is:
+Two related dead-ends on the Reels feed:
 
+**(1) Group-end dead-end.** When a user completes the last lesson in a group:
 1. Group-completion celebration modal appears with a rating prompt.
 2. User rates and dismisses (or dismisses directly).
 3. The video underneath is `loop`, so it keeps replaying. The active feed item does not change.
 4. The user is left rewatching a lesson they just finished, with no cue to move on. They have to manually swipe to the next feed item — which, because the feed is unsorted with respect to watched-state, may be another already-completed lesson.
 
-Result: the "you just finished a group" moment ends in a dead-end. Progression breaks.
+**(2) Training-complete miscommunication.** When a user completes THEIR LAST lesson, the Expert tier modal fires with:
+
+> Congrats! You've just unlocked a new tier.
+> **Keep going — new lessons just opened up.**
+
+That subtitle is misleading — nothing new opened up, they're done. There's no separate "training complete" screen.
+
+Result: the "you just finished a group" moment ends in a dead-end, and the "you just finished EVERYTHING" moment tells you to keep going.
 
 ## Desired behavior
 
-After a celebration burst finishes draining (the last modal in the queue pops), the feed scrolls to the next unwatched lesson.
+1. After a celebration burst finishes draining (the last modal in the queue pops), the feed scrolls to the next unwatched lesson.
+2. When the Expert tier modal (or any tier modal) fires AT 100% completion, its subtitle switches from "Keep going — new lessons just opened up." to copy that acknowledges the end. No new modal — reuse the existing tier surface.
 
 ## Scope
 
@@ -54,6 +63,26 @@ If a burst does NOT include a `groupCompleted` (e.g., a lone `tierUnlocked` mid-
 
 `disableTracking` short-circuits the advance. `initialCompleted` is not passed (or passed as an empty set) and celebrations still render but the completion-set update and the advance do not fire.
 
+### Tier modal subtitle at 100% completion
+
+- **Server**: augment the `tierUnlocked` payload from [`scoped.ts:751`](../../src/lib/db/scoped.ts#L751) with a `trainingComplete: boolean` field. True when `completedAfter === total` (i.e., the tier crossing that fires because of this event ALSO brings the user to 100% of their assigned lessons). The existing `completedAfter` and `total` values inside `tierCrossing.detectForLesson` already have what's needed; no new query.
+- **Type**: extend `LessonCompletedResponse["tierUnlocked"]` in [`useLessonTracking.ts:35`](../../src/lib/useLessonTracking.ts#L35) with the optional `trainingComplete?: boolean`.
+- **Client**: in [`ReelsFeed.tsx`](../../src/app/watch/[id]/ReelsFeed.tsx) the `Celebration` union's `tier` variant gains `trainingComplete: boolean`, populated from `res.tierUnlocked.trainingComplete`. The tier celebration render block ([`ReelsFeed.tsx:893`](../../src/app/watch/[id]/ReelsFeed.tsx#L893)) branches on this flag:
+  - **`false` (default)** — current subtitle: "Keep going — new lessons just opened up."
+  - **`true`** — new subtitle: "That's every lesson done. Nice work."
+- **Design preview**: [`design-preview/success-tier/page.tsx`](../../src/app/design-preview/success-tier/page.tsx) gets a `?complete=1` query param so we can review both copy states without a fixture. When present, renders with the new subtitle. Add a second entry in the [`design-preview/page.tsx`](../../src/app/design-preview/page.tsx) index list — "Success — new tier (training complete)" pointing to the query-param variant — so it's discoverable.
+- **Copy notes**: title ("Congrats! You've just unlocked a new tier.") stays — Expert IS a new tier. Only the subtitle changes. Kept short and un-exclaimed to match the Iris/Dojo tone; open to tuning during review.
+
+### Interaction with auto-advance
+
+The training-complete case is a natural fit for the exhausted branch of auto-advance:
+1. User completes final lesson → server emits `groupCompleted` + `tierUnlocked{trainingComplete: true}`.
+2. Celebration queue: tier modal first (with new subtitle), then group modal (rating).
+3. `advancePendingRef` is set to `true` by the fresh `groupCompleted`.
+4. User dismisses both → burst drains → advance fires → walks feed → nothing unwatched → routes to `/browse`.
+
+The two features compose cleanly with no special-case branching for "last lesson."
+
 ## Edge cases
 
 - **Feed of length 1**: after celebration drain, there IS no other item. Route to `/browse`.
@@ -67,16 +96,19 @@ If a burst does NOT include a `groupCompleted` (e.g., a lone `tierUnlocked` mid-
 - Reordering the feed itself (still `sortOrder ASC` from the DB).
 - Auto-advance on mid-group lesson completion.
 - Cross-group visual signaling ("you're now in group X") — separate design.
+- A distinct, standalone "training complete" success screen. Reusing the tier modal with a subtitle switch is the smaller, correct change.
+- Changing the tier modal for the intermediate-tier case (Apprentice→Specialist, or Specialist→Expert BEFORE 100%). Copy stays as-is.
 
 ## Testing
 
 - **Unit**: a small `nextUnwatchedIndex(items, activeIndex, completedSet)` pure function is easy to test — cover: forward hit, wraparound hit, all-completed → -1, active is only uncompleted → -1.
 - **Integration** (Vitest, existing pattern): mount `ReelsFeed` with a test items array and simulate `handleLessonCompleted` fires with a `groupCompleted` payload. Assert that after `submitGroupRating` resolves, `scrollIntoView` is called on the expected next-unwatched section (mock via `sectionRefs`). Also assert the negative case: a `tierUnlocked`-only payload does NOT trigger `scrollIntoView` after dismissal.
-- **Manual**: preview URL, use test tenant with a fixture user 3 lessons deep in a 4-lesson group. Complete lesson 4 → rate → observe scroll to next-unwatched lesson in a different group.
+- **Server unit** (extend [`success-detectors.test.ts`](../../src/tests/success-detectors.test.ts)): a scenario where completion #N crosses into the top tier AND brings the user to 100%. Assert the returned `tierUnlocked.trainingComplete === true`. Also assert `false` for a mid-tier crossing that doesn't hit 100%.
+- **Manual**: preview URL, use test tenant with a fixture user 3 lessons deep in a 4-lesson group. Complete lesson 4 → rate → observe scroll to next-unwatched lesson in a different group. Then complete the very last lesson → observe the Expert modal with the new "That's every lesson done" subtitle → dismiss → observe route to `/browse`.
 
 ## Rollout
 
-Single PR. No feature flag — the change is additive to a moment that currently does nothing.
+Single PR bundling both changes. No feature flag — the auto-advance is additive to a dead-end moment, and the tier-copy switch is a subtitle swap gated on a server-emitted flag that defaults to `false` for every existing case except the true training-complete crossing.
 
 ## Related
 
