@@ -2,6 +2,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
+import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
 import TierIcon from "./TierIcon";
 
@@ -77,24 +78,30 @@ export default function TierProgressPopup({
           className="fixed inset-0 z-50 bg-[rgba(14,14,14,0.6)] backdrop-blur-[4px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
         />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 w-[338px] -translate-x-1/2 -translate-y-1/2 rounded-[40px] border border-[rgba(193,232,251,0.56)] px-6 pb-10 pt-[72px] shadow-[0px_-16px_40px_0px_rgba(193,232,251,0.2),0px_-24px_60px_0px_rgba(0,0,0,0.5)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+          className="fixed left-1/2 top-1/2 z-50 w-[338px] -translate-x-1/2 -translate-y-1/2 rounded-[40px] border border-[rgba(193,232,251,0.56)] px-6 pb-10 pt-10 shadow-[0px_-16px_40px_0px_rgba(193,232,251,0.2),0px_-24px_60px_0px_rgba(0,0,0,0.5)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
           style={{
             backgroundImage:
               "linear-gradient(90deg, #0e0e0e 0%, rgba(68,81,88,0.2) 100%), linear-gradient(90deg, #0e0e0e 0%, #0e0e0e 100%)",
           }}
           aria-describedby={undefined}
         >
-          <Dialog.Title className="sr-only">Tier progress</Dialog.Title>
-
           <div className="flex flex-col gap-8">
-            {/* Tier ladder — grid so each tier sits in an equal-width slot */}
+            {/* pr-10 keeps the centered title clear of the close X in the
+                top-right corner. */}
+            <Dialog.Title className="text-center text-[20px] font-medium leading-tight tracking-tight text-[#f9fdff] pr-10">
+              Lorem ipsum dolor sit
+            </Dialog.Title>
+
+            {/* Tier ladder — grid so each tier sits in an equal-width slot.
+                Icons stagger in left→right when the dialog mounts. */}
             <div className="grid grid-cols-3 items-center">
-              {visibleTiers.map((t) => (
+              {visibleTiers.map((t, i) => (
                 <div key={t.id} className="flex justify-center">
                   <TierCircle
                     name={t.name}
                     sortOrder={t.sortOrder}
                     variant={t.position}
+                    index={i}
                   />
                 </div>
               ))}
@@ -107,10 +114,16 @@ export default function TierProgressPopup({
                 <span className="text-[#91aebc]"> / {total}</span>
               </p>
               <div className="relative h-[20px] w-full overflow-hidden rounded-[10px] bg-[rgba(68,81,88,0.3)]">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-[10px] transition-[width] duration-500 ease-out"
+                <motion.div
+                  className="absolute inset-y-0 left-0 rounded-[10px]"
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{
+                    delay: 0.55,
+                    duration: 0.9,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
                   style={{
-                    width: `${pct}%`,
                     background: "#C1E8FB",
                     boxShadow: `0 0 12px 0 ${ACCENT_RGBA_GLOW}`,
                   }}
@@ -127,9 +140,9 @@ export default function TierProgressPopup({
           <button
             type="button"
             onClick={() => onOpenChange?.(false)}
-            className="mt-[72px] flex h-[56px] w-full items-center justify-center rounded-[28px] text-[16px] font-medium leading-[1.3] text-[#f9fdff] transition-opacity hover:opacity-90"
+            className="tier-cta-shimmer mt-[72px] flex h-[56px] w-full items-center justify-center rounded-[28px] text-[16px] font-medium leading-[1.3] text-[#f9fdff] transition-opacity hover:opacity-90"
             style={{
-              backgroundImage: `linear-gradient(90deg, ${ACCENT} 0%, ${ACCENT_DEEP} 100%)`,
+              backgroundImage: `linear-gradient(90deg, ${ACCENT} 0%, ${ACCENT_DEEP} 50%, ${ACCENT} 100%)`,
               boxShadow: `0px 0px 18px 0px rgba(193,232,251,0.2), 0px 10px 24px 0px ${ACCENT_RGBA_GLOW}`,
             }}
           >
@@ -164,22 +177,51 @@ function TierCircle({
   name,
   sortOrder,
   variant,
+  index,
 }: {
   name: string;
   sortOrder: number;
   variant: "past" | "current" | "future";
+  index: number;
 }) {
   const isCurrent = variant === "current";
   const circleSize = isCurrent ? "h-20 w-20" : "h-16 w-16";
   const iconSize = isCurrent ? "h-8 w-8" : "h-7 w-7";
+  // Entry stagger: 180ms buffer after the dialog's own zoom-in, then 110ms
+  // between tiles. Current tile gets a spring overshoot + a single pulse
+  // beat so the eye lands on it after the row settles.
+  const entryDelay = 0.18 + index * 0.11;
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: entryDelay, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
         "flex flex-col items-center gap-2",
         variant === "future" && "opacity-50",
       )}
     >
-      <div
+      <motion.div
+        initial={{ scale: 0.6 }}
+        animate={
+          isCurrent
+            ? { scale: [0.6, 1.08, 0.98, 1.04, 1] }
+            : { scale: 1 }
+        }
+        transition={
+          isCurrent
+            ? {
+                delay: entryDelay,
+                duration: 0.75,
+                times: [0, 0.35, 0.6, 0.82, 1],
+                ease: [0.16, 1, 0.3, 1],
+              }
+            : {
+                delay: entryDelay,
+                duration: 0.4,
+                ease: [0.16, 1, 0.3, 1],
+              }
+        }
         className={cn(
           "flex items-center justify-center rounded-[40px] border-2",
           circleSize,
@@ -202,7 +244,7 @@ function TierCircle({
           name={name}
           className={iconSize}
         />
-      </div>
+      </motion.div>
       <p
         className={cn(
           "text-[12px] leading-4",
@@ -213,6 +255,6 @@ function TierCircle({
       >
         {name}
       </p>
-    </div>
+    </motion.div>
   );
 }

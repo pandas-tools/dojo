@@ -161,6 +161,18 @@ select:focus-visible,
 .aurora-layer-b { animation: aurora-drift-b 28s ease-in-out infinite; will-change: transform, opacity; }
 .star-twinkle   { animation: star-twinkle 4s ease-in-out infinite; }
 
+/* Palindrome gradient sweep for tier-progress CTA. Stops are a→b→a so the
+ * position slide loops seamlessly without a visual cut. */
+@keyframes tier-cta-shimmer {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.tier-cta-shimmer {
+  background-size: 200% 100%;
+  animation: tier-cta-shimmer 4.5s ease-in-out infinite;
+  will-change: background-position;
+}
+
 /* Reduced motion — kill all transitions/animations */
 @media (prefers-reduced-motion: reduce) {
   *,
