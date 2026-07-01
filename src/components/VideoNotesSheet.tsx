@@ -11,7 +11,10 @@ import { Drawer } from "vaul";
  * body scrolls freely once the sheet is expanded.
  */
 
-const SNAP_POINTS = ["55%", "92%"] as const;
+// vaul snap points are fractions of viewport height (numbers 0..1) or
+// pixel strings like "500px". Percentage strings are treated as pixels
+// (parseInt("55%", 10) → 55px), which collapses the drawer to a slit.
+const SNAP_POINTS = [0.55, 0.92] as const;
 
 export default function VideoNotesSheet({
   open,
@@ -24,7 +27,9 @@ export default function VideoNotesSheet({
   notesMarkdown: string | null;
   lessonTitle?: string;
 }) {
-  const [snap, setSnap] = useState<number | string | null>(SNAP_POINTS[0]);
+  const [snap, setSnap] = useState<number | string | null>(
+    SNAP_POINTS[0],
+  );
 
   return (
     <Drawer.Root
