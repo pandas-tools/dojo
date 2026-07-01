@@ -144,7 +144,7 @@ export default function PreLoginWizard() {
   return (
     <div className="relative z-10 mx-auto h-dvh w-full max-w-[402px]">
       {/* HEADER */}
-      <div className="absolute left-0 right-0 top-[13.3%] flex flex-col items-center gap-10 px-6">
+      <div className="dojo-rise-in absolute left-0 right-0 top-[13.3%] flex flex-col items-center gap-10 px-6">
         {showProgress && <StepProgress current={segmentIndex} total={3} />}
         <div className="w-full max-w-[327px] space-y-2 text-center">
           <h1 className="text-balance text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
@@ -160,6 +160,7 @@ export default function PreLoginWizard() {
 
       {/* CONTENT — centered, 327px wide */}
       <div className="absolute left-1/2 top-1/2 w-[327px] -translate-x-1/2 -translate-y-1/2">
+        <div className="dojo-rise-in dojo-rise-in--delay-1">
         <AnimatePresence mode="wait" initial={false}>
           {step === "email" && (
             <motion.div
@@ -226,11 +227,12 @@ export default function PreLoginWizard() {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
 
       {/* CTA */}
       {step !== "sent" && (
-        <div className="absolute left-0 right-0 top-[86%] flex items-center gap-2 px-6">
+        <div className="dojo-rise-in dojo-rise-in--delay-2 absolute left-0 right-0 top-[86%] flex items-center gap-2 px-6">
           {step !== "email" && (
             <BackButton
               onClick={() =>

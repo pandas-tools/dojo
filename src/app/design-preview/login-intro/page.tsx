@@ -1,94 +1,90 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useState } from "react";
 import AuthAtmosphere from "@/components/AuthAtmosphere";
 
 /**
- * Design preview — login intro (4s).
+ * Design preview — login intro (3s).
  *
  * Timeline:
  *   0.00s  full-viewport #0e0e0e overlay covers the settled login state.
  *   0.20s  Pandas emblem starts drawing (GIF, filter: invert(1) for white).
- *   2.30s  emblem stroke complete, held.
- *   2.50s  emblem fades out (700ms). Overlay fades to transparent (900ms).
+ *   1.20s  emblem stroke complete (native GIF timing), held.
+ *   1.50s  emblem fades out (700ms). Overlay fades to transparent (900ms).
  *          Underlying gradient (AuthAtmosphere) is revealed by the fade.
- *   3.20s  wizard content rises into place (500ms, cubic-bezier .16,1,.3,1).
- *   4.00s  at rest — real /login state.
+ *   2.20s  wizard content rises into place (500ms).
+ *   3.00s  at rest — real /login state.
  *
- * Not the production integration — this route just plays the sequence so
- * we can see the timing before wiring the real LoginIntro into /login.
+ * Preview only. The real integration will live in a separate LoginIntro
+ * client component wired into /login itself.
  */
-const T = {
-  emblemInDelay: 0.2,
-  emblemOutStart: 2.5,
-  emblemOutDur: 0.7,
-  overlayFadeStart: 2.5,
-  overlayFadeDur: 0.9,
-  wizardRiseStart: 3.2,
-  wizardRiseDur: 0.5,
-} as const;
-
-const EASE = [0.16, 1, 0.3, 1] as const;
-
 export default function LoginIntroPreview() {
   const [runKey, setRunKey] = useState(0);
 
   return (
-    <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white">
+    <main
+      key={runKey}
+      className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white"
+    >
       <AuthAtmosphere />
-      <MockWizard key={`wiz-${runKey}`} />
-      <IntroOverlay key={`intro-${runKey}`} />
+      <MockWizard />
+      <IntroOverlay />
       <ReplayButton onClick={() => setRunKey((n) => n + 1)} />
+
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+@keyframes lipOverlayFade {
+  0%, 50% { opacity: 1; }
+  80%, 100% { opacity: 0; }
+}
+@keyframes lipEmblemPulse {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.98); }
+  6.7% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  50%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  73.3%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.02); }
+}
+@keyframes lipWizardRise {
+  0%, 73.3% { opacity: 0; transform: translateY(12px); }
+  90%, 100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes lipWizardCenterRise {
+  0%, 73.3% { opacity: 0; transform: translate(-50%, calc(-50% + 12px)); }
+  90%, 100% { opacity: 1; transform: translate(-50%, -50%); }
+}
+`,
+        }}
+      />
     </main>
   );
 }
 
 function IntroOverlay() {
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    const total = (T.overlayFadeStart + T.overlayFadeDur) * 1000;
-    const t = window.setTimeout(() => setVisible(false), total + 50);
-    return () => window.clearTimeout(t);
-  }, []);
-
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          aria-hidden
-          className="pointer-events-none fixed inset-0 z-50 bg-[#0e0e0e]"
-          initial={{ opacity: 1 }}
-          animate={{ opacity: 0 }}
-          transition={{
-            duration: T.overlayFadeDur,
-            delay: T.overlayFadeStart,
-            ease: EASE,
-          }}
-        >
-          <motion.img
-            src="/brand/pandas-emblem-animated.gif"
-            alt=""
-            aria-hidden
-            draggable={false}
-            className="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 select-none"
-            style={{ width: 160, filter: "invert(1) brightness(1.05)" }}
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{
-              opacity: [0, 1, 1, 0],
-              scale: [0.98, 1, 1, 1.02],
-            }}
-            transition={{
-              times: [0, 0.05, 0.625, 0.8],
-              duration: T.emblemOutStart + T.emblemOutDur,
-              delay: T.emblemInDelay,
-              ease: "easeInOut",
-            }}
-          />
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-0 z-50 bg-[#0e0e0e]"
+      style={{
+        animation:
+          "lipOverlayFade 3s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+      }}
+    >
+      <img
+        src="/brand/pandas-emblem-animated.gif"
+        alt=""
+        aria-hidden
+        draggable={false}
+        className="absolute left-1/2 top-[46%] select-none"
+        style={{
+          width: 160,
+          filter: "invert(1) brightness(1.05)",
+          transform: "translate(-50%, -50%) scale(0.98)",
+          opacity: 0,
+          animation:
+            "lipEmblemPulse 3s cubic-bezier(0.4, 0, 0.2, 1) forwards",
+        }}
+      />
+    </div>
   );
 }
 
@@ -97,21 +93,19 @@ function IntroOverlay() {
  * intro's rise-in choreography reads against the real settled layout.
  */
 function MockWizard() {
-  const rise = {
-    initial: { opacity: 0, y: 12 },
-    animate: { opacity: 1, y: 0 },
-    transition: {
-      duration: T.wizardRiseDur,
-      delay: T.wizardRiseStart,
-      ease: EASE,
-    },
+  const risingBase = {
+    opacity: 0,
+    animationName: "lipWizardRise",
+    animationDuration: "3s",
+    animationTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+    animationFillMode: "forwards" as const,
   };
 
   return (
     <div className="relative z-10 mx-auto h-dvh w-full max-w-[402px]">
-      <motion.div
-        {...rise}
+      <div
         className="absolute left-0 right-0 top-[13.3%] flex flex-col items-center gap-10 px-6"
+        style={risingBase}
       >
         <div className="flex gap-2">
           <span className="h-1.5 w-8 rounded-full bg-[#f9fdff]" />
@@ -126,12 +120,15 @@ function MockWizard() {
             Sign in to keep training on Pandas Vision AI.
           </p>
         </div>
-      </motion.div>
+      </div>
 
-      <motion.div
-        {...rise}
-        transition={{ ...rise.transition, delay: T.wizardRiseStart + 0.06 }}
-        className="absolute left-1/2 top-1/2 w-[327px] -translate-x-1/2 -translate-y-1/2"
+      <div
+        className="absolute left-1/2 top-1/2 w-[327px]"
+        style={{
+          opacity: 0,
+          animation:
+            "lipWizardCenterRise 3s cubic-bezier(0.16, 1, 0.3, 1) 0.06s forwards",
+        }}
       >
         <input
           type="email"
@@ -139,12 +136,11 @@ function MockWizard() {
           placeholder="andylexian22@orange.com"
           className="block h-[52px] w-full rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-4 text-[16px] leading-[1.3] text-[#fefefe] backdrop-blur-md placeholder:text-[#8e8e8e]"
         />
-      </motion.div>
+      </div>
 
-      <motion.div
-        {...rise}
-        transition={{ ...rise.transition, delay: T.wizardRiseStart + 0.12 }}
+      <div
         className="absolute left-0 right-0 top-[86%] px-6"
+        style={{ ...risingBase, animationDelay: "0.12s" }}
       >
         <button
           type="button"
@@ -153,7 +149,7 @@ function MockWizard() {
         >
           Continue
         </button>
-      </motion.div>
+      </div>
     </div>
   );
 }
