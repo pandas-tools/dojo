@@ -496,11 +496,14 @@ export default function ReelsFeed({
                     "lg:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)]",
                     "lg:ring-1 lg:ring-white/10",
                     "origin-top transition-transform duration-500 ease-out will-change-transform",
-                    // 0.43 (card ends ~43vh) leaves a ~2vh black gap
-                    // above the 55% drawer top (~45vh) so the preview
-                    // isn't kissing the sheet.
+                    // Card floats between the back button and the drawer:
+                    //   translate-y 4vh  → 4vh top padding above the card
+                    //   scale 0.39       → card is 39vh tall
+                    //   card bottom      → 4vh + 39vh = 43vh
+                    //   drawer top       → 45vh (snap 0.55)
+                    //   bottom gap       → 2vh, matches the top padding rhythm
                     notesOpen &&
-                      "scale-[0.43] overflow-hidden rounded-[24px] lg:scale-100 lg:rounded-2xl",
+                      "scale-[0.39] translate-y-[4vh] overflow-hidden rounded-[24px] lg:scale-100 lg:translate-y-0 lg:rounded-2xl",
                   )}
                 >
                   {it.content.type === "video" && (
