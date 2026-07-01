@@ -6,7 +6,7 @@ import type { BrowseCard } from "@/lib/browse";
 /**
  * LessonCard — single video/image/carousel tile in the Library rails.
  *
- *   - 154px wide × 221px tall, rounded-[8px]
+ *   - 154×221px (mobile) / 185×265px (lg: ≥1024px), rounded-[8px]
  *   - object-cover thumbnail — fills the tile edge-to-edge
  *   - bottom-anchored dark gradient gives the bookmark contrast
  *   - bookmark icon bottom-right (red when saved)
@@ -23,11 +23,11 @@ export default function LessonCard({ card }: { card: BrowseCard }) {
   return (
     <div
       className={cn(
-        "flex w-[154px] shrink-0 flex-col gap-3",
+        "flex w-[154px] shrink-0 flex-col gap-3 lg:w-[185px]",
         card.completed && "opacity-70",
       )}
     >
-      <div className="relative h-[221px] w-[154px] overflow-hidden rounded-[8px] bg-zinc-900">
+      <div className="relative h-[221px] w-[154px] overflow-hidden rounded-[8px] bg-zinc-900 lg:h-[265px] lg:w-[185px]">
         {card.ready && card.thumbnail ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
