@@ -86,9 +86,9 @@ export default function TierProgressPopup({
           aria-describedby={undefined}
         >
           <div className="flex flex-col gap-8">
-            {/* pr-10 keeps the centered title clear of the close X in the
-                top-right corner. */}
-            <Dialog.Title className="text-center text-[20px] font-medium leading-tight tracking-tight text-[#f9fdff] pr-10">
+            {/* Symmetric px-10 so the centered title reads centered against
+                the dialog, and stays clear of the close X in the top-right. */}
+            <Dialog.Title className="px-10 text-center text-[20px] font-medium leading-tight tracking-tight text-[#f9fdff]">
               Lorem ipsum dolor sit
             </Dialog.Title>
 
