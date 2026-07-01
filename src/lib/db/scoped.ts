@@ -27,6 +27,8 @@ import {
   clientLanguages,
   users,
 } from "./schema";
+import { classifyTier } from "@/lib/tiers";
+import { getTierConfig } from "@/lib/tiers-data";
 
 // Event types that new code is allowed to WRITE. `rating_submitted` is
 // intentionally absent — it's a historical value preserved in the postgres
@@ -684,6 +686,115 @@ export function scopedDb(user: ScopedUser) {
       },
     },
 
+    firstThreeComplete: {
+      // Fires exactly once — on the completion that takes the user from 2 to 3
+      // distinct completed lessons. Returns { totalCompleted: 3 } on that edge,
+      // null otherwise.
+      //
+      // Fires only when THIS lesson is the one that crossed 2 → 3 (same
+      // before/after derivation tierCrossing uses), so a later completion at a
+      // higher count never re-fires and a completion of a lesson that doesn't
+      // count never spuriously fires. Like tierCrossing, the re-completion case
+      // is handled upstream — the route only calls this on a genuinely new
+      // completion (events.write → alreadyExisted === false); this stays
+      // consistent with that gate rather than duplicating it.
+      //
+      // Scoping mirrors events.completedLessonIds: distinct lesson_completed
+      // events for this user over the client's currently-assigned lessons
+      // (the just-completed lesson is already persisted when this runs).
+      detectForLesson: async (
+        lessonId: string,
+      ): Promise<{ totalCompleted: number } | null> => {
+        const assignments = await db
+          .select({ lessonId: clientLessons.lessonId })
+          .from(clientLessons)
+          .where(eq(clientLessons.clientId, cid));
+        const assignedIds = assignments.map((a) => a.lessonId);
+        if (assignedIds.length === 0) return null;
+
+        const completedRows = await db
+          .selectDistinct({ lessonId: lessonEvents.lessonId })
+          .from(lessonEvents)
+          .where(
+            and(
+              eq(lessonEvents.userId, user.id),
+              eq(lessonEvents.eventType, "lesson_completed"),
+              inArray(lessonEvents.lessonId, assignedIds),
+            ),
+          );
+        const completedAfter = completedRows.length;
+        const wasThis = completedRows.some((r) => r.lessonId === lessonId);
+        const completedBefore = completedAfter - (wasThis ? 1 : 0);
+        return completedAfter === 3 && completedBefore === 2
+          ? { totalCompleted: completedAfter }
+          : null;
+      },
+    },
+
+    tierCrossing: {
+      // Fires when THIS lesson_completed moved the user up a tier — the tier
+      // for their completed-count BEFORE this event differs from the tier
+      // AFTER it. Returns the newly-reached tier's { tierId, tierName,
+      // tierEmoji }, else null.
+      //
+      // Denominator is the client's assigned+published lesson count — the same
+      // basis as getClientTierRollup / getBrowseTierData — so a user is never
+      // classified on a different total than their colleagues. The active
+      // ladder comes from getTierConfig(cid) (client override → global →
+      // FALLBACK_TIERS), matching every other tier surface.
+      //
+      // Like firstThreeComplete, this assumes the caller invokes it ONLY on a
+      // genuinely new completion (alreadyExisted === false): the "before"
+      // count is derived by removing the just-completed lesson from the
+      // distinct set, which is the real prior state only when this event
+      // actually added it. Re-completions are gated out upstream.
+      detectForLesson: async (
+        lessonId: string,
+      ): Promise<{
+        tierId: string;
+        tierName: string;
+        tierEmoji: string;
+      } | null> => {
+        const assignedPublished = await db
+          .select({ lessonId: clientLessons.lessonId })
+          .from(clientLessons)
+          .innerJoin(lessons, eq(lessons.id, clientLessons.lessonId))
+          .where(
+            and(eq(clientLessons.clientId, cid), eq(lessons.isPublished, true)),
+          );
+        const assignedPublishedIds = assignedPublished.map((r) => r.lessonId);
+        const total = assignedPublishedIds.length;
+        if (total === 0) return null;
+
+        const completedRows = await db
+          .selectDistinct({ lessonId: lessonEvents.lessonId })
+          .from(lessonEvents)
+          .where(
+            and(
+              eq(lessonEvents.userId, user.id),
+              eq(lessonEvents.eventType, "lesson_completed"),
+              inArray(lessonEvents.lessonId, assignedPublishedIds),
+            ),
+          );
+        const completedSet = new Set(completedRows.map((r) => r.lessonId));
+        const completedAfter = completedSet.size;
+        // The just-completed lesson only shifts the count if it actually
+        // counts toward the tier basis (assigned + published). If it doesn't
+        // (e.g. an unpublished lesson), before === after and no cross fires.
+        const completedBefore =
+          completedAfter - (completedSet.has(lessonId) ? 1 : 0);
+
+        const tiers = await getTierConfig(cid);
+        const before = classifyTier(completedBefore, total, tiers);
+        const after = classifyTier(completedAfter, total, tiers);
+        if (before.tierId === after.tierId) return null;
+
+        const tier = tiers.find((t) => t.id === after.tierId);
+        if (!tier) return null;
+        return { tierId: tier.id, tierName: tier.name, tierEmoji: tier.emoji };
+      },
+    },
+
     events: {
       // Append a tracker event for a lesson the user has access to.
       // Verifies the lesson is currently assigned to this client first —
@@ -700,7 +811,7 @@ export function scopedDb(user: ScopedUser) {
         lessonId: string,
         eventType: LessonEventType,
         payload: Record<string, unknown> | null,
-      ) => {
+      ): Promise<{ id: string; alreadyExisted: boolean }> => {
         const [assignment] = await db
           .select()
           .from(clientLessons)
@@ -728,7 +839,7 @@ export function scopedDb(user: ScopedUser) {
               ),
             )
             .limit(1);
-          if (existing) return existing;
+          if (existing) return { id: existing.id, alreadyExisted: true };
         }
 
         const [row] = await db
@@ -741,7 +852,7 @@ export function scopedDb(user: ScopedUser) {
             payload,
           })
           .returning({ id: lessonEvents.id });
-        return row;
+        return { id: row!.id, alreadyExisted: false };
       },
 
       // Read all lesson_completed events for the user's currently-assigned
