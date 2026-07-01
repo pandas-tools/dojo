@@ -17,7 +17,17 @@ import { Drawer } from "vaul";
 // vaul snap points are fractions of viewport height (numbers 0..1) or
 // pixel strings like "500px". Percentage strings are treated as pixels
 // (parseInt("55%", 10) → 55px), which collapses the drawer to a slit.
-export const NOTES_SNAP_POINTS = [0.55, 0.92] as const;
+//
+// We fake free-drag by populating snap points every 2% between 0.18 and
+// 0.96 — vaul always lands on the nearest snap on release, but at 2%
+// granularity that's imperceptible on a phone. The one canonical
+// resting height (used every time the sheet opens) is
+// NOTES_INITIAL_SNAP.
+export const NOTES_INITIAL_SNAP = 0.55;
+export const NOTES_SNAP_POINTS: readonly number[] = Array.from(
+  { length: 40 },
+  (_, i) => Number((0.18 + i * 0.02).toFixed(2)),
+);
 
 export default function VideoNotesSheet({
   open,
@@ -38,10 +48,10 @@ export default function VideoNotesSheet({
     <Drawer.Root
       open={open}
       onOpenChange={(next) => {
-        // Reset to the peek snap on every open so the sheet always
-        // animates in at the smaller height regardless of where the
-        // user left it last time.
-        if (next) setSnap(NOTES_SNAP_POINTS[0]);
+        // Reset to the canonical peek height on every open so the sheet
+        // always animates in at the same starting size regardless of
+        // where the user left it last time.
+        if (next) setSnap(NOTES_INITIAL_SNAP);
         onOpenChange(next);
       }}
       snapPoints={[...NOTES_SNAP_POINTS]}

@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import VideoNotesSheet, {
-  NOTES_SNAP_POINTS,
+  NOTES_INITIAL_SNAP,
 } from "@/components/VideoNotesSheet";
 import UpvoteBurst from "@/components/UpvoteBurst";
 import SuccessAtmosphere from "@/components/SuccessAtmosphere";
@@ -119,7 +119,7 @@ export default function ReelsFeed({
   // function of the active snap point, keeping a constant ~2vh black
   // gap between card-bottom and drawer-top at every snap.
   const [notesSnap, setNotesSnap] = useState<number | string | null>(
-    NOTES_SNAP_POINTS[0],
+    NOTES_INITIAL_SNAP,
   );
   // Celebration queue. A single lesson_completed can arrive with up to three
   // signals (tierUnlocked, groupCompleted, firstThreeComplete). We render one
