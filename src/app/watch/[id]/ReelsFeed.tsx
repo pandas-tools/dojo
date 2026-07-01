@@ -22,6 +22,7 @@ import VideoNotesSheet from "@/components/VideoNotesSheet";
 import UpvoteBurst from "@/components/UpvoteBurst";
 import SuccessAtmosphere from "@/components/SuccessAtmosphere";
 import ConfettiBurst from "@/components/ConfettiBurst";
+import SuccessCard from "@/components/SuccessCard";
 import SuccessGroupCard, {
   type GroupRating,
 } from "@/components/SuccessGroupCard";
@@ -111,37 +112,66 @@ export default function ReelsFeed({
   }, [items, initialId]);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [notesOpen, setNotesOpen] = useState(false);
-  // Group-completion celebration. Set when a lesson_completed response
-  // includes a groupCompleted payload and the user hasn't already rated
-  // the group. Dismissed on submit or explicit close.
-  type GroupCelebration = {
-    groupId: string;
-    groupName: string;
-    lessonCount: number;
-  };
-  const [groupCelebration, setGroupCelebration] =
-    useState<GroupCelebration | null>(null);
+  // Celebration queue. A single lesson_completed can arrive with up to three
+  // signals (tierUnlocked, groupCompleted, firstThreeComplete). We render one
+  // at a time — dismissing the top pops the next — in priority order:
+  // tier > group > first-three. Tier is the rarest and biggest moment, group
+  // needs a rating, first-three is a small pat on the back.
+  type Celebration =
+    | {
+        kind: "tier";
+        tierId: string;
+        tierName: string;
+        tierEmoji: string;
+      }
+    | {
+        kind: "group";
+        groupId: string;
+        groupName: string;
+        lessonCount: number;
+      }
+    | { kind: "firstThree"; totalCompleted: number };
+  const [celebrations, setCelebrations] = useState<Celebration[]>([]);
   const [submittingRating, setSubmittingRating] = useState(false);
+  const celebration = celebrations[0] ?? null;
+  const popCelebration = useCallback(
+    () => setCelebrations((prev) => prev.slice(1)),
+    [],
+  );
 
   const handleLessonCompleted = useCallback(
     (res: LessonCompletedResponse) => {
-      const gc = res.groupCompleted;
-      if (!gc || gc.alreadyRated) return;
-      setGroupCelebration({
-        groupId: gc.groupId,
-        groupName: gc.groupName,
-        lessonCount: gc.lessonCount,
-      });
+      const next: Celebration[] = [];
+      if (res.tierUnlocked) {
+        next.push({ kind: "tier", ...res.tierUnlocked });
+      }
+      if (res.groupCompleted && !res.groupCompleted.alreadyRated) {
+        next.push({
+          kind: "group",
+          groupId: res.groupCompleted.groupId,
+          groupName: res.groupCompleted.groupName,
+          lessonCount: res.groupCompleted.lessonCount,
+        });
+      }
+      if (res.firstThreeComplete) {
+        next.push({
+          kind: "firstThree",
+          totalCompleted: res.firstThreeComplete.totalCompleted,
+        });
+      }
+      if (next.length === 0) return;
+      setCelebrations((prev) => [...prev, ...next]);
     },
     [],
   );
 
   const submitGroupRating = useCallback(
     async (input: { rating: GroupRating | null; comment: string }) => {
-      if (!groupCelebration || !input.rating || submittingRating) return;
+      if (!celebration || celebration.kind !== "group" || !input.rating) return;
+      if (submittingRating) return;
       setSubmittingRating(true);
       try {
-        await fetch(`/api/groups/${groupCelebration.groupId}/rate`, {
+        await fetch(`/api/groups/${celebration.groupId}/rate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rating: RATING_TO_INT[input.rating] }),
@@ -154,10 +184,10 @@ export default function ReelsFeed({
         // error mid-flow. Analytics can reconcile from lesson_events.
       } finally {
         setSubmittingRating(false);
-        setGroupCelebration(null);
+        popCelebration();
       }
     },
-    [groupCelebration, submittingRating],
+    [celebration, submittingRating, popCelebration],
   );
   // TikTok-style gesture state. Tap = mute toggle, press-hold = pause.
   const [muted, setMuted] = useState(true);
@@ -397,7 +427,16 @@ export default function ReelsFeed({
 
   return (
     <main
-      className="fixed inset-0 bg-black text-white overflow-hidden touch-none select-none"
+      data-notes-open={notesOpen ? "true" : "false"}
+      className={cn(
+        "fixed inset-0 bg-black text-white overflow-hidden touch-none select-none",
+        // When the mobile notes sheet is open, shrink the feed to the top
+        // half of the viewport so the notes drawer sits underneath a small
+        // preview card, matching Figma node 96:291. Desktop keeps the
+        // inline notes panel, so we never scale below lg.
+        "origin-top transition-transform duration-500 ease-out will-change-transform",
+        "data-[notes-open=true]:scale-[0.45] lg:data-[notes-open=true]:scale-100",
+      )}
       onPointerDown={onShellPointerDown}
       onPointerMove={onShellPointerMove}
       onPointerUp={onShellPointerUp}
@@ -771,8 +810,15 @@ export default function ReelsFeed({
         lessonTitle={current?.title}
       />
 
-      {groupCelebration && (
+      {celebration && (
         <div
+          key={
+            celebration.kind === "tier"
+              ? `tier-${celebration.tierId}`
+              : celebration.kind === "group"
+                ? `group-${celebration.groupId}`
+                : `first-three-${celebration.totalCompleted}`
+          }
           data-no-shell-gesture
           className="fixed inset-0 z-[60] flex items-center justify-center px-6 py-12"
           onPointerDown={(e) => e.stopPropagation()}
@@ -785,18 +831,46 @@ export default function ReelsFeed({
             className="absolute inset-0 bg-near-black/75 backdrop-blur-md"
           />
           <SuccessAtmosphere />
-          <ConfettiBurst intensity="lesson" />
+          <ConfettiBurst
+            intensity={celebration.kind === "tier" ? "tier" : "lesson"}
+          />
           <button
             type="button"
             aria-label="Dismiss"
-            onClick={() => setGroupCelebration(null)}
+            onClick={popCelebration}
             className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
             style={{ top: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
           >
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
-          <div className="relative z-10">
-            <SuccessGroupCard onSubmit={submitGroupRating} />
+          <div className="relative z-10 flex w-full max-w-md items-center justify-center">
+            {celebration.kind === "group" && (
+              <SuccessGroupCard onSubmit={submitGroupRating} />
+            )}
+            {celebration.kind === "firstThree" && (
+              <SuccessCard
+                icon={<span className="text-4xl leading-none">🎉</span>}
+                title={
+                  <>Congrats! You&apos;ve just completed your first three lessons.</>
+                }
+                subtitle="Keep going!"
+              />
+            )}
+            {celebration.kind === "tier" && (
+              <SuccessCard
+                icon={
+                  <span className="text-4xl leading-none">
+                    {celebration.tierEmoji}
+                  </span>
+                }
+                title={
+                  <>
+                    Congrats! You&apos;ve just reached {celebration.tierName}.
+                  </>
+                }
+                subtitle="Keep going — new lessons just opened up."
+              />
+            )}
           </div>
         </div>
       )}

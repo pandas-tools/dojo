@@ -29,6 +29,14 @@ export type LessonCompletedResponse = {
     lessonCount: number;
     alreadyRated: boolean;
   };
+  firstThreeComplete?: {
+    totalCompleted: number;
+  };
+  tierUnlocked?: {
+    tierId: string;
+    tierName: string;
+    tierEmoji: string;
+  };
 };
 
 export type UseLessonTrackingOptions = {
