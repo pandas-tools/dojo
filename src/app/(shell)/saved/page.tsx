@@ -3,7 +3,9 @@ import { Bookmark } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
 import { shapeBrowseData } from "@/lib/browse-shape";
+import { getBrowseTierData } from "@/lib/tiers-data";
 import LibraryAtmosphere from "@/components/LibraryAtmosphere";
+import TierStrip from "@/components/TierStrip";
 import { LessonCardLink } from "@/components/LessonCard";
 
 export const metadata = { title: "Saved · Dojo" };
@@ -49,11 +51,47 @@ export default async function SavedPage() {
     .flatMap((g) => g.cards)
     .filter((c) => c.isBookmarked);
 
+  const tierData = await getBrowseTierData({
+    clientId: session.user.clientId,
+    completed: completedIds.size,
+  });
+
+  const currentTier = tierData.tiers.find((t) => t.id === tierData.me.tierId);
+  const currentIdx = tierData.tiers.findIndex((t) => t.id === tierData.me.tierId);
+  const nextTier =
+    currentIdx >= 0 ? (tierData.tiers[currentIdx + 1] ?? null) : null;
+  const lessonsToNext = nextTier
+    ? Math.max(0, Math.ceil(nextTier.minPct * tierData.me.total) - tierData.me.completed)
+    : undefined;
+
   return (
     <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white selection:bg-arctic-haze/30">
       <LibraryAtmosphere />
 
-      <header className="relative z-10 mx-auto mt-[98px] px-6 text-center lg:mt-[114px] lg:max-w-[560px]">
+      <div className="relative z-10 px-6 pt-4">
+        {currentTier && (
+          <TierStrip
+            currentTier={{
+              id: currentTier.id,
+              name: currentTier.name,
+              sortOrder: currentTier.sortOrder,
+              emoji: currentTier.emoji,
+            }}
+            nextTierLabel={nextTier?.name}
+            lessonsToNext={lessonsToNext}
+            tiers={tierData.tiers.map((t) => ({
+              id: t.id,
+              name: t.name,
+              sortOrder: t.sortOrder,
+              emoji: t.emoji,
+            }))}
+            completed={tierData.me.completed}
+            total={tierData.me.total}
+          />
+        )}
+      </div>
+
+      <header className="relative z-10 mx-auto mt-12 px-6 text-center lg:mt-16 lg:max-w-[560px]">
         <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff] lg:text-[36px]">
           Bookmarks
         </h1>
