@@ -509,16 +509,15 @@ export default function ReelsFeed({
                       </div>
                     </div>
 
-                    {/* Progress bar / scrubber — reflects the ACTIVE lesson's
-                        own playback progress (video: currentTime/duration,
-                        image: dwell elapsed, carousel: slide index). For the
-                        active video, an invisible hit-pad above the bar makes
-                        it draggable to seek without shifting the visual bar
-                        position; image/carousel render read-only. */}
-                    {(() => {
+                    {/* Progress bar / scrubber — video only. Reflects the
+                        active lesson's currentTime/duration; an invisible
+                        hit-pad above the bar makes it draggable to seek
+                        without shifting the visual bar position. Images and
+                        carousels have no timeline to represent, so we omit
+                        the bar there entirely. */}
+                    {it.content.type === "video" && (() => {
                       const pct = progressByLessonId[it.id] ?? 0;
-                      const isVideoActive =
-                        active && it.content.type === "video";
+                      const isVideoActive = active;
                       const applyScrub = (
                         e: React.PointerEvent<HTMLDivElement>,
                       ) => {
