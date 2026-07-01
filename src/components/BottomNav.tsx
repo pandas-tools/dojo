@@ -1,15 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  motion,
-  animate,
-  useMotionValue,
-  useVelocity,
-  useTransform,
-} from "motion/react";
+import { motion } from "motion/react";
 import { House, Play, Bookmark, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -20,10 +13,9 @@ import { cn } from "@/lib/cn";
  * with 4 × 48px icon buttons (Library, Reels, Saved, Profile).
  *
  * Mounted once by the (shell) route-group layout so the active pill can
- * slide between icons on navigation. Uses an imperative motion value:
- * `animate()` springs `x` on activeIndex change, `useVelocity` reads the
- * spring's instantaneous speed, `useTransform` maps that to scaleX/scaleY
- * so the pill stretches horizontally in flight and rounds up on arrival.
+ * slide between icons on navigation. Pure declarative glide via animate={{x}}
+ * — no velocity-driven scale (which produced sub-frame scale micro-updates
+ * that read as flicker on the ring border).
  */
 type Item = {
   href: string;
@@ -41,7 +33,6 @@ const STATIC_ITEMS: Item[] = [
 
 const BTN_W = 48; // h-12 w-12
 const GAP = 16; // gap-4
-const posFor = (i: number) => i * (BTN_W + GAP);
 
 export default function BottomNav({
   reelsHref,
@@ -58,30 +49,6 @@ export default function BottomNav({
   );
   const activeIndex = rawIndex >= 0 ? rawIndex : 0;
   const hasActive = rawIndex >= 0;
-
-  const x = useMotionValue(posFor(activeIndex));
-  useEffect(() => {
-    const controls = animate(x, posFor(activeIndex), {
-      type: "spring",
-      stiffness: 260,
-      damping: 30,
-      mass: 0.9,
-    });
-    return controls.stop;
-  }, [x, activeIndex]);
-  const velocity = useVelocity(x);
-  const scaleX = useTransform(
-    velocity,
-    [-2600, -300, 0, 300, 2600],
-    [1.18, 1, 1, 1, 1.18],
-    { clamp: true },
-  );
-  const scaleY = useTransform(
-    velocity,
-    [-2600, -300, 0, 300, 2600],
-    [0.92, 1, 1, 1, 0.92],
-    { clamp: true },
-  );
 
   return (
     <nav
@@ -100,7 +67,9 @@ export default function BottomNav({
             <motion.span
               aria-hidden
               className="pointer-events-none absolute left-2 top-2 h-12 w-12 rounded-full bg-white/[0.12] ring-1 ring-inset ring-white/[0.06]"
-              style={{ x, scaleX, scaleY, transformOrigin: "center" }}
+              initial={false}
+              animate={{ x: activeIndex * (BTN_W + GAP) }}
+              transition={{ type: "spring", stiffness: 260, damping: 30, mass: 0.9 }}
             />
           )}
           {items.map((item) => {
