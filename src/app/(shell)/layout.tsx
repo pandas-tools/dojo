@@ -8,10 +8,12 @@ export const dynamic = "force-dynamic";
 
 /**
  * Persistent shell for the employee-facing surfaces (library, saved, profile).
- * Keeps BottomNav mounted across navigations so the sliding-pill layoutId
- * animation can glide between tabs instead of resetting on every route change.
- * /watch/[id] intentionally sits outside this shell — the reels player owns
- * its own full-viewport chrome.
+ * Keeps BottomNav mounted across navigations so its active-tab pill can
+ * spring-glide between icons rather than snapping on remount. ShellFade
+ * wraps `children` in a CSS keyframe fade-in so each new page mounts
+ * already-invisible and eases in without a doubled-render flash.
+ * /watch/[id] intentionally sits outside this shell — the reels player
+ * owns its own full-viewport chrome.
  */
 export default async function ShellLayout({
   children,
