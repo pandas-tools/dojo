@@ -16,14 +16,30 @@ import {
   ThumbsUp,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import VideoNotesSheet from "@/components/VideoNotesSheet";
 import UpvoteBurst from "@/components/UpvoteBurst";
+import SuccessAtmosphere from "@/components/SuccessAtmosphere";
+import ConfettiBurst from "@/components/ConfettiBurst";
+import SuccessGroupCard, {
+  type GroupRating,
+} from "@/components/SuccessGroupCard";
 import { cn } from "@/lib/cn";
+import type { LessonCompletedResponse } from "@/lib/useLessonTracking";
 import type { CarouselSlide } from "@/lib/db/schema";
 import VideoLessonViewer from "./VideoLessonViewer";
 import ImageLessonViewer from "./ImageLessonViewer";
 import CarouselLessonViewer from "./CarouselLessonViewer";
+
+// bad/meh/good/amazing → 1..5. Skips 3 so meh sits closer to bad and good
+// closer to amazing — matches the felt semantic gap between "meh" and "good".
+const RATING_TO_INT: Record<GroupRating, number> = {
+  bad: 1,
+  meh: 2,
+  good: 4,
+  amazing: 5,
+};
 
 export type FeedItemContent =
   | {
@@ -95,6 +111,54 @@ export default function ReelsFeed({
   }, [items, initialId]);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [notesOpen, setNotesOpen] = useState(false);
+  // Group-completion celebration. Set when a lesson_completed response
+  // includes a groupCompleted payload and the user hasn't already rated
+  // the group. Dismissed on submit or explicit close.
+  type GroupCelebration = {
+    groupId: string;
+    groupName: string;
+    lessonCount: number;
+  };
+  const [groupCelebration, setGroupCelebration] =
+    useState<GroupCelebration | null>(null);
+  const [submittingRating, setSubmittingRating] = useState(false);
+
+  const handleLessonCompleted = useCallback(
+    (res: LessonCompletedResponse) => {
+      const gc = res.groupCompleted;
+      if (!gc || gc.alreadyRated) return;
+      setGroupCelebration({
+        groupId: gc.groupId,
+        groupName: gc.groupName,
+        lessonCount: gc.lessonCount,
+      });
+    },
+    [],
+  );
+
+  const submitGroupRating = useCallback(
+    async (input: { rating: GroupRating | null; comment: string }) => {
+      if (!groupCelebration || !input.rating || submittingRating) return;
+      setSubmittingRating(true);
+      try {
+        await fetch(`/api/groups/${groupCelebration.groupId}/rate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rating: RATING_TO_INT[input.rating] }),
+        });
+        // Comment is not yet persisted server-side; it lives in the UI
+        // only until the schema adds a comment column. Intentional no-op
+        // for now rather than a silent 400 from the rate endpoint.
+      } catch {
+        // Swallow — the celebration UX should never surface a network
+        // error mid-flow. Analytics can reconcile from lesson_events.
+      } finally {
+        setSubmittingRating(false);
+        setGroupCelebration(null);
+      }
+    },
+    [groupCelebration, submittingRating],
+  );
   // TikTok-style gesture state. Tap = mute toggle, press-hold = pause.
   const [muted, setMuted] = useState(true);
   const [pausing, setPausing] = useState(false);
@@ -412,6 +476,7 @@ export default function ReelsFeed({
                       paused={active && pausing}
                       onProgress={handleProgress}
                       onSeekReady={handleSeekReady}
+                      onLessonCompleted={handleLessonCompleted}
                     />
                   )}
                   {it.content.type === "image" && (
@@ -423,6 +488,7 @@ export default function ReelsFeed({
                       active={active}
                       disableTracking={disableTracking}
                       onProgress={handleProgress}
+                      onLessonCompleted={handleLessonCompleted}
                     />
                   )}
                   {it.content.type === "carousel" && (
@@ -433,9 +499,32 @@ export default function ReelsFeed({
                       active={active}
                       disableTracking={disableTracking}
                       onProgress={handleProgress}
+                      onLessonCompleted={handleLessonCompleted}
                     />
                   )}
                   <UpvoteBurst active={active && burstLessonId === it.id} />
+
+                  {/* MUTE — desktop only, overlaid on top-right of the video
+                      card. No stroke: rests on the media, softer weight. */}
+                  {it.content.type === "video" && (
+                    <button
+                      type="button"
+                      aria-label={muted ? "Unmute" : "Mute"}
+                      aria-pressed={!muted}
+                      data-no-shell-gesture
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMuted((m) => !m);
+                      }}
+                      className="pointer-events-auto absolute right-4 top-4 z-40 hidden h-10 w-10 items-center justify-center rounded-full bg-[rgba(14,14,14,0.45)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.65)] lg:flex"
+                    >
+                      {muted ? (
+                        <VolumeX className="h-4 w-4" strokeWidth={2} />
+                      ) : (
+                        <Volume2 className="h-4 w-4" strokeWidth={2} />
+                      )}
+                    </button>
+                  )}
 
                   {/* BOTTOM OVERLAY — per-section. Inside the card on lg,
                       full-width gradient on mobile (same as before). Title +
@@ -592,8 +681,9 @@ export default function ReelsFeed({
                 {/* SIDE RAIL — desktop only, vertical stack immediately to
                     the right of the card (or the notes panel, when present).
                     All buttons share the same 48px circular-stroke treatment.
-                    Actions on top (upvote + mute); nav arrows below with a
-                    small gap. */}
+                    Upvote on top; nav arrows below with a small gap. Mute
+                    lives on top of the video, no stroke, top-right of the
+                    card. */}
                 <div className="pointer-events-auto hidden lg:flex flex-col gap-2">
                   <button
                     type="button"
@@ -613,24 +703,6 @@ export default function ReelsFeed({
                       strokeWidth={2}
                     />
                   </button>
-                  {it.content.type === "video" && (
-                    <button
-                      type="button"
-                      aria-label={muted ? "Unmute" : "Mute"}
-                      aria-pressed={!muted}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMuted((m) => !m);
-                      }}
-                      className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
-                    >
-                      {muted ? (
-                        <VolumeX className="h-5 w-5" strokeWidth={2} />
-                      ) : (
-                        <Volume2 className="h-5 w-5" strokeWidth={2} />
-                      )}
-                    </button>
-                  )}
                   {items.length > 1 && (
                     <>
                       <button
@@ -698,6 +770,36 @@ export default function ReelsFeed({
         notesMarkdown={currentNotes}
         lessonTitle={current?.title}
       />
+
+      {groupCelebration && (
+        <div
+          data-no-shell-gesture
+          className="fixed inset-0 z-[60] flex items-center justify-center px-6 py-12"
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerMove={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+        >
+          {/* Backdrop — dims the reel behind and swallows shell gestures. */}
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-near-black/75 backdrop-blur-md"
+          />
+          <SuccessAtmosphere />
+          <ConfettiBurst intensity="lesson" />
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => setGroupCelebration(null)}
+            className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+            style={{ top: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
+          >
+            <X className="h-4 w-4" strokeWidth={2} />
+          </button>
+          <div className="relative z-10">
+            <SuccessGroupCard onSubmit={submitGroupRating} />
+          </div>
+        </div>
+      )}
 
       <style>{`main > div::-webkit-scrollbar { display: none; }`}</style>
     </main>
