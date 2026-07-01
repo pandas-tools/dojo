@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderOpen, Play, Bookmark, User } from "lucide-react";
+import { House, Play, Bookmark, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -20,7 +20,7 @@ type Item = {
 };
 
 const STATIC_ITEMS: Item[] = [
-  { href: "/browse", matchPrefix: "/browse", label: "Library", icon: FolderOpen },
+  { href: "/browse", matchPrefix: "/browse", label: "Library", icon: House },
   { href: "/watch", matchPrefix: "/watch", label: "Reels", icon: Play },
   { href: "/saved", matchPrefix: "/saved", label: "Saved", icon: Bookmark },
   { href: "/profile", matchPrefix: "/profile", label: "Profile", icon: User },
