@@ -63,15 +63,25 @@ export default function BottomNav({
   useEffect(() => {
     const controls = animate(x, posFor(activeIndex), {
       type: "spring",
-      stiffness: 280,
-      damping: 24,
+      stiffness: 260,
+      damping: 30,
       mass: 0.9,
     });
     return controls.stop;
   }, [x, activeIndex]);
   const velocity = useVelocity(x);
-  const scaleX = useTransform(velocity, [-1400, 0, 1400], [1.3, 1, 1.3]);
-  const scaleY = useTransform(velocity, [-1400, 0, 1400], [0.86, 1, 0.86]);
+  const scaleX = useTransform(
+    velocity,
+    [-2600, -300, 0, 300, 2600],
+    [1.18, 1, 1, 1, 1.18],
+    { clamp: true },
+  );
+  const scaleY = useTransform(
+    velocity,
+    [-2600, -300, 0, 300, 2600],
+    [0.92, 1, 1, 1, 0.92],
+    { clamp: true },
+  );
 
   return (
     <nav
@@ -89,7 +99,7 @@ export default function BottomNav({
           {hasActive && (
             <motion.span
               aria-hidden
-              className="pointer-events-none absolute left-2 top-2 h-12 w-12 rounded-full bg-white/[0.14] ring-1 ring-inset ring-white/[0.08] shadow-[0_0_24px_-6px_rgba(193,232,251,0.28)]"
+              className="pointer-events-none absolute left-2 top-2 h-12 w-12 rounded-full bg-white/[0.12] ring-1 ring-inset ring-white/[0.06]"
               style={{ x, scaleX, scaleY, transformOrigin: "center" }}
             />
           )}
