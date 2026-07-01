@@ -95,10 +95,18 @@ export default function StoreStep({
 
       {/* Options list — stores + an HQ row at the end. Picked option is
           hidden so it only appears in the trigger above. ~3 visible rows;
-          rest scrolls with a thin arctic-haze scrollbar for affordance. */}
+          scrolls on touch/wheel. Scrollbar hidden — a visible rounded pill
+          thumb read as a stray dark line on the right edge of the mobile
+          login. Bottom fade signals "more below" instead. */}
       <ul
-        className="flex w-full flex-col gap-2 overflow-y-auto pr-1.5 [scrollbar-width:thin] [scrollbar-color:rgba(193,232,251,0.3)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(193,232,251,0.3)] [&::-webkit-scrollbar-thumb:hover]:bg-[rgba(193,232,251,0.5)]"
-        style={{ maxHeight: "240px" }}
+        className="flex w-full flex-col gap-2 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        style={{
+          maxHeight: "240px",
+          WebkitMaskImage:
+            "linear-gradient(180deg, #000 0, #000 calc(100% - 24px), transparent 100%)",
+          maskImage:
+            "linear-gradient(180deg, #000 0, #000 calc(100% - 24px), transparent 100%)",
+        }}
       >
         {stores.length === 0 && !hq && (
           <li className="rounded-[24px] border border-[#445158] bg-[rgba(68,81,88,0.1)] px-5 py-3 text-center text-sm text-[#8e8e8e]">
