@@ -52,6 +52,31 @@ export default function LessonCard({ card }: { card: BrowseCard }) {
           />
         )}
 
+        {/* Watched badge — top-right when the user has completed this
+            lesson. Same arctic-haze-ring + dark check treatment as the
+            SuccessCard glyph (src/components/SuccessCard.tsx), scaled to
+            a 20px tile-corner badge. */}
+        {card.completed && (
+          <div
+            aria-label="Watched"
+            role="img"
+            className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-arctic-haze shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3 w-3 text-[#0e0e0e]"
+              aria-hidden
+            >
+              <path d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>
+          </div>
+        )}
+
         {/* Bookmark icon — bottom-right of cover */}
         <div className="absolute bottom-1.5 right-1.5">
           <BookmarkButton
