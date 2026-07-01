@@ -5,6 +5,11 @@ export const metadata = { title: "Design preview · Dojo" };
 
 const PREVIEWS = [
   {
+    href: "/design-preview/login-intro",
+    title: "Login intro (4s emblem → gradient → email)",
+    desc: "Boot animation for /login. Pandas emblem draws in on black, dissolves into the gradient, wizard rises. Replay button included.",
+  },
+  {
     href: "/design-preview/all-set",
     title: "All set — onboarding complete",
     desc: "The glass card that closes the onboarding flow. Auto-routes to / after ~2s.",
