@@ -63,11 +63,11 @@ export default async function SavedPage() {
     <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white selection:bg-arctic-haze/30">
       <LibraryAtmosphere />
 
-      <header className="relative z-10 mx-auto max-w-[360px] px-6 pt-14 text-center">
-        <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
+      <header className="relative z-10 mx-auto mt-24 max-w-[320px] px-6 text-center lg:mt-28 lg:max-w-[560px]">
+        <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff] lg:text-[36px]">
           Bookmarks
         </h1>
-        <p className="mt-2 text-[14px] font-medium leading-[22px] tracking-[0.07px] text-[#f9fdff]/85">
+        <p className="mt-2 text-[14px] font-medium leading-[22px] tracking-[0.07px] text-[#f9fdff]/85 lg:mt-3 lg:text-[16px] lg:leading-[26px]">
           {savedCards.length === 0
             ? "Tap the bookmark on any lesson to save it here."
             : `${savedCards.length} saved ${savedCards.length === 1 ? "lesson" : "lessons"}`}
@@ -77,8 +77,8 @@ export default async function SavedPage() {
       {savedCards.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="relative z-10 mt-10 px-6 pb-36">
-          <div className="mx-auto flex max-w-[330px] flex-wrap content-start gap-x-4 gap-y-6">
+        <div className="relative z-10 mt-10 pb-36">
+          <div className="mx-auto flex max-w-[378px] flex-wrap content-start gap-x-4 gap-y-6 px-6 lg:max-w-[608px]">
             {savedCards.map((card) => (
               <LessonCardLink key={card.id} card={card} />
             ))}
