@@ -743,7 +743,7 @@ export default function ReelsFeed({
                         {it.title}
                       </p>
                     </div>
-                    <div className="flex-1 overflow-y-auto whitespace-pre-wrap px-6 py-5 text-[14px] leading-[22px] text-[#f9fdff]/85">
+                    <div className="flex-1 overflow-y-auto whitespace-pre-wrap px-6 py-5 text-[13px] leading-[20px] text-[#f9fdff]/85">
                       {it.notesMarkdown}
                     </div>
                   </aside>
