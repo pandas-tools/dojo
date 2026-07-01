@@ -63,7 +63,7 @@ export default async function SavedPage() {
     <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white selection:bg-arctic-haze/30">
       <LibraryAtmosphere />
 
-      <header className="relative z-10 mx-auto mt-24 max-w-[320px] px-6 text-center lg:mt-28 lg:max-w-[560px]">
+      <header className="relative z-10 mx-auto mt-[98px] max-w-[320px] px-6 text-center lg:mt-[114px] lg:max-w-[560px]">
         <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff] lg:text-[36px]">
           Bookmarks
         </h1>
