@@ -1,8 +1,15 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, useSpring, useVelocity, useTransform } from "motion/react";
+import {
+  motion,
+  animate,
+  useMotionValue,
+  useVelocity,
+  useTransform,
+} from "motion/react";
 import { House, Play, Bookmark, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -10,14 +17,13 @@ import { cn } from "@/lib/cn";
 /**
  * BottomNav — primary nav pill, fixed to the bottom of every in-app surface.
  * Matches the Figma file (node I111:2149) — rounded-[100px] glass pill
- * with 4 × 48px icon buttons (Library, Reels, Saved, Profile) and a
- * gradient fade from the page bg to near-black above the pill.
+ * with 4 × 48px icon buttons (Library, Reels, Saved, Profile).
  *
- * Mounted once by the (shell) route-group layout so the active-tab pill can
- * slide between icons. The pill glides via a spring on `x` and stretches
- * horizontally proportional to spring velocity — feels like it's slipping
- * through the container rather than teleporting. A faint arctic-haze halo
- * ties the affordance to the brand's cool palette.
+ * Mounted once by the (shell) route-group layout so the active pill can
+ * slide between icons on navigation. Uses an imperative motion value:
+ * `animate()` springs `x` on activeIndex change, `useVelocity` reads the
+ * spring's instantaneous speed, `useTransform` maps that to scaleX/scaleY
+ * so the pill stretches horizontally in flight and rounds up on arrival.
  */
 type Item = {
   href: string;
@@ -35,11 +41,11 @@ const STATIC_ITEMS: Item[] = [
 
 const BTN_W = 48; // h-12 w-12
 const GAP = 16; // gap-4
+const posFor = (i: number) => i * (BTN_W + GAP);
 
 export default function BottomNav({
   reelsHref,
 }: {
-  /** Direct /watch/[id] link to skip the /watch redirect hop. */
   reelsHref?: string;
 }) {
   const pathname = usePathname();
@@ -47,20 +53,25 @@ export default function BottomNav({
     item.label === "Reels" && reelsHref ? { ...item, href: reelsHref } : item,
   );
 
-  const activeIndex = Math.max(
-    0,
-    items.findIndex((item) => pathname.startsWith(item.matchPrefix)),
+  const rawIndex = items.findIndex((item) =>
+    pathname.startsWith(item.matchPrefix),
   );
-  const hasActive = items.some((item) => pathname.startsWith(item.matchPrefix));
+  const activeIndex = rawIndex >= 0 ? rawIndex : 0;
+  const hasActive = rawIndex >= 0;
 
-  const x = useSpring(activeIndex * (BTN_W + GAP), {
-    stiffness: 300,
-    damping: 26,
-    mass: 0.9,
-  });
+  const x = useMotionValue(posFor(activeIndex));
+  useEffect(() => {
+    const controls = animate(x, posFor(activeIndex), {
+      type: "spring",
+      stiffness: 280,
+      damping: 24,
+      mass: 0.9,
+    });
+    return controls.stop;
+  }, [x, activeIndex]);
   const velocity = useVelocity(x);
-  const scaleX = useTransform(velocity, [-1400, 0, 1400], [1.28, 1, 1.28]);
-  const scaleY = useTransform(velocity, [-1400, 0, 1400], [0.88, 1, 0.88]);
+  const scaleX = useTransform(velocity, [-1400, 0, 1400], [1.3, 1, 1.3]);
+  const scaleY = useTransform(velocity, [-1400, 0, 1400], [0.86, 1, 0.86]);
 
   return (
     <nav

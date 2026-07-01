@@ -39,9 +39,9 @@ export default async function ShellLayout({
   const reelsHref = firstIncomplete ? `/watch/${firstIncomplete.id}` : undefined;
 
   return (
-    <>
+    <div className="min-h-dvh bg-near-black">
       <ShellFade>{children}</ShellFade>
       <BottomNav reelsHref={reelsHref} />
-    </>
+    </div>
   );
 }
