@@ -78,11 +78,11 @@ export default async function BrowsePage() {
         )}
       </div>
 
-      <header className="relative z-10 mx-auto mt-12 max-w-[320px] px-6 text-center">
-        <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
+      <header className="relative z-10 mx-auto mt-12 max-w-[320px] px-6 text-center lg:mt-16 lg:max-w-[560px]">
+        <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff] lg:text-[36px]">
           Lesson library
         </h1>
-        <p className="mt-2 text-[14px] font-medium leading-[22px] tracking-[0.07px] text-[#f9fdff]/85">
+        <p className="mt-2 text-[14px] font-medium leading-[22px] tracking-[0.07px] text-[#f9fdff]/85 lg:mt-3 lg:text-[16px] lg:leading-[26px]">
           Browse lessons assigned to your store, save the ones you want to revisit.
         </p>
       </header>
