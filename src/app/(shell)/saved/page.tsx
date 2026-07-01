@@ -3,7 +3,6 @@ import { Bookmark } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
 import { shapeBrowseData } from "@/lib/browse-shape";
-import BottomNav from "@/components/BottomNav";
 import LibraryAtmosphere from "@/components/LibraryAtmosphere";
 import { LessonCardLink } from "@/components/LessonCard";
 
@@ -50,15 +49,6 @@ export default async function SavedPage() {
     .flatMap((g) => g.cards)
     .filter((c) => c.isBookmarked);
 
-  const userInitial = (session.user.email ?? "?").charAt(0).toUpperCase();
-  const allCards = groups.flatMap((g) => g.cards);
-  const reelsTarget =
-    allCards.find((c) => !c.completed && c.ready) ??
-    allCards.find((c) => c.ready) ??
-    allCards[0] ??
-    null;
-  const reelsHref = reelsTarget ? `/watch/${reelsTarget.id}` : undefined;
-
   return (
     <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white selection:bg-arctic-haze/30">
       <LibraryAtmosphere />
@@ -85,8 +75,6 @@ export default async function SavedPage() {
           </div>
         </div>
       )}
-
-      <BottomNav userInitial={userInitial} reelsHref={reelsHref} />
     </main>
   );
 }

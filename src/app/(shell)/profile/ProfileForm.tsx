@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { Check, LogOut } from "lucide-react";
 import { toast } from "sonner";
-import { signOutAction } from "../actions";
+import { signOutAction } from "../../actions";
 import { updatePreferredLanguage, updateStore } from "./actions";
 
 type Lang = { language: string; label: string };

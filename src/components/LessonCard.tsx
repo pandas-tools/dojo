@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
-import BookmarkButton from "@/app/browse/BookmarkButton";
+import BookmarkButton from "@/app/(shell)/browse/BookmarkButton";
 import type { BrowseCard } from "@/lib/browse";
 
 /**

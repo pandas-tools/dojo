@@ -5,7 +5,6 @@ import {
   type BrowseGroup,
 } from "@/lib/browse";
 import { getBrowseTierData } from "@/lib/tiers-data";
-import BottomNav from "@/components/BottomNav";
 import LibraryAtmosphere from "@/components/LibraryAtmosphere";
 import TierStrip from "@/components/TierStrip";
 import { LessonCardLink } from "@/components/LessonCard";
@@ -43,15 +42,6 @@ export default async function BrowsePage() {
   const lessonsToNext = nextTier
     ? Math.max(0, Math.ceil(nextTier.minPct * tierData.me.total) - tierData.me.completed)
     : undefined;
-
-  const userInitial = (session.user.email ?? "?").charAt(0).toUpperCase();
-  const allCards = data.groups.flatMap((g) => g.cards);
-  const reelsTarget =
-    allCards.find((c) => !c.completed && c.ready) ??
-    allCards.find((c) => c.ready) ??
-    allCards[0] ??
-    null;
-  const reelsHref = reelsTarget ? `/watch/${reelsTarget.id}` : undefined;
 
   return (
     <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white selection:bg-arctic-haze/30">
@@ -113,8 +103,6 @@ export default async function BrowsePage() {
           })()}
         </div>
       )}
-
-      <BottomNav userInitial={userInitial} reelsHref={reelsHref} />
     </main>
   );
 }
