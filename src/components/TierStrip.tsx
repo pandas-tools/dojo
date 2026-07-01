@@ -37,9 +37,13 @@ export default function TierStrip({
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          "flex w-full items-center justify-between rounded-[8px] border border-white/15 bg-[rgba(14,14,14,0.4)] px-5 py-2 text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.55)]",
+          "tier-cta-shimmer flex w-full items-center justify-between rounded-full border border-white/15 px-5 py-2 text-[#f9fdff] backdrop-blur-md transition-colors hover:border-[color:var(--color-arctic-haze)]/30",
           className,
         )}
+        style={{
+          backgroundImage:
+            "linear-gradient(90deg, rgba(193,232,251,0) 0%, rgba(193,232,251,0.14) 50%, rgba(193,232,251,0) 100%), linear-gradient(90deg, rgba(14,14,14,0.4) 0%, rgba(14,14,14,0.4) 100%)",
+        }}
       >
         <div className="flex flex-1 items-center gap-2">
           <TierIcon
