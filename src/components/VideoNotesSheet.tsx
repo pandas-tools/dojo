@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Drawer } from "vaul";
 
 /**
@@ -9,28 +8,32 @@ import { Drawer } from "vaul";
  * (half the viewport, video still visible above) and an expanded view
  * (near full screen). The top handle is the only drag surface; the notes
  * body scrolls freely once the sheet is expanded.
+ *
+ * Snap state lives in the parent (ReelsFeed) so the video preview above
+ * the drawer can track the drawer height — as the drawer grows, the
+ * card shrinks, keeping the black gap between them constant.
  */
 
 // vaul snap points are fractions of viewport height (numbers 0..1) or
 // pixel strings like "500px". Percentage strings are treated as pixels
 // (parseInt("55%", 10) → 55px), which collapses the drawer to a slit.
-const SNAP_POINTS = [0.55, 0.92] as const;
+export const NOTES_SNAP_POINTS = [0.55, 0.92] as const;
 
 export default function VideoNotesSheet({
   open,
   onOpenChange,
+  snap,
+  setSnap,
   notesMarkdown,
   lessonTitle,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  snap: number | string | null;
+  setSnap: (v: number | string | null) => void;
   notesMarkdown: string | null;
   lessonTitle?: string;
 }) {
-  const [snap, setSnap] = useState<number | string | null>(
-    SNAP_POINTS[0],
-  );
-
   return (
     <Drawer.Root
       open={open}
@@ -38,10 +41,10 @@ export default function VideoNotesSheet({
         // Reset to the peek snap on every open so the sheet always
         // animates in at the smaller height regardless of where the
         // user left it last time.
-        if (next) setSnap(SNAP_POINTS[0]);
+        if (next) setSnap(NOTES_SNAP_POINTS[0]);
         onOpenChange(next);
       }}
-      snapPoints={[...SNAP_POINTS]}
+      snapPoints={[...NOTES_SNAP_POINTS]}
       activeSnapPoint={snap}
       setActiveSnapPoint={setSnap}
       handleOnly
@@ -63,7 +66,19 @@ export default function VideoNotesSheet({
             className="!mx-auto !mt-3 !mb-6 !h-1 !w-10 !flex-shrink-0 !rounded-full !bg-white/25"
           />
 
-          <div className="flex-1 overflow-y-auto overscroll-contain px-10 pb-12">
+          {/* Notes body — height matches the visible drawer at the current
+              snap so overflow-y-auto has a bounded viewport to scroll within.
+              Without this, Drawer.Content's 97dvh layout height means content
+              longer than the visible drawer disappears below the viewport. */}
+          <div
+            className="overflow-y-auto overscroll-contain px-10 pb-12"
+            style={{
+              height:
+                typeof snap === "number"
+                  ? `calc(${snap * 100}dvh - 48px)`
+                  : "50dvh",
+            }}
+          >
             <Drawer.Title className="text-[32px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
               Notes
             </Drawer.Title>
