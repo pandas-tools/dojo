@@ -64,6 +64,7 @@ export default async function BrowsePage() {
               id: currentTier.id,
               name: currentTier.name,
               sortOrder: currentTier.sortOrder,
+              emoji: currentTier.emoji,
             }}
             nextTierLabel={nextTier?.name}
             lessonsToNext={lessonsToNext}
@@ -71,6 +72,7 @@ export default async function BrowsePage() {
               id: t.id,
               name: t.name,
               sortOrder: t.sortOrder,
+              emoji: t.emoji,
             }))}
             completed={tierData.me.completed}
             total={tierData.me.total}

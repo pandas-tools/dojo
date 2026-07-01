@@ -4,7 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
-import TierIcon from "./TierIcon";
+import TierEmoji from "./TierEmoji";
 
 /**
  * TierProgressPopup — modal showing the user's tier ladder + a progress bar
@@ -24,8 +24,10 @@ const ACCENT_RGBA_GLOW = "rgba(0,201,167,0.2)";
 export type TierStanding = {
   id: string;
   name: string;
-  /** Display order in the tier ladder (0-indexed) — drives icon mapping. */
+  /** Display order in the tier ladder (0-indexed). */
   sortOrder: number;
+  /** Emoji glyph from tier config — resolved to Noto Lottie in <TierEmoji>. */
+  emoji: string;
 };
 
 export default function TierProgressPopup({
@@ -99,7 +101,7 @@ export default function TierProgressPopup({
                 <div key={t.id} className="flex justify-center">
                   <TierCircle
                     name={t.name}
-                    sortOrder={t.sortOrder}
+                    emoji={t.emoji}
                     variant={t.position}
                     index={i}
                   />
@@ -175,12 +177,12 @@ export default function TierProgressPopup({
 
 function TierCircle({
   name,
-  sortOrder,
+  emoji,
   variant,
   index,
 }: {
   name: string;
-  sortOrder: number;
+  emoji: string;
   variant: "past" | "current" | "future";
   index: number;
 }) {
@@ -239,9 +241,9 @@ function TierCircle({
               }
         }
       >
-        <TierIcon
-          sortOrder={sortOrder}
-          name={name}
+        <TierEmoji
+          emoji={emoji}
+          play={isCurrent}
           className={iconSize}
         />
       </motion.div>

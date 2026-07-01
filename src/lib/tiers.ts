@@ -25,7 +25,7 @@ export type TierConfig = {
 // (and the counts map) stay keyable even when running in fallback mode.
 export const FALLBACK_TIERS: readonly TierConfig[] = [
   { id: "fallback-apprentice", name: "Apprentice", emoji: "🌱", minPct: 0, sortOrder: 0 },
-  { id: "fallback-specialist", name: "Specialist", emoji: "⚡", minPct: 0.34, sortOrder: 1 },
+  { id: "fallback-specialist", name: "Specialist", emoji: "🔥", minPct: 0.34, sortOrder: 1 },
   { id: "fallback-expert", name: "Expert", emoji: "🏆", minPct: 0.67, sortOrder: 2 },
 ];
 
