@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import {
   getBrowseData,
+  NEW_LESSONS_LABEL,
   type BrowseGroup,
 } from "@/lib/browse";
 import { getBrowseTierData } from "@/lib/tiers-data";
@@ -85,10 +86,15 @@ export default async function BrowsePage() {
         <div className="relative z-10 mt-10 space-y-8 pb-36">
           {(() => {
             // The Figma always shows a featured/highlighted section at the
-            // top. Real `newRail` data is one-shot per fresh batch (checkpoint
-            // bumps on every load), so fall back to the first regular group
-            // styled the same way — keeps the layout consistent for any user.
-            const featured = data.newRail ?? data.groups[0];
+            // top labeled "New lessons". Real `newRail` data is one-shot per
+            // fresh batch (checkpoint bumps on every load), so fall back to
+            // the first regular group styled — and labeled — the same way to
+            // keep the layout and the header consistent for any user.
+            const featured =
+              data.newRail ??
+              (data.groups[0]
+                ? { ...data.groups[0], name: NEW_LESSONS_LABEL }
+                : undefined);
             const remainingGroups = data.newRail
               ? data.groups
               : data.groups.slice(1);
