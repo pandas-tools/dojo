@@ -20,7 +20,7 @@
 import "dotenv/config";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import {
   clients,
   clientLessons,
@@ -301,6 +301,8 @@ async function main() {
         console.log(`    = lesson exists: ${spec.title}`);
       }
 
+      const fixtureNotes = `# ${spec.title}\n\nFixture notes for /browse design review. Replace with real content when the lesson is authored.\n\n- Key point one\n- Key point two\n- Key point three`;
+
       // Translation — copy the recycled media verbatim. ON CONFLICT (lesson,
       // lang) DO NOTHING so a re-run never clobbers hand-edits.
       await db
@@ -310,6 +312,7 @@ async function main() {
           language: LANG,
           title: spec.title,
           description: `${g.name} · fixture lesson for /browse design review.`,
+          notesMarkdown: fixtureNotes,
           muxPlaybackId: media.muxPlaybackId,
           muxAssetId: media.muxAssetId,
           durationSeconds: media.durationSeconds,
@@ -322,6 +325,19 @@ async function main() {
         .onConflictDoNothing({
           target: [lessonTranslations.lessonId, lessonTranslations.language],
         });
+
+      // Backfill notesMarkdown on pre-existing fixture rows that lack it, so
+      // "Learn more" surfaces. Guarded on IS NULL to protect hand-edits.
+      await db
+        .update(lessonTranslations)
+        .set({ notesMarkdown: fixtureNotes })
+        .where(
+          and(
+            eq(lessonTranslations.lessonId, lessonId),
+            eq(lessonTranslations.language, LANG),
+            isNull(lessonTranslations.notesMarkdown),
+          ),
+        );
 
       // Assign to the tenant.
       await db

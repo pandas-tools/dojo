@@ -13,7 +13,7 @@ import {
   ChevronLeft,
   ChevronUp,
   ChevronDown,
-  Heart,
+  ThumbsUp,
   BookOpen,
   Volume2,
   VolumeX,
@@ -83,7 +83,7 @@ export default function ReelsFeed({
   urlPrefix: string;
   /** True in preview mode — no tracking events fire. */
   disableTracking?: boolean;
-  /** Set of lesson ids the user has already upvoted. Drives the filled-Heart
+  /** Set of lesson ids the user has already upvoted. Drives the filled-ThumbsUp
    *  state for the matching lesson in the feed; empty/omitted in preview. */
   initialUpvoted?: Set<string>;
 }) {
@@ -440,7 +440,7 @@ export default function ReelsFeed({
 
                   {/* BOTTOM OVERLAY — per-section. Inside the card on lg,
                       full-width gradient on mobile (same as before). Title +
-                      description + (mobile) Heart + (mobile) Learn more +
+                      description + (mobile) upvote + (mobile) Learn more +
                       progress bar. */}
                   <div
                     className="pointer-events-none absolute inset-x-0 bottom-0 z-40"
@@ -485,7 +485,7 @@ export default function ReelsFeed({
                         )}
                       </div>
 
-                      {/* Mobile-only Heart (right column). On lg the rail
+                      {/* Mobile-only upvote (right column). On lg the rail
                           outside the card owns this affordance. */}
                       <div className="pointer-events-auto flex flex-col items-center gap-4 pl-2 lg:hidden">
                         <button
@@ -498,7 +498,7 @@ export default function ReelsFeed({
                           }}
                           className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
                         >
-                          <Heart
+                          <ThumbsUp
                             className={cn(
                               "h-5 w-5 transition-colors",
                               isUpvoted ? "fill-arctic-haze text-arctic-haze" : "",
@@ -579,7 +579,7 @@ export default function ReelsFeed({
                 </div>
 
                 {/* SIDE RAIL — desktop only, vertical stack to the right of the
-                    card. Heart + (optional) Notes + (video) Mute. */}
+                    card. Upvote + (optional) Notes + (video) Mute. */}
                 <div className="pointer-events-auto hidden lg:flex flex-col items-center gap-3 pl-1">
                   <button
                     type="button"
@@ -591,7 +591,7 @@ export default function ReelsFeed({
                     }}
                     className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
                   >
-                    <Heart
+                    <ThumbsUp
                       className={cn(
                         "h-5 w-5 transition-colors",
                         isUpvoted ? "fill-arctic-haze text-arctic-haze" : "",
