@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, LayoutGroup } from "motion/react";
+import { motion } from "motion/react";
 import { House, Play, Bookmark, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -14,7 +14,9 @@ import { cn } from "@/lib/cn";
  * gradient fade from the page bg to near-black above the pill.
  *
  * Mounted once by the (shell) route-group layout so the active-tab pill can
- * slide between icons via motion's shared-layout animation on navigation.
+ * slide between icons via an always-mounted `motion.span` whose `x` animates
+ * to `activeIndex * (BTN_W + GAP)`. Using an explicit `animate` here (rather
+ * than shared `layoutId`) survives the RSC page-swap between shell routes.
  */
 type Item = {
   href: string;
@@ -30,6 +32,9 @@ const STATIC_ITEMS: Item[] = [
   { href: "/profile", matchPrefix: "/profile", label: "Profile", icon: User },
 ];
 
+const BTN_W = 48; // h-12 w-12
+const GAP = 16; // gap-4
+
 export default function BottomNav({
   reelsHref,
 }: {
@@ -40,6 +45,12 @@ export default function BottomNav({
   const items = STATIC_ITEMS.map((item) =>
     item.label === "Reels" && reelsHref ? { ...item, href: reelsHref } : item,
   );
+
+  const activeIndex = Math.max(
+    0,
+    items.findIndex((item) => pathname.startsWith(item.matchPrefix)),
+  );
+  const hasActive = items.some((item) => pathname.startsWith(item.matchPrefix));
 
   return (
     <nav
@@ -53,47 +64,41 @@ export default function BottomNav({
       }}
     >
       <div className="mx-auto flex justify-center px-4">
-        <div className="pointer-events-auto inline-flex items-center gap-4 rounded-[100px] bg-[rgba(14,16,21,0.55)] p-2 backdrop-blur-xl ring-1 ring-white/10">
-          <LayoutGroup>
-            {items.map((item) => {
-              const Icon = item.icon;
-              const active = pathname.startsWith(item.matchPrefix);
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  aria-label={item.label}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "relative flex h-12 w-12 items-center justify-center rounded-full",
-                    "transition-colors duration-200",
-                    active
-                      ? "text-[#f9fdff]"
-                      : "text-[#f9fdff]/70 hover:text-[#f9fdff]",
-                  )}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="bottom-nav-active-pill"
-                      aria-hidden
-                      className="absolute inset-0 rounded-full bg-white/10"
-                      transition={{
-                        type: "spring",
-                        stiffness: 380,
-                        damping: 32,
-                        mass: 0.6,
-                      }}
-                    />
-                  )}
-                  <Icon
-                    className="relative h-5 w-5"
-                    strokeWidth={active ? 2.25 : 2}
-                    fill={active && item.label === "Saved" ? "currentColor" : "none"}
-                  />
-                </Link>
-              );
-            })}
-          </LayoutGroup>
+        <div className="pointer-events-auto relative inline-flex items-center gap-4 rounded-[100px] bg-[rgba(14,16,21,0.55)] p-2 backdrop-blur-xl ring-1 ring-white/10">
+          {hasActive && (
+            <motion.span
+              aria-hidden
+              className="pointer-events-none absolute left-2 top-2 h-12 w-12 rounded-full bg-white/10"
+              initial={false}
+              animate={{ x: activeIndex * (BTN_W + GAP) }}
+              transition={{ type: "spring", stiffness: 320, damping: 28, mass: 0.9 }}
+            />
+          )}
+          {items.map((item) => {
+            const Icon = item.icon;
+            const active = pathname.startsWith(item.matchPrefix);
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative z-10 flex h-12 w-12 items-center justify-center rounded-full",
+                  "transition-colors duration-200",
+                  active
+                    ? "text-[#f9fdff]"
+                    : "text-[#f9fdff]/70 hover:text-[#f9fdff]",
+                )}
+              >
+                <Icon
+                  className="h-5 w-5"
+                  strokeWidth={active ? 2.25 : 2}
+                  fill={active && item.label === "Saved" ? "currentColor" : "none"}
+                />
+              </Link>
+            );
+          })}
         </div>
       </div>
     </nav>
