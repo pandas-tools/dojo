@@ -303,7 +303,7 @@ function EmailField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="andylexian22@orange.com"
-        className="block h-[52px] w-full rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-4 text-[16px] leading-[1.3] text-[#fefefe] backdrop-blur-md placeholder:text-[#8e8e8e] focus:outline-none focus:ring-2 focus:ring-arctic-haze/40"
+        className="block h-[52px] w-full rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-4 pb-[14px] pt-[16px] text-[16px] leading-[22px] text-[#fefefe] backdrop-blur-md placeholder:text-[#8e8e8e] focus:outline-none focus:ring-2 focus:ring-arctic-haze/40"
       />
       {error && (
         <p className="mt-3 rounded-[16px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
