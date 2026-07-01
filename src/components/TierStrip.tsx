@@ -42,7 +42,7 @@ export default function TierStrip({
         )}
         style={{
           backgroundImage:
-            "linear-gradient(90deg, rgba(193,232,251,0) 0%, rgba(193,232,251,0.14) 50%, rgba(193,232,251,0) 100%), linear-gradient(90deg, rgba(14,14,14,0.4) 0%, rgba(14,14,14,0.4) 100%)",
+            "linear-gradient(90deg, rgba(219,243,255,0) 0%, rgba(219,243,255,0.32) 50%, rgba(219,243,255,0) 100%), linear-gradient(90deg, rgba(14,14,14,0.4) 0%, rgba(14,14,14,0.4) 100%)",
         }}
       >
         <div className="flex flex-1 items-center gap-2">
