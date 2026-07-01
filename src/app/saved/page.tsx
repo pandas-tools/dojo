@@ -78,7 +78,7 @@ export default async function SavedPage() {
         <EmptyState />
       ) : (
         <div className="relative z-10 mt-10 pb-36">
-          <div className="mx-auto flex max-w-[378px] flex-wrap content-start gap-x-4 gap-y-6 px-6 lg:max-w-[608px]">
+          <div className="flex flex-wrap content-start gap-x-4 gap-y-6 px-6">
             {savedCards.map((card) => (
               <LessonCardLink key={card.id} card={card} />
             ))}
