@@ -475,10 +475,9 @@ export default function ReelsFeed({
                         )}
                       </div>
 
-                      {/* Bottom-overlay action buttons — upvote on both
-                          mobile + desktop; mute for video shown on desktop
-                          only (mobile uses tap-to-mute on the shell). */}
-                      <div className="pointer-events-auto flex items-center gap-2 pl-2">
+                      {/* Bottom-overlay upvote — mobile only. Desktop's
+                          upvote/mute live in the outside side rail. */}
+                      <div className="pointer-events-auto flex items-center gap-2 pl-2 lg:hidden">
                         <button
                           type="button"
                           aria-label={isUpvoted ? "Remove upvote" : "Upvote"}
@@ -497,24 +496,6 @@ export default function ReelsFeed({
                             strokeWidth={2}
                           />
                         </button>
-                        {it.content.type === "video" && (
-                          <button
-                            type="button"
-                            aria-label={muted ? "Unmute" : "Mute"}
-                            aria-pressed={!muted}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMuted((m) => !m);
-                            }}
-                            className="hidden h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)] lg:flex"
-                          >
-                            {muted ? (
-                              <VolumeX className="h-5 w-5" strokeWidth={2} />
-                            ) : (
-                              <Volume2 className="h-5 w-5" strokeWidth={2} />
-                            )}
-                          </button>
-                        )}
                       </div>
                     </div>
 
@@ -608,38 +589,75 @@ export default function ReelsFeed({
                   </aside>
                 )}
 
-                {/* NAV ARROWS — desktop only, vertical stack immediately to
+                {/* SIDE RAIL — desktop only, vertical stack immediately to
                     the right of the card (or the notes panel, when present).
-                    Same circular-stroke treatment as the overlay buttons.
-                    Global controls: drive `activeIndex`, not per-lesson state,
-                    so rendering per section is fine — only the active section
-                    is on-screen at a time. */}
-                {items.length > 1 && (
-                  <div className="pointer-events-auto hidden lg:flex flex-col gap-2">
+                    All buttons share the same 48px circular-stroke treatment.
+                    Actions on top (upvote + mute); nav arrows below with a
+                    small gap. */}
+                <div className="pointer-events-auto hidden lg:flex flex-col gap-2">
+                  <button
+                    type="button"
+                    aria-label={isUpvoted ? "Remove upvote" : "Upvote"}
+                    aria-pressed={isUpvoted}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void toggleUpvote(it.id);
+                    }}
+                    className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                  >
+                    <ThumbsUp
+                      className={cn(
+                        "h-5 w-5 transition-colors",
+                        isUpvoted ? "fill-arctic-haze text-arctic-haze" : "",
+                      )}
+                      strokeWidth={2}
+                    />
+                  </button>
+                  {it.content.type === "video" && (
                     <button
                       type="button"
-                      aria-label="Previous lesson"
+                      aria-label={muted ? "Unmute" : "Mute"}
+                      aria-pressed={!muted}
                       onClick={(e) => {
                         e.stopPropagation();
-                        gotoIndex(activeIndex - 1);
+                        setMuted((m) => !m);
                       }}
                       className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
                     >
-                      <ChevronUp className="h-5 w-5" strokeWidth={2} />
+                      {muted ? (
+                        <VolumeX className="h-5 w-5" strokeWidth={2} />
+                      ) : (
+                        <Volume2 className="h-5 w-5" strokeWidth={2} />
+                      )}
                     </button>
-                    <button
-                      type="button"
-                      aria-label="Next lesson"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        gotoIndex(activeIndex + 1);
-                      }}
-                      className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
-                    >
-                      <ChevronDown className="h-5 w-5" strokeWidth={2} />
-                    </button>
-                  </div>
-                )}
+                  )}
+                  {items.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="Previous lesson"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          gotoIndex(activeIndex - 1);
+                        }}
+                        className="mt-3 flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                      >
+                        <ChevronUp className="h-5 w-5" strokeWidth={2} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Next lesson"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          gotoIndex(activeIndex + 1);
+                        }}
+                        className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                      >
+                        <ChevronDown className="h-5 w-5" strokeWidth={2} />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </section>
           );
