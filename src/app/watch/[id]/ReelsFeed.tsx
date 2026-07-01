@@ -427,16 +427,7 @@ export default function ReelsFeed({
 
   return (
     <main
-      data-notes-open={notesOpen ? "true" : "false"}
-      className={cn(
-        "fixed inset-0 bg-black text-white overflow-hidden touch-none select-none",
-        // When the mobile notes sheet is open, shrink the feed to the top
-        // half of the viewport so the notes drawer sits underneath a small
-        // preview card, matching Figma node 96:291. Desktop keeps the
-        // inline notes panel, so we never scale below lg.
-        "origin-top transition-transform duration-500 ease-out will-change-transform",
-        "data-[notes-open=true]:scale-[0.45] lg:data-[notes-open=true]:scale-100",
-      )}
+      className="fixed inset-0 bg-black text-white overflow-hidden touch-none select-none"
       onPointerDown={onShellPointerDown}
       onPointerMove={onShellPointerMove}
       onPointerUp={onShellPointerUp}
@@ -491,7 +482,11 @@ export default function ReelsFeed({
 
               {/* CENTERING LAYER — flex on lg, passthrough below. */}
               <div className="relative h-full w-full lg:flex lg:items-center lg:justify-center lg:gap-5">
-                {/* CARD FRAME — full-bleed on mobile, rounded portrait card on lg. */}
+                {/* CARD FRAME — full-bleed on mobile, rounded portrait card on lg.
+                    When the mobile notes sheet is open, shrink the card to a
+                    small preview at the top with rounded corners (Figma
+                    node 96:291). Main stays full-viewport bg-black so the
+                    space around the preview is dark, not the browser default. */}
                 <div
                   className={cn(
                     "relative h-full w-full bg-black",
@@ -500,6 +495,9 @@ export default function ReelsFeed({
                     "lg:overflow-hidden lg:rounded-2xl",
                     "lg:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)]",
                     "lg:ring-1 lg:ring-white/10",
+                    "origin-top transition-transform duration-500 ease-out will-change-transform",
+                    notesOpen &&
+                      "scale-[0.55] overflow-hidden rounded-[24px] lg:scale-100 lg:rounded-2xl",
                   )}
                 >
                   {it.content.type === "video" && (
@@ -567,9 +565,14 @@ export default function ReelsFeed({
 
                   {/* BOTTOM OVERLAY — per-section. Inside the card on lg,
                       full-width gradient on mobile (same as before). Title +
-                      (mobile) upvote + (mobile) Learn more + progress bar. */}
+                      (mobile) upvote + (mobile) Learn more + progress bar.
+                      Fades out when the mobile notes sheet opens so the
+                      preview shows just the media. */}
                   <div
-                    className="pointer-events-none absolute inset-x-0 bottom-0 z-40"
+                    className={cn(
+                      "pointer-events-none absolute inset-x-0 bottom-0 z-40 transition-opacity duration-300",
+                      notesOpen && "opacity-0 lg:opacity-100",
+                    )}
                     style={{
                       backgroundImage:
                         "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0) 100%)",
