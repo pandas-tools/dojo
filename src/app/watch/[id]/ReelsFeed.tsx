@@ -496,8 +496,11 @@ export default function ReelsFeed({
                     "lg:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)]",
                     "lg:ring-1 lg:ring-white/10",
                     "origin-top transition-transform duration-500 ease-out will-change-transform",
+                    // 0.42 (card ends ~42vh) leaves a small black gap
+                    // above the 55% drawer top (~45vh) so the preview
+                    // isn't kissing the sheet.
                     notesOpen &&
-                      "scale-[0.55] overflow-hidden rounded-[24px] lg:scale-100 lg:rounded-2xl",
+                      "scale-[0.42] overflow-hidden rounded-[24px] lg:scale-100 lg:rounded-2xl",
                   )}
                 >
                   {it.content.type === "video" && (
