@@ -47,7 +47,6 @@ export default function VideoNotesSheet({
       snapPoints={[...NOTES_SNAP_POINTS]}
       activeSnapPoint={snap}
       setActiveSnapPoint={setSnap}
-      handleOnly
     >
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/45" />
@@ -59,8 +58,13 @@ export default function VideoNotesSheet({
               "linear-gradient(180deg, rgba(68,81,88,0.4) 0%, rgba(14,14,14,0.95) 100%), linear-gradient(90deg, rgba(14,14,14,0.95) 0%, rgba(14,14,14,0.95) 100%)",
           }}
         >
-          {/* Drag handle — the thin rectangle at the top. vaul wires the
-              drag onto this element when handleOnly is set. */}
+          {/* Drag handle — the thin rectangle at the top. Vaul lets the
+              whole drawer receive drag (handleOnly is off) because vaul's
+              handle drag doesn't set pointer capture — with handleOnly on,
+              any finger movement more than ~22px off the tiny handle would
+              stall the drag mid-gesture. Whole-drawer drag routes through
+              vaul's Content component, which distinguishes scroll from
+              drag based on the body's scroll position. */}
           <Drawer.Handle
             preventCycle
             className="!mx-auto !mt-3 !mb-6 !h-1 !w-10 !flex-shrink-0 !rounded-full !bg-white/25"
