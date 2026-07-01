@@ -24,8 +24,11 @@ import { Drawer } from "vaul";
 // snaps therefore feel stuck on flick because each "next" step is
 // only ~2vh. Three semantic stops give flicks a meaningful jump and
 // slow drags land at the nearest of the three.
+// Max is 0.70 (not 0.92) so the video preview above the drawer stays
+// meaningfully visible — at 0.92 the card scale (1 - snap - 0.06) is
+// down to 0.02 and the video is basically a sliver.
 export const NOTES_INITIAL_SNAP = 0.55;
-export const NOTES_SNAP_POINTS: readonly number[] = [0.3, 0.55, 0.92];
+export const NOTES_SNAP_POINTS: readonly number[] = [0.3, 0.55, 0.7];
 
 export default function VideoNotesSheet({
   open,
