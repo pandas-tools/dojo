@@ -191,6 +191,9 @@ select:focus-visible,
 .dojo-store-list {
   scrollbar-width: thin;
   scrollbar-color: rgba(193, 232, 251, 0.35) transparent;
+  /* Reserve scrollbar gutter on BOTH sides so the pills stay optically
+   * centered regardless of whether the list overflows. */
+  scrollbar-gutter: stable both-edges;
 }
 .dojo-store-list::-webkit-scrollbar { width: 4px; }
 .dojo-store-list::-webkit-scrollbar-track { background: transparent; }

@@ -55,7 +55,7 @@ export default function StoreStep({
   return (
     <div className="flex w-full flex-col gap-3">
       <ul
-        className="dojo-store-list flex w-full flex-col gap-2 overflow-y-auto pr-2"
+        className="dojo-store-list flex w-full flex-col gap-2 overflow-y-auto"
         style={{ maxHeight: "336px" }}
       >
         {stores.length === 0 && !hq && (
