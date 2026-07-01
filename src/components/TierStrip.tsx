@@ -48,7 +48,7 @@ export default function TierStrip({
         <div className="flex flex-1 items-center gap-2">
           <TierEmoji
             emoji={currentTier.emoji}
-            play={false}
+            play
             className="h-4 w-4 shrink-0"
           />
           <span className="text-[13px] font-medium leading-[1.2] text-[#f9fdff]">

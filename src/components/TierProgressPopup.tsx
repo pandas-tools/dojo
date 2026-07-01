@@ -243,7 +243,7 @@ function TierCircle({
       >
         <TierEmoji
           emoji={emoji}
-          play={isCurrent}
+          play
           className={iconSize}
         />
       </motion.div>
