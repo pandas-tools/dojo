@@ -18,7 +18,9 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import VideoNotesSheet from "@/components/VideoNotesSheet";
+import VideoNotesSheet, {
+  NOTES_SNAP_POINTS,
+} from "@/components/VideoNotesSheet";
 import UpvoteBurst from "@/components/UpvoteBurst";
 import SuccessAtmosphere from "@/components/SuccessAtmosphere";
 import ConfettiBurst from "@/components/ConfettiBurst";
@@ -112,6 +114,13 @@ export default function ReelsFeed({
   }, [items, initialId]);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [notesOpen, setNotesOpen] = useState(false);
+  // Snap state is lifted here so the shrunk video card behind the drawer
+  // can track the drawer height in real time — the card's scale is a
+  // function of the active snap point, keeping a constant ~2vh black
+  // gap between card-bottom and drawer-top at every snap.
+  const [notesSnap, setNotesSnap] = useState<number | string | null>(
+    NOTES_SNAP_POINTS[0],
+  );
   // Celebration queue. A single lesson_completed can arrive with up to three
   // signals (tierUnlocked, groupCompleted, firstThreeComplete). We render one
   // at a time — dismissing the top pops the next — in priority order:
@@ -496,15 +505,29 @@ export default function ReelsFeed({
                     "lg:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)]",
                     "lg:ring-1 lg:ring-white/10",
                     "origin-top transition-transform duration-500 ease-out will-change-transform",
-                    // Card floats between the back button and the drawer:
-                    //   translate-y 4vh  → 4vh top padding above the card
-                    //   scale 0.39       → card is 39vh tall
-                    //   card bottom      → 4vh + 39vh = 43vh
-                    //   drawer top       → 45vh (snap 0.55)
-                    //   bottom gap       → 2vh, matches the top padding rhythm
+                    // Rounded/overflow stays class-based; the actual scale
+                    // is computed from the drawer snap point below so the
+                    // card tracks the drawer height in real time.
                     notesOpen &&
-                      "scale-[0.39] translate-y-[4vh] overflow-hidden rounded-[24px] lg:scale-100 lg:translate-y-0 lg:rounded-2xl",
+                      "overflow-hidden rounded-[24px] lg:rounded-2xl",
                   )}
+                  style={
+                    notesOpen
+                      ? {
+                          // 4vh top pad + card height + 2vh gap = drawer top.
+                          // drawer top = (1 - snap) * 100vh, so
+                          // card height = ((1 - snap) * 100 - 4 - 2)vh
+                          // and scale (of the 100vh section) = card_height / 100.
+                          // Guarded to 0.02 min so the card never inverts.
+                          transform: (() => {
+                            const s =
+                              typeof notesSnap === "number" ? notesSnap : 0.55;
+                            const scale = Math.max(0.02, 1 - s - 0.06);
+                            return `translateY(4vh) scale(${scale.toFixed(3)})`;
+                          })(),
+                        }
+                      : undefined
+                  }
                 >
                   {it.content.type === "video" && (
                     <VideoLessonViewer
@@ -815,6 +838,8 @@ export default function ReelsFeed({
       <VideoNotesSheet
         open={notesOpen}
         onOpenChange={setNotesOpen}
+        snap={notesSnap}
+        setSnap={setNotesSnap}
         notesMarkdown={currentNotes}
         lessonTitle={current?.title}
       />
