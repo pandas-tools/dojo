@@ -557,7 +557,7 @@ export default function ReelsFeed({
                               e.stopPropagation();
                               setNotesOpen(true);
                             }}
-                            className="self-start text-[11px] leading-[1.3] text-[#b2b2b2] underline underline-offset-2 transition-colors hover:text-[#f9fdff] lg:hidden"
+                            className="pointer-events-auto self-start text-[11px] leading-[1.3] text-[#b2b2b2] underline underline-offset-2 transition-colors hover:text-[#f9fdff] lg:hidden"
                           >
                             Learn more
                           </button>
