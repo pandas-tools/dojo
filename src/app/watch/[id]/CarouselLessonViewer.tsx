@@ -11,9 +11,9 @@ type Slide = { url: string; alt: string; caption?: string };
 
 /**
  * CarouselLessonViewer — horizontal "card-peek" slider per Figma node 96:282.
- * Each slide renders as a rounded-[16px] card; the next card peeks in at
- * 40% opacity to signal swipe affordance. The current slide is full opacity.
- * Pagination dots sit centered below the carousel.
+ * Each slide renders as a rounded-[16px] 4:5 portrait card; the next card
+ * peeks in at 40% opacity to signal swipe affordance. Pagination dots sit
+ * centered below the carousel.
  */
 export default function CarouselLessonViewer({
   lessonId,
@@ -115,13 +115,13 @@ export default function CarouselLessonViewer({
   }, [active, index, gotoSlide]);
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center select-none">
+    <div className="relative flex h-full w-full flex-col items-center justify-center gap-4 select-none">
       <div
         ref={containerRef}
         className="
-          flex h-[80%] w-full items-center gap-6 overflow-x-scroll
+          flex w-full items-center gap-4 overflow-x-scroll
           overscroll-x-contain snap-x snap-mandatory
-          px-[max(3.5rem,calc(50%-168px))]
+          px-8
           [scrollbar-width:none] [-ms-overflow-style:none]
           [&::-webkit-scrollbar]:hidden
         "
@@ -137,7 +137,7 @@ export default function CarouselLessonViewer({
               }}
               data-slide-index={i}
               className={cn(
-                "relative h-[80%] w-[min(336px,calc(100%-7rem))] shrink-0 snap-center overflow-hidden rounded-[16px] bg-zinc-900 transition-opacity duration-300",
+                "relative aspect-[4/5] w-[calc(100%-4rem)] shrink-0 snap-center overflow-hidden rounded-[16px] bg-zinc-900 transition-opacity duration-300",
                 isActive ? "opacity-100" : "opacity-40",
               )}
             >
@@ -162,10 +162,7 @@ export default function CarouselLessonViewer({
 
       {/* Pagination dots — Figma's 38×8 capsule, centered below the carousel */}
       {slides.length > 1 && (
-        <div
-          className="pointer-events-none absolute left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full bg-[rgba(14,14,14,0.55)] px-3 py-1.5 backdrop-blur-md"
-          style={{ bottom: "calc(20% - 32px)" }}
-        >
+        <div className="pointer-events-none flex items-center gap-1 rounded-full bg-[rgba(14,14,14,0.55)] px-3 py-1.5 backdrop-blur-md">
           {slides.map((_, i) => {
             const isActive = i === index;
             return (
