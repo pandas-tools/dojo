@@ -30,6 +30,11 @@ const PREVIEWS = [
     desc: "Shown when the user crosses into a new tier.",
   },
   {
+    href: "/design-preview/success-tier?complete=1",
+    title: "Success — tier unlocked (training complete)",
+    desc: "Same modal as tier unlock, but with the training-complete subtitle. Renders when the final tier is reached at 100% completion.",
+  },
+  {
     href: "/login",
     title: "Login",
     desc: "Restyled login surface with the new aurora-drift atmosphere.",

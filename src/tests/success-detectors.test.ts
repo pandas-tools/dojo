@@ -131,6 +131,7 @@ describe.skipIf(skipReason !== null)("success detectors", () => {
     expect(cross!.tierName).toBe("Specialist");
     expect(cross!.tierEmoji).toBe("⚡");
     expect(typeof cross!.tierId).toBe("string");
+    expect(cross!.trainingComplete).toBe(false);
   });
 
   it("completion #3 fires first-three and does not cross a tier", async () => {
@@ -140,12 +141,13 @@ describe.skipIf(skipReason !== null)("success detectors", () => {
     expect(await sdb().tierCrossing.detectForLesson(lessonIds[2])).toBeNull();
   });
 
-  it("completion #4 crosses into Expert and first-three no longer fires", async () => {
+  it("completion #4 crosses into Expert, flags trainingComplete, first-three no longer fires", async () => {
     await sdb().events.write(lessonIds[3], "lesson_completed", null);
     expect(await sdb().firstThreeComplete.detectForLesson(lessonIds[3])).toBeNull();
     const cross = await sdb().tierCrossing.detectForLesson(lessonIds[3]);
     expect(cross).not.toBeNull();
     expect(cross!.tierName).toBe("Expert");
     expect(cross!.tierEmoji).toBe("🏆");
+    expect(cross!.trainingComplete).toBe(true);
   });
 });

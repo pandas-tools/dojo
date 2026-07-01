@@ -754,6 +754,7 @@ export function scopedDb(user: ScopedUser) {
         tierId: string;
         tierName: string;
         tierEmoji: string;
+        trainingComplete: boolean;
       } | null> => {
         const assignedPublished = await db
           .select({ lessonId: clientLessons.lessonId })
@@ -791,7 +792,12 @@ export function scopedDb(user: ScopedUser) {
 
         const tier = tiers.find((t) => t.id === after.tierId);
         if (!tier) return null;
-        return { tierId: tier.id, tierName: tier.name, tierEmoji: tier.emoji };
+        return {
+          tierId: tier.id,
+          tierName: tier.name,
+          tierEmoji: tier.emoji,
+          trainingComplete: completedAfter === total,
+        };
       },
     },
 

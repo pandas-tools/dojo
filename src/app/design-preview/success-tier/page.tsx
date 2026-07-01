@@ -4,7 +4,13 @@ import ConfettiBurst from "@/components/ConfettiBurst";
 
 export const metadata = { title: "New tier · Preview" };
 
-export default function SuccessTierPreviewPage() {
+export default async function SuccessTierPreviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ complete?: string }>;
+}) {
+  const { complete } = await searchParams;
+  const trainingComplete = complete === "1";
   return (
     <main className="relative isolate flex min-h-dvh items-center justify-center overflow-hidden bg-near-black px-6 py-12 text-white">
       <SuccessAtmosphere />
@@ -13,7 +19,11 @@ export default function SuccessTierPreviewPage() {
         <SuccessCard
           icon={<span className="text-4xl leading-none">🏆</span>}
           title={<>Congrats! You&apos;ve just unlocked a new tier.</>}
-          subtitle="Keep going — new lessons just opened up."
+          subtitle={
+            trainingComplete
+              ? "That's every lesson done. Nice work."
+              : "Keep going — new lessons just opened up."
+          }
         />
       </div>
     </main>

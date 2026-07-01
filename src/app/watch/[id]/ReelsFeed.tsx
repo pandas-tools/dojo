@@ -28,6 +28,7 @@ import SuccessCard from "@/components/SuccessCard";
 import SuccessGroupCard, {
   type GroupRating,
 } from "@/components/SuccessGroupCard";
+import { nextUnwatchedIndex } from "./nextUnwatched";
 import { cn } from "@/lib/cn";
 import type { LessonCompletedResponse } from "@/lib/useLessonTracking";
 import type { CarouselSlide } from "@/lib/db/schema";
@@ -92,6 +93,7 @@ export default function ReelsFeed({
   urlPrefix,
   disableTracking = false,
   initialUpvoted,
+  initialCompleted,
 }: {
   items: FeedItem[];
   initialId: string;
@@ -104,6 +106,10 @@ export default function ReelsFeed({
   /** Set of lesson ids the user has already upvoted. Drives the filled-ThumbsUp
    *  state for the matching lesson in the feed; empty/omitted in preview. */
   initialUpvoted?: Set<string>;
+  /** Set of lesson ids the user has already completed. Used to auto-advance
+   *  to the next unwatched lesson after a group-completion celebration
+   *  burst drains; empty/omitted in preview. */
+  initialCompleted?: Set<string>;
 }) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -132,12 +138,14 @@ export default function ReelsFeed({
         tierId: string;
         tierName: string;
         tierEmoji: string;
+        trainingComplete: boolean;
       }
     | {
         kind: "group";
         groupId: string;
         groupName: string;
         lessonCount: number;
+        lessonId: string;
       }
     | { kind: "firstThree"; totalCompleted: number };
   const [celebrations, setCelebrations] = useState<Celebration[]>([]);
@@ -148,8 +156,31 @@ export default function ReelsFeed({
     [],
   );
 
+  // Completed lesson ids — hydrated from the server on mount, then augmented
+  // client-side each time handleLessonCompleted fires. Drives the "next
+  // unwatched" walk after a celebration burst drains.
+  const [completed, setCompleted] = useState<Set<string>>(
+    () => new Set(initialCompleted ?? []),
+  );
+  // True when the current celebration burst was seeded by a fresh
+  // `groupCompleted`. Cleared when the advance fires. Ensures a lone
+  // tier-only or first-three-only burst (which can fire mid-group) does
+  // NOT auto-advance and rip the user out of the group they're in.
+  const advancePendingRef = useRef<boolean>(false);
+  // Latest activeIndex mirror — the advance effect reads this without
+  // re-subscribing on every scroll.
+  const activeIndexRef = useRef<number>(initialIndex);
+
   const handleLessonCompleted = useCallback(
-    (res: LessonCompletedResponse) => {
+    (res: LessonCompletedResponse, lessonId: string) => {
+      // Optimistically mark this lesson completed so the auto-advance walk
+      // doesn't scroll back to it.
+      setCompleted((prev) => {
+        if (prev.has(lessonId)) return prev;
+        const nextSet = new Set(prev);
+        nextSet.add(lessonId);
+        return nextSet;
+      });
       const next: Celebration[] = [];
       if (res.tierUnlocked) {
         next.push({ kind: "tier", ...res.tierUnlocked });
@@ -160,7 +191,9 @@ export default function ReelsFeed({
           groupId: res.groupCompleted.groupId,
           groupName: res.groupCompleted.groupName,
           lessonCount: res.groupCompleted.lessonCount,
+          lessonId,
         });
+        advancePendingRef.current = true;
       }
       if (res.firstThreeComplete) {
         next.push({
@@ -337,6 +370,32 @@ export default function ReelsFeed({
       window.history.replaceState(window.history.state, "", url);
     }
   }, [activeIndex, items, urlPrefix]);
+
+  // Keep activeIndexRef mirrored so the auto-advance effect below reads the
+  // latest scroll position without re-subscribing on every change.
+  useEffect(() => {
+    activeIndexRef.current = activeIndex;
+  }, [activeIndex]);
+
+  // Auto-advance after a celebration burst finishes draining, but only if
+  // the burst was seeded by a fresh `groupCompleted`. Solo tier or
+  // first-three bursts (which can fire mid-group) intentionally don't
+  // advance — see docs/specs/2026-07-01-auto-advance-after-group.md.
+  useEffect(() => {
+    if (disableTracking) return;
+    if (celebrations.length !== 0) return;
+    if (!advancePendingRef.current) return;
+    advancePendingRef.current = false;
+    const nextIdx = nextUnwatchedIndex(items, activeIndexRef.current, completed);
+    if (nextIdx < 0) {
+      router.push("/browse");
+      return;
+    }
+    const target = items[nextIdx];
+    if (!target) return;
+    const el = sectionRefs.current.get(target.id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [celebrations.length, completed, items, router, disableTracking]);
 
   const gotoIndex = useCallback(
     (next: number) => {
@@ -542,7 +601,9 @@ export default function ReelsFeed({
                       paused={active && pausing}
                       onProgress={handleProgress}
                       onSeekReady={handleSeekReady}
-                      onLessonCompleted={handleLessonCompleted}
+                      onLessonCompleted={(res) =>
+                        handleLessonCompleted(res, it.id)
+                      }
                     />
                   )}
                   {it.content.type === "image" && (
@@ -554,7 +615,9 @@ export default function ReelsFeed({
                       active={active}
                       disableTracking={disableTracking}
                       onProgress={handleProgress}
-                      onLessonCompleted={handleLessonCompleted}
+                      onLessonCompleted={(res) =>
+                        handleLessonCompleted(res, it.id)
+                      }
                     />
                   )}
                   {it.content.type === "carousel" && (
@@ -565,7 +628,9 @@ export default function ReelsFeed({
                       active={active}
                       disableTracking={disableTracking}
                       onProgress={handleProgress}
-                      onLessonCompleted={handleLessonCompleted}
+                      onLessonCompleted={(res) =>
+                        handleLessonCompleted(res, it.id)
+                      }
                     />
                   )}
                   <UpvoteBurst active={active && burstLessonId === it.id} />
@@ -902,7 +967,11 @@ export default function ReelsFeed({
                     Congrats! You&apos;ve just reached {celebration.tierName}.
                   </>
                 }
-                subtitle="Keep going — new lessons just opened up."
+                subtitle={
+                  celebration.trainingComplete
+                    ? "That's every lesson done. Nice work."
+                    : "Keep going — new lessons just opened up."
+                }
               />
             )}
           </div>

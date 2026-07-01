@@ -36,6 +36,10 @@ export type LessonCompletedResponse = {
     tierId: string;
     tierName: string;
     tierEmoji: string;
+    // True when this tier crossing brings the user to 100% of their assigned
+    // lessons — the modal swaps its subtitle to acknowledge the end instead
+    // of the "keep going" default.
+    trainingComplete: boolean;
   };
 };
 
