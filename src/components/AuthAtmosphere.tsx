@@ -36,8 +36,13 @@ export default function AuthAtmosphere() {
             stays CIRCULAR regardless of viewport aspect (the prior ellipse
             got squashed wide on mobile portrait viewports). Centered at
             the bottom edge of the viewport so we see a half-circle arc. */}
+      {/* NOTE: no aurora-drift class — that CSS keyframe translates the
+          dome ±6% horizontally, which reads as a vertical dark band
+          growing/shrinking on the right (and left) edge of a mobile
+          viewport. Opacity breathe alone keeps it "alive" without the
+          asymmetric shift. */}
       <motion.div
-        className="absolute inset-0 aurora-layer-a"
+        className="absolute inset-0"
         style={{
           background:
             "radial-gradient(circle 70vh at 50% 100%, rgba(255,255,255,0.95) 0%, rgba(219,243,255,0.75) 14%, rgba(193,232,251,0.48) 30%, rgba(159,191,207,0.2) 50%, rgba(68,81,88,0.06) 70%, transparent 88%)",
