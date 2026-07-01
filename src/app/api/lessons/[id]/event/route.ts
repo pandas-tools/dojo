@@ -66,19 +66,43 @@ export async function POST(
       clientId: session.user.clientId,
       role: "employee",
     });
-    await sdb.events.write(id, parsed.data.type, parsed.data.payload ?? null);
+    const written = await sdb.events.write(
+      id,
+      parsed.data.type,
+      parsed.data.payload ?? null,
+    );
 
-    // After a successful lesson_completed write, surface a groupCompleted
-    // signal so the watch shell can navigate to the group-rating
-    // celebration. Detection is point-in-time and idempotent: re-completing
-    // the same lesson keeps returning the same payload; the client uses
-    // `alreadyRated` to suppress the rating prompt on subsequent views.
-    // Returns null when the lesson is ungrouped, unpublished, the group has
-    // unfinished siblings, or no assigned+published lessons exist.
+    // After a lesson_completed write, run the success-celebration detectors
+    // and merge any that fired into the response for the watch shell.
+    //
+    // groupCompletion is point-in-time and idempotent: re-completing the same
+    // lesson keeps returning the same payload so a returning, not-yet-rated
+    // viewer is still routed to the group-rating celebration (the client uses
+    // `alreadyRated` to suppress the prompt on subsequent views). It runs on
+    // every completion.
+    //
+    // firstThreeComplete and tierUnlocked are once-per-milestone signals, so
+    // they only run on a genuinely NEW completion (alreadyExisted === false);
+    // re-completing a lesson never re-fires them. Each returns null unless its
+    // milestone just landed.
     if (parsed.data.type === "lesson_completed") {
-      const groupCompleted = await sdb.groupCompletion.detectForLesson(id);
-      if (groupCompleted) {
-        return NextResponse.json({ ok: true, groupCompleted });
+      const [groupCompleted, firstThreeComplete, tierUnlocked] =
+        await Promise.all([
+          sdb.groupCompletion.detectForLesson(id),
+          written.alreadyExisted
+            ? Promise.resolve(null)
+            : sdb.firstThreeComplete.detectForLesson(id),
+          written.alreadyExisted
+            ? Promise.resolve(null)
+            : sdb.tierCrossing.detectForLesson(id),
+        ]);
+      if (groupCompleted || firstThreeComplete || tierUnlocked) {
+        return NextResponse.json({
+          ok: true,
+          ...(groupCompleted ? { groupCompleted } : {}),
+          ...(firstThreeComplete ? { firstThreeComplete } : {}),
+          ...(tierUnlocked ? { tierUnlocked } : {}),
+        });
       }
     }
     return NextResponse.json({ ok: true });
