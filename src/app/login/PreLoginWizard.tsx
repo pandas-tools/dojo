@@ -266,13 +266,6 @@ export default function PreLoginWizard() {
                 ? "Send sign-in link"
                 : "Continue"}
           </button>
-          {/* Symmetric spacer on the right balances the BackButton on the
-              left so the main Continue button reads CENTERED on the wizard
-              column (otherwise it ends up shifted right by 48+gap pixels
-              and misaligns with the heading + list items above). */}
-          {step !== "email" && (
-            <div aria-hidden className="h-12 w-12 shrink-0" />
-          )}
         </div>
       )}
     </div>
@@ -303,7 +296,7 @@ function EmailField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="andylexian22@orange.com"
-        className="block h-[52px] w-full rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-4 pb-[14px] pt-[16px] text-[16px] leading-[22px] text-[#fefefe] backdrop-blur-md placeholder:text-[#8e8e8e] focus:outline-none focus:ring-2 focus:ring-arctic-haze/40"
+        className="block h-[52px] w-full rounded-[24px] border border-[#c1e8fb] bg-[rgba(68,81,88,0.1)] px-4 pb-[15px] pt-[13px] text-[16px] leading-[24px] text-[#fefefe] backdrop-blur-md placeholder:text-[#8e8e8e] focus:outline-none focus:ring-2 focus:ring-arctic-haze/40"
       />
       {error && (
         <p className="mt-3 rounded-[16px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
