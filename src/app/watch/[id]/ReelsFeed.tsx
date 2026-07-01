@@ -14,7 +14,6 @@ import {
   ChevronUp,
   ChevronDown,
   ThumbsUp,
-  BookOpen,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -440,8 +439,7 @@ export default function ReelsFeed({
 
                   {/* BOTTOM OVERLAY — per-section. Inside the card on lg,
                       full-width gradient on mobile (same as before). Title +
-                      description + (mobile) upvote + (mobile) Learn more +
-                      progress bar. */}
+                      (mobile) upvote + (mobile) Learn more + progress bar. */}
                   <div
                     className="pointer-events-none absolute inset-x-0 bottom-0 z-40"
                     style={{
@@ -460,16 +458,8 @@ export default function ReelsFeed({
                         className="flex flex-1 flex-col gap-1.5 text-[#f9fdff]"
                         style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
                       >
-                        <p className="leading-[1.3]">
-                          <span className="text-[22px] font-medium text-[#f9fdff] lg:text-[15px]">
-                            {it.title}
-                          </span>
-                          {it.description && (
-                            <span className="text-[13px] text-[#b2b2b2] lg:text-[12px]">
-                              {" "}
-                              {it.description}
-                            </span>
-                          )}
+                        <p className="text-[22px] font-medium leading-[1.3] text-[#f9fdff] lg:text-[15px]">
+                          {it.title}
                         </p>
                         {hasNotes && (
                           <button
@@ -577,8 +567,30 @@ export default function ReelsFeed({
                   </div>
                 </div>
 
+                {/* NOTES PANEL — desktop only, sits to the right of the card
+                    when the lesson has notes. Mobile surfaces the same
+                    content via the "Learn more" sheet inside the overlay. */}
+                {hasNotes && (
+                  <aside
+                    data-no-shell-gesture
+                    className="pointer-events-auto hidden lg:flex lg:flex-col h-[min(90vh,880px)] w-[360px] overflow-hidden rounded-2xl border border-white/10 bg-[rgba(14,14,14,0.85)] text-[#f9fdff] backdrop-blur-md shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)]"
+                  >
+                    <div className="border-b border-white/8 px-6 pt-6 pb-4">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-[#f9fdff]/55">
+                        Notes
+                      </p>
+                      <p className="mt-1 text-[16px] font-medium leading-[1.3]">
+                        {it.title}
+                      </p>
+                    </div>
+                    <div className="flex-1 overflow-y-auto whitespace-pre-wrap px-6 py-5 text-[14px] leading-[22px] text-[#f9fdff]/85">
+                      {it.notesMarkdown}
+                    </div>
+                  </aside>
+                )}
+
                 {/* SIDE RAIL — desktop only, vertical stack to the right of the
-                    card. Upvote + (optional) Notes + (video) Mute. */}
+                    card. Upvote + (video) Mute. */}
                 <div className="pointer-events-auto hidden lg:flex flex-col items-center gap-3 pl-1">
                   <button
                     type="button"
@@ -598,19 +610,6 @@ export default function ReelsFeed({
                       strokeWidth={2}
                     />
                   </button>
-                  {hasNotes && (
-                    <button
-                      type="button"
-                      aria-label="Open lesson notes"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setNotesOpen(true);
-                      }}
-                      className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
-                    >
-                      <BookOpen className="h-5 w-5" strokeWidth={2} />
-                    </button>
-                  )}
                   {it.content.type === "video" && (
                     <button
                       type="button"
