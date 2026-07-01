@@ -64,6 +64,10 @@ export default async function SavedPage() {
     ? Math.max(0, Math.ceil(nextTier.minPct * tierData.me.total) - tierData.me.completed)
     : undefined;
 
+  const firstIncomplete =
+    lessons.find((l) => !completedIds.has(l.id)) ?? lessons[0];
+  const resumeHref = firstIncomplete ? `/watch/${firstIncomplete.id}` : undefined;
+
   return (
     <main className="relative isolate min-h-dvh overflow-hidden bg-near-black text-white selection:bg-arctic-haze/30">
       <LibraryAtmosphere />
@@ -87,6 +91,7 @@ export default async function SavedPage() {
             }))}
             completed={tierData.me.completed}
             total={tierData.me.total}
+            ctaHref={resumeHref}
           />
         )}
       </div>

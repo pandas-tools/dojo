@@ -19,6 +19,7 @@ export default function TierStrip({
   tiers,
   completed,
   total,
+  ctaHref,
   className,
 }: {
   currentTier: TierStanding;
@@ -27,6 +28,8 @@ export default function TierStrip({
   tiers: TierStanding[];
   completed: number;
   total: number;
+  /** Route the TierProgressPopup CTA navigates to (typically /watch/[id]). */
+  ctaHref?: string;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -78,6 +81,7 @@ export default function TierStrip({
         ctaLabel={
           lessonsToNext && lessonsToNext > 0 ? "Keep going!" : "Browse lessons"
         }
+        ctaHref={ctaHref}
       />
     </>
   );

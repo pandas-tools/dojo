@@ -2,6 +2,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
 import TierEmoji from "./TierEmoji";
@@ -39,6 +40,7 @@ export default function TierProgressPopup({
   total,
   lessonsToNext,
   ctaLabel = "Keep going!",
+  ctaHref,
   trigger,
 }: {
   open?: boolean;
@@ -49,8 +51,11 @@ export default function TierProgressPopup({
   total: number;
   lessonsToNext?: number;
   ctaLabel?: string;
+  /** When set, the CTA closes the dialog and pushes this route. */
+  ctaHref?: string;
   trigger?: ReactNode;
 }) {
+  const router = useRouter();
   const currentIdx = tiers.findIndex((t) => t.id === currentTierId);
   // Always show up to 3 tiers, centered on the current when possible.
   // Edge: current at idx 0 → [0,1,2]; current at last idx → [n-3,n-2,n-1].
@@ -141,7 +146,10 @@ export default function TierProgressPopup({
 
           <button
             type="button"
-            onClick={() => onOpenChange?.(false)}
+            onClick={() => {
+              onOpenChange?.(false);
+              if (ctaHref) router.push(ctaHref);
+            }}
             className="tier-cta-shimmer mt-[72px] flex h-[56px] w-full items-center justify-center rounded-[28px] text-[16px] font-medium leading-[1.3] text-[#f9fdff] transition-opacity hover:opacity-90"
             style={{
               backgroundImage: `linear-gradient(90deg, ${ACCENT} 0%, ${ACCENT_DEEP} 50%, ${ACCENT} 100%)`,
