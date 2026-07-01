@@ -120,7 +120,8 @@ export default function CarouselLessonViewer({
         ref={containerRef}
         className="
           flex h-[80%] w-full items-center gap-6 overflow-x-scroll
-          overscroll-x-contain snap-x snap-mandatory px-[calc(50%-168px)]
+          overscroll-x-contain snap-x snap-mandatory
+          px-[max(3.5rem,calc(50%-168px))]
           [scrollbar-width:none] [-ms-overflow-style:none]
           [&::-webkit-scrollbar]:hidden
         "
@@ -136,8 +137,8 @@ export default function CarouselLessonViewer({
               }}
               data-slide-index={i}
               className={cn(
-                "relative h-[80%] shrink-0 snap-center overflow-hidden rounded-[16px] bg-zinc-900 transition-opacity duration-300",
-                isActive ? "w-[336px] opacity-100" : "w-[336px] opacity-40",
+                "relative h-[80%] w-[min(336px,calc(100%-7rem))] shrink-0 snap-center overflow-hidden rounded-[16px] bg-zinc-900 transition-opacity duration-300",
+                isActive ? "opacity-100" : "opacity-40",
               )}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
