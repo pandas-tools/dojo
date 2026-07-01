@@ -60,7 +60,7 @@ export default function LessonCard({ card }: { card: BrowseCard }) {
           <div
             aria-label="Watched"
             role="img"
-            className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-arctic-haze shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
+            className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-arctic-haze"
           >
             <svg
               viewBox="0 0 24 24"
