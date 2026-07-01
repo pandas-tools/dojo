@@ -18,16 +18,14 @@ import { Drawer } from "vaul";
 // pixel strings like "500px". Percentage strings are treated as pixels
 // (parseInt("55%", 10) → 55px), which collapses the drawer to a slit.
 //
-// We fake free-drag by populating snap points every 2% between 0.18 and
-// 0.96 — vaul always lands on the nearest snap on release, but at 2%
-// granularity that's imperceptible on a phone. The one canonical
-// resting height (used every time the sheet opens) is
-// NOTES_INITIAL_SNAP.
+// vaul on release always snaps — either to closest (slow drag) or to
+// activeIndex + 1 (fast flick, which is essentially every real touch
+// gesture: velocity > 0.4px/ms AND distance < 40vh). Fine-grained
+// snaps therefore feel stuck on flick because each "next" step is
+// only ~2vh. Three semantic stops give flicks a meaningful jump and
+// slow drags land at the nearest of the three.
 export const NOTES_INITIAL_SNAP = 0.55;
-export const NOTES_SNAP_POINTS: readonly number[] = Array.from(
-  { length: 40 },
-  (_, i) => Number((0.18 + i * 0.02).toFixed(2)),
-);
+export const NOTES_SNAP_POINTS: readonly number[] = [0.3, 0.55, 0.92];
 
 export default function VideoNotesSheet({
   open,
