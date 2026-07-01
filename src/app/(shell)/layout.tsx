@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
 import BottomNav from "@/components/BottomNav";
+import ShellFade from "./ShellFade";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ export default async function ShellLayout({
 
   return (
     <>
-      {children}
+      <ShellFade>{children}</ShellFade>
       <BottomNav reelsHref={reelsHref} />
     </>
   );

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "motion/react";
+import { motion, useSpring, useVelocity, useTransform } from "motion/react";
 import { House, Play, Bookmark, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -14,9 +14,10 @@ import { cn } from "@/lib/cn";
  * gradient fade from the page bg to near-black above the pill.
  *
  * Mounted once by the (shell) route-group layout so the active-tab pill can
- * slide between icons via an always-mounted `motion.span` whose `x` animates
- * to `activeIndex * (BTN_W + GAP)`. Using an explicit `animate` here (rather
- * than shared `layoutId`) survives the RSC page-swap between shell routes.
+ * slide between icons. The pill glides via a spring on `x` and stretches
+ * horizontally proportional to spring velocity — feels like it's slipping
+ * through the container rather than teleporting. A faint arctic-haze halo
+ * ties the affordance to the brand's cool palette.
  */
 type Item = {
   href: string;
@@ -52,6 +53,15 @@ export default function BottomNav({
   );
   const hasActive = items.some((item) => pathname.startsWith(item.matchPrefix));
 
+  const x = useSpring(activeIndex * (BTN_W + GAP), {
+    stiffness: 300,
+    damping: 26,
+    mass: 0.9,
+  });
+  const velocity = useVelocity(x);
+  const scaleX = useTransform(velocity, [-1400, 0, 1400], [1.28, 1, 1.28]);
+  const scaleY = useTransform(velocity, [-1400, 0, 1400], [0.88, 1, 0.88]);
+
   return (
     <nav
       aria-label="Primary"
@@ -68,10 +78,8 @@ export default function BottomNav({
           {hasActive && (
             <motion.span
               aria-hidden
-              className="pointer-events-none absolute left-2 top-2 h-12 w-12 rounded-full bg-white/10"
-              initial={false}
-              animate={{ x: activeIndex * (BTN_W + GAP) }}
-              transition={{ type: "spring", stiffness: 320, damping: 28, mass: 0.9 }}
+              className="pointer-events-none absolute left-2 top-2 h-12 w-12 rounded-full bg-white/[0.14] ring-1 ring-inset ring-white/[0.08] shadow-[0_0_24px_-6px_rgba(193,232,251,0.28)]"
+              style={{ x, scaleX, scaleY, transformOrigin: "center" }}
             />
           )}
           {items.map((item) => {
