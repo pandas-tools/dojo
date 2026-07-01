@@ -4,10 +4,10 @@ import { Drawer } from "vaul";
 
 /**
  * VideoNotesSheet — bottom sheet that surfaces the lesson's notes content.
- * Matches Figma node 96:295 (Video_Notes panel). Two snap points: a peek
- * (half the viewport, video still visible above) and an expanded view
- * (near full screen). The top handle is the only drag surface; the notes
- * body scrolls freely once the sheet is expanded.
+ * Matches Figma node 96:295 (Video_Notes panel). Three snap points: a peek
+ * (30%), the default (55%), and expanded (70%). The handle + title header
+ * sit outside the scroll container so they stay draggable at any snap; the
+ * notes body scrolls freely below them.
  *
  * Snap state lives in the parent (ReelsFeed) so the video preview above
  * the drawer can track the drawer height — as the drawer grows, the
@@ -69,49 +69,42 @@ export default function VideoNotesSheet({
               "linear-gradient(180deg, rgba(68,81,88,0.4) 0%, rgba(14,14,14,0.95) 100%), linear-gradient(90deg, rgba(14,14,14,0.95) 0%, rgba(14,14,14,0.95) 100%)",
           }}
         >
-          {/* Drag handle — the thin rectangle at the top. Vaul lets the
-              whole drawer receive drag (handleOnly is off) because vaul's
-              handle drag doesn't set pointer capture — with handleOnly on,
-              any finger movement more than ~22px off the tiny handle would
-              stall the drag mid-gesture. Whole-drawer drag routes through
-              vaul's Content component, which distinguishes scroll from
-              drag based on the body's scroll position. */}
-          <Drawer.Handle
-            preventCycle
-            className="!mx-auto !mt-3 !mb-6 !h-1 !w-10 !flex-shrink-0 !rounded-full !bg-white/25"
-          />
-
-          {/* Notes body — height matches the visible drawer at the current
-              snap so overflow-y-auto has a bounded viewport to scroll within.
-              Without this, Drawer.Content's 97dvh layout height means content
-              longer than the visible drawer disappears below the viewport. */}
-          <div
-            className="overflow-y-auto overscroll-contain px-10 pb-12"
-            style={{
-              height:
-                typeof snap === "number"
-                  ? `calc(${snap * 100}dvh - 48px)`
-                  : "50dvh",
-            }}
-          >
-            <Drawer.Title className="text-[32px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
-              Notes
-            </Drawer.Title>
-            {lessonTitle && (
-              <p className="mt-1 text-[12px] uppercase tracking-wider text-[#f9fdff]/55">
-                {lessonTitle}
-              </p>
-            )}
-
-            <div className="mt-10">
-              {notesMarkdown && notesMarkdown.trim().length > 0 ? (
-                <div className="space-y-4 whitespace-pre-wrap text-[14px] leading-[22px] text-[#f9fdff]/85">
-                  {notesMarkdown}
-                </div>
-              ) : (
-                <EmptyNotes />
+          {/* Fixed header — drag handle + title. Sits ABOVE the scroll
+              container, NOT inside it, so it's always a draggable surface
+              regardless of the notes body's scroll position. Vaul routes
+              whole-drawer drag through non-scrollable areas; if the header
+              lived inside the scroll container (as it did before), then at
+              the top snap point with any scroll-down state the user had no
+              reliable way to drag the drawer back down — the handle's tiny
+              44×44 hitarea was the only escape. */}
+          <div className="flex-shrink-0">
+            <Drawer.Handle
+              preventCycle
+              className="!mx-auto !mt-3 !mb-4 !h-1 !w-10 !rounded-full !bg-white/25"
+            />
+            <div className="px-10 pb-6">
+              <Drawer.Title className="text-[32px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
+                Notes
+              </Drawer.Title>
+              {lessonTitle && (
+                <p className="mt-1 text-[12px] uppercase tracking-wider text-[#f9fdff]/55">
+                  {lessonTitle}
+                </p>
               )}
             </div>
+          </div>
+
+          {/* Scrollable notes body. `min-h-0 flex-1` lets it fill the
+              remaining flex space and scroll independently; the drawer's
+              own snap-point transform controls how much of it is visible. */}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-10 pb-12">
+            {notesMarkdown && notesMarkdown.trim().length > 0 ? (
+              <div className="space-y-4 whitespace-pre-wrap text-[14px] leading-[22px] text-[#f9fdff]/85">
+                {notesMarkdown}
+              </div>
+            ) : (
+              <EmptyNotes />
+            )}
           </div>
 
           <Drawer.Close
