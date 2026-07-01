@@ -91,7 +91,7 @@ export default function TierProgressPopup({
             {/* Symmetric px-10 so the centered title reads centered against
                 the dialog, and stays clear of the close X in the top-right. */}
             <Dialog.Title className="px-10 text-center text-[20px] font-medium leading-tight tracking-tight text-[#f9fdff]">
-              Lorem ipsum dolor sit
+              Keep track of your progress
             </Dialog.Title>
 
             {/* Tier ladder — grid so each tier sits in an equal-width slot.
