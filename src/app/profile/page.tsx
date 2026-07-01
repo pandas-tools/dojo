@@ -3,7 +3,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { scopedDb } from "@/lib/db/scoped";
 import BottomNav from "@/components/BottomNav";
-import DojoMark from "@/components/DojoMark";
+import PandasMark from "@/components/PandasMark";
 import BrandAtmosphere from "@/components/BrandAtmosphere";
 import ProfileForm from "./ProfileForm";
 
@@ -65,10 +65,10 @@ export default async function ProfilePage() {
       <header className="relative z-10 flex items-center justify-between px-5 pt-6 sm:px-8 sm:pt-7">
         <Link
           href="/browse"
-          aria-label="Dojo home"
+          aria-label="Home"
           className="text-white transition-opacity hover:opacity-80"
         >
-          <DojoMark variant="wordmark" className="h-7 w-auto sm:h-8" />
+          <PandasMark variant="wordmark" className="h-7 w-auto sm:h-8" />
         </Link>
       </header>
       <div className="relative z-10 px-5 pt-10 pb-8 text-center sm:pt-12">
