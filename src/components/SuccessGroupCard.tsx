@@ -9,7 +9,8 @@ import { cn } from "@/lib/cn";
  * comment input. Matches the Figma file (node 152:2471 — Success Group).
  *
  * Layout differs from SuccessCard: left-aligned, 315px wide, no subtitle,
- * has a divider, "Rate it:" label, 4-emoji rating row, and a comment input.
+ * has a divider, centered "How do you feel?" label, 4-emoji rating row, and
+ * a collapsible comment input.
  * Selected emoji highlights to arctic-haze; unselected stay muted at
  * #445158 (steel-harbor). Per the strictly-cool palette rule the selected
  * state uses the brand cyan rather than an emoji color shift.
@@ -58,9 +59,9 @@ export default function SuccessGroupCard({
 
       <div aria-hidden className="h-px w-full bg-white/10" />
 
-      <div className="flex flex-col gap-3">
-        <p className="text-[18px] font-medium leading-[1.2] text-[#f9fdff]">
-          Rate it:
+      <div className="flex flex-col gap-4">
+        <p className="text-center text-[18px] font-medium leading-[1.2] text-[#f9fdff]">
+          How do you feel?
         </p>
         <div className="flex w-full items-start justify-between">
           {RATINGS.map((r) => {
@@ -72,14 +73,14 @@ export default function SuccessGroupCard({
                 onClick={() => setRating(selected ? null : r.id)}
                 aria-pressed={selected}
                 aria-label={`Rate ${r.label}`}
-                className="flex flex-col items-center gap-1 transition-transform duration-200 hover:scale-110"
+                className="flex flex-col items-center gap-1.5 transition-transform duration-200 hover:scale-110"
               >
                 <span
                   className={cn(
-                    "text-[28px] leading-none transition-[filter,opacity] duration-200",
+                    "text-[40px] leading-none transition-[filter,opacity] duration-200",
                     selected
-                      ? "opacity-100 [filter:drop-shadow(0_0_10px_rgba(193,232,251,0.6))]"
-                      : "opacity-50",
+                      ? "opacity-100 [filter:drop-shadow(0_0_12px_rgba(193,232,251,0.65))]"
+                      : "opacity-55",
                   )}
                 >
                   {r.emoji}
