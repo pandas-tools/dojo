@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 // useLessonTracking — client-side tracker for the Reels-shell content
 // renderers (Mux player, Image viewer, Carousel viewer). Emits three
@@ -230,8 +230,14 @@ export function useLessonTracking(
     };
   }, [lessonId, contentType, enabled]);
 
-  return {
-    emitCompleted: (payload?: Record<string, unknown>) => {
+  // Both emitters are memoised so downstream effects (e.g. the ImageLessonViewer
+  // dwell timer, the CarouselLessonViewer intersection observer) can safely put
+  // them in their dependency arrays without the effect re-running — and
+  // resetting its accumulated state — on every parent re-render. They close
+  // over refs for `onCompletedRef` and `completed/openedRef`, so `lessonId`
+  // + `contentType` are the only real deps.
+  const emitCompleted = useCallback(
+    (payload?: Record<string, unknown>) => {
       if (completedRef.current) return;
       completedRef.current = true;
       sendEvent(
@@ -242,10 +248,14 @@ export function useLessonTracking(
         (body) => onCompletedRef.current?.(body),
       );
     },
-    emitOpened: () => {
-      if (openedRef.current) return;
-      openedRef.current = true;
-      sendEvent(lessonId, "lesson_opened", { contentType });
-    },
-  };
+    [lessonId, contentType],
+  );
+
+  const emitOpened = useCallback(() => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    sendEvent(lessonId, "lesson_opened", { contentType });
+  }, [lessonId, contentType]);
+
+  return { emitCompleted, emitOpened };
 }
