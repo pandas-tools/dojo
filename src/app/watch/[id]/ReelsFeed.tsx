@@ -693,8 +693,6 @@ export default function ReelsFeed({
                       }
                     />
                   )}
-                  <UpvoteBurst active={active && burstLessonId === it.id} />
-
                   {/* MUTE — desktop only, overlaid on top-right of the video
                       card. No stroke: rests on the media, softer weight. */}
                   {it.content.type === "video" && (
@@ -800,15 +798,24 @@ export default function ReelsFeed({
                             e.stopPropagation();
                             void toggleUpvote(it.id);
                           }}
-                          className="flex h-12 w-12 items-center justify-center text-[#f9fdff]"
+                          className="relative flex h-12 w-12 items-center justify-center text-[#f9fdff]"
                         >
-                          <ThumbsUp
+                          <UpvoteBurst active={active && burstLessonId === it.id} />
+                          <span
+                            key={burstLessonId === it.id ? "bump" : "rest"}
                             className={cn(
-                              "h-5 w-5 transition-colors",
-                              isUpvoted ? "fill-arctic-haze text-arctic-haze" : "",
+                              "relative z-10 inline-flex",
+                              burstLessonId === it.id && "upvote-bump",
                             )}
-                            strokeWidth={2}
-                          />
+                          >
+                            <ThumbsUp
+                              className={cn(
+                                "h-5 w-5 transition-colors",
+                                isUpvoted ? "fill-arctic-haze text-arctic-haze" : "",
+                              )}
+                              strokeWidth={2}
+                            />
+                          </span>
                         </button>
                       </div>
                     </div>
@@ -939,15 +946,24 @@ export default function ReelsFeed({
                       e.stopPropagation();
                       void toggleUpvote(it.id);
                     }}
-                    className="flex h-12 w-12 items-center justify-center text-[#f9fdff]"
+                    className="relative flex h-12 w-12 items-center justify-center text-[#f9fdff]"
                   >
-                    <ThumbsUp
+                    <UpvoteBurst active={active && burstLessonId === it.id} />
+                    <span
+                      key={burstLessonId === it.id ? "bump" : "rest"}
                       className={cn(
-                        "h-5 w-5 transition-colors",
-                        isUpvoted ? "fill-arctic-haze text-arctic-haze" : "",
+                        "relative z-10 inline-flex",
+                        burstLessonId === it.id && "upvote-bump",
                       )}
-                      strokeWidth={2}
-                    />
+                    >
+                      <ThumbsUp
+                        className={cn(
+                          "h-5 w-5 transition-colors",
+                          isUpvoted ? "fill-arctic-haze text-arctic-haze" : "",
+                        )}
+                        strokeWidth={2}
+                      />
+                    </span>
                   </button>
                   {items.length > 1 && (
                     <>
