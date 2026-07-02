@@ -810,9 +810,6 @@ export default function ReelsFeed({
                       <p className="text-[11px] uppercase tracking-[0.14em] text-[#f9fdff]/55">
                         Notes
                       </p>
-                      <p className="mt-1 text-[16px] font-medium leading-[1.3]">
-                        {it.title}
-                      </p>
                     </div>
                     <div className="flex-1 overflow-y-auto whitespace-pre-wrap px-6 py-5 text-[13px] leading-[20px] text-[#f9fdff]/85">
                       {it.notesMarkdown}
