@@ -105,6 +105,7 @@ export default function TranslationsManager({
   );
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [newNotes, setNewNotes] = useState("");
 
   const englishTranslation = translations.find((t) => t.language === "en");
   const englishReady = englishHasMedia(englishTranslation, contentType);
@@ -120,7 +121,8 @@ export default function TranslationsManager({
         lessonId,
         language: newLang,
         title: newTitle,
-        description: newDesc || undefined,
+        description: newDesc,
+        notesMarkdown: newNotes,
       });
       if (res?.error) {
         setError(res.error);
@@ -128,6 +130,7 @@ export default function TranslationsManager({
       }
       setNewTitle("");
       setNewDesc("");
+      setNewNotes("");
       router.refresh();
     });
   }
@@ -190,19 +193,39 @@ export default function TranslationsManager({
             </div>
             <div className="sm:col-span-4">
               <label className="block text-xs font-medium text-zinc-600 mb-1">
-                Description (optional)
+                Description
               </label>
               <input
+                required
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
+                placeholder="Short teaser shown on the video overlay — ends with … as the tap-to-expand hint."
                 className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+            </div>
+            <div className="sm:col-span-4">
+              <label className="block text-xs font-medium text-zinc-600 mb-1">
+                Notes (markdown)
+              </label>
+              <textarea
+                required
+                value={newNotes}
+                onChange={(e) => setNewNotes(e.target.value)}
+                rows={4}
+                placeholder="Full notes revealed when the employee taps the description."
+                className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-mono focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
             </div>
           </div>
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={pending || !newTitle}
+              disabled={
+                pending ||
+                !newTitle.trim() ||
+                !newDesc.trim() ||
+                !newNotes.trim()
+              }
               className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:bg-zinc-300 transition-colors"
             >
               {pending ? "Adding…" : "Add translation"}
@@ -251,8 +274,8 @@ function TranslationRow({
         translationId: t.id,
         lessonId,
         title,
-        description: description.trim() ? description : null,
-        notesMarkdown: notes.trim() ? notes : null,
+        description,
+        notesMarkdown: notes,
       });
       if (res?.error) setError(res.error);
       else {
@@ -306,15 +329,17 @@ function TranslationRow({
                 className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
               <input
+                required
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Description (optional)"
+                placeholder="Description — short teaser shown on the video overlay."
                 className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
               <textarea
+                required
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Notes (markdown, optional)"
+                placeholder="Notes (markdown) — full body revealed when the description is tapped."
                 rows={4}
                 className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-mono focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
@@ -348,7 +373,12 @@ function TranslationRow({
               <button
                 type="button"
                 onClick={onSave}
-                disabled={pending}
+                disabled={
+                  pending ||
+                  !title.trim() ||
+                  !description.trim() ||
+                  !notes.trim()
+                }
                 className="rounded-md bg-zinc-900 px-3 py-1 text-xs font-medium text-white hover:bg-zinc-800 disabled:bg-zinc-300 transition-colors"
               >
                 {pending ? "Saving…" : "Save"}

@@ -683,19 +683,25 @@ export default function ReelsFeed({
                         className="flex flex-1 flex-col gap-1.5 text-[#f9fdff]"
                         style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
                       >
-                        <p className="text-[22px] font-medium leading-[1.3] text-[#f9fdff] lg:text-[15px]">
+                        <p className="text-[24px] font-semibold leading-[1.2] text-[#f9fdff] lg:text-[15px] lg:font-medium lg:leading-[1.3]">
                           {it.title}
                         </p>
-                        {hasNotes && (
+                        {it.description && (
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setNotesOpen(true);
+                              if (hasNotes) setNotesOpen(true);
                             }}
-                            className="pointer-events-auto self-start text-[11px] leading-[1.3] text-[#b2b2b2] underline underline-offset-2 transition-colors hover:text-[#f9fdff] lg:hidden"
+                            disabled={!hasNotes}
+                            className="pointer-events-auto self-start text-left text-[14px] font-normal leading-[1.35] text-[#f9fdff]/85 transition-colors hover:text-[#f9fdff] disabled:cursor-default lg:hidden"
                           >
-                            Learn more
+                            <span className="line-clamp-2">
+                              {it.description}
+                              {hasNotes && (
+                                <span className="text-[#b2b2b2]"> …</span>
+                              )}
+                            </span>
                           </button>
                         )}
                       </div>

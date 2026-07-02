@@ -149,6 +149,10 @@ export async function addTranslation(input: {
   }
   const title = input.title.trim();
   if (!title) return { error: "Title is required" };
+  const description = input.description?.trim() ?? "";
+  if (!description) return { error: "Description is required" };
+  const notesMarkdown = input.notesMarkdown?.trim() ?? "";
+  if (!notesMarkdown) return { error: "Notes are required" };
 
   // Reject duplicates (also enforced by unique constraint)
   const [existing] = await db
@@ -171,8 +175,8 @@ export async function addTranslation(input: {
       lessonId: input.lessonId,
       language: input.language,
       title,
-      description: input.description?.trim() || null,
-      notesMarkdown: input.notesMarkdown?.trim() || null,
+      description,
+      notesMarkdown,
     })
     .returning();
   await writeAuditEntry({
@@ -212,10 +216,16 @@ export async function updateTranslation(input: {
     if (!title) return { error: "Title cannot be empty" };
     patch.title = title;
   }
-  if (input.description !== undefined)
-    patch.description = input.description?.trim() || null;
-  if (input.notesMarkdown !== undefined)
-    patch.notesMarkdown = input.notesMarkdown?.trim() || null;
+  if (input.description !== undefined) {
+    const description = input.description?.trim() ?? "";
+    if (!description) return { error: "Description is required" };
+    patch.description = description;
+  }
+  if (input.notesMarkdown !== undefined) {
+    const notesMarkdown = input.notesMarkdown?.trim() ?? "";
+    if (!notesMarkdown) return { error: "Notes are required" };
+    patch.notesMarkdown = notesMarkdown;
+  }
 
   await db
     .update(lessonTranslations)
