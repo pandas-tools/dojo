@@ -10,10 +10,9 @@ import { cn } from "@/lib/cn";
 type Slide = { url: string; alt: string; caption?: string };
 
 /**
- * CarouselLessonViewer — horizontal "card-peek" slider per Figma node 96:282.
- * Each slide renders as a rounded-[16px] 4:5 portrait card; the next card
- * peeks in at 40% opacity to signal swipe affordance. Pagination dots sit
- * centered below the carousel.
+ * CarouselLessonViewer — full-bleed horizontal photo carousel (TikTok-style).
+ * Each slide fills the entire card frame; a small `N/total` counter sits
+ * top-right, pagination dots sit bottom-center above the title overlay.
  */
 export default function CarouselLessonViewer({
   lessonId,
@@ -115,54 +114,62 @@ export default function CarouselLessonViewer({
   }, [active, index, gotoSlide]);
 
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center gap-4 select-none">
+    <div className="relative h-full w-full select-none">
       <div
         ref={containerRef}
         className="
-          flex w-full items-center gap-4 overflow-x-scroll
+          flex h-full w-full overflow-x-scroll
           overscroll-x-contain snap-x snap-mandatory
-          px-8
           [scrollbar-width:none] [-ms-overflow-style:none]
           [&::-webkit-scrollbar]:hidden
         "
         style={{ touchAction: "pan-x pan-y" }}
       >
-        {slides.map((slide, i) => {
-          const isActive = i === index;
-          return (
-            <div
-              key={i}
-              ref={(el) => {
-                slideRefs.current[i] = el;
-              }}
-              data-slide-index={i}
-              className={cn(
-                "relative aspect-[4/5] w-[calc(100%-4rem)] shrink-0 snap-center overflow-hidden rounded-[16px] bg-zinc-900 transition-opacity duration-300",
-                isActive ? "opacity-100" : "opacity-40",
-              )}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={slide.url}
-                alt={slide.alt}
-                className="absolute inset-0 h-full w-full object-cover"
-                draggable={false}
-              />
-              {slide.caption && (
-                <div className="pointer-events-none absolute inset-x-4 bottom-4 z-10">
-                  <p className="rounded-lg bg-black/55 px-3 py-2 text-sm text-white backdrop-blur-sm">
-                    {slide.caption}
-                  </p>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {slides.map((slide, i) => (
+          <div
+            key={i}
+            ref={(el) => {
+              slideRefs.current[i] = el;
+            }}
+            data-slide-index={i}
+            className="relative h-full w-full shrink-0 snap-center bg-black"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={slide.url}
+              alt={slide.alt}
+              className="absolute inset-0 h-full w-full object-cover"
+              draggable={false}
+            />
+            {slide.caption && (
+              <div className="pointer-events-none absolute inset-x-4 bottom-4 z-10">
+                <p className="rounded-lg bg-black/55 px-3 py-2 text-[10px] text-white backdrop-blur-sm">
+                  {slide.caption}
+                </p>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
-      {/* Pagination dots — Figma's 38×8 capsule, centered below the carousel */}
+      {/* Counter — top-right pill, `N / total`. Sits above the parent overlay
+          so it stays readable regardless of underlying image. */}
       {slides.length > 1 && (
-        <div className="pointer-events-none flex items-center gap-1 rounded-full bg-[rgba(14,14,14,0.55)] px-3 py-1.5 backdrop-blur-md">
+        <div
+          className="pointer-events-none absolute right-4 z-50 rounded-full bg-[rgba(14,14,14,0.55)] px-2.5 py-1 text-[11px] font-medium tabular-nums text-white/90 backdrop-blur-md"
+          style={{ top: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
+        >
+          {index + 1} / {slides.length}
+        </div>
+      )}
+
+      {/* Pagination dots — bottom-center capsule, positioned above the parent
+          ReelsFeed title overlay so it never sits under the title text. */}
+      {slides.length > 1 && (
+        <div
+          className="pointer-events-none absolute left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full bg-[rgba(14,14,14,0.55)] px-3 py-1.5 backdrop-blur-md"
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 9rem)" }}
+        >
           {slides.map((_, i) => {
             const isActive = i === index;
             return (
