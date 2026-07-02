@@ -48,7 +48,7 @@ export default function OnboardingWizard({
     initialStoreId ?? stores[0]?.id ?? "",
   );
 
-  const currentSegment = step === "store" ? 2 : 3;
+  const currentSegment = step === "store" ? 1 : 2;
   const submitLabel = mode === "reconfirm" ? "Confirm" : "Finish";
 
   function handleSubmit() {
@@ -85,7 +85,7 @@ export default function OnboardingWizard({
       <div className="relative z-10 mx-auto h-dvh w-full max-w-[402px]">
       {/* HEADER — top 13.3% */}
       <div className="absolute left-0 right-0 top-[13.3%] flex flex-col items-center gap-10 px-6">
-        <StepProgress current={currentSegment} total={3} />
+        <StepProgress current={currentSegment} total={2} />
         <h1 className="text-center text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
           {STEP_TITLE[step]}
         </h1>

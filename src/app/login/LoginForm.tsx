@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import StepProgress from "@/components/StepProgress";
 import { signInWithEmail } from "./actions";
 
 const TRANSITION = { duration: 0.4, ease: [0.25, 1, 0.5, 1] } as const;
@@ -44,8 +43,7 @@ export default function LoginForm() {
       className="relative z-10 mx-auto h-dvh w-full max-w-[402px]"
     >
       {/* HEADER — top 13.3% (matches Figma's top-[116px] of 874) */}
-      <div className="absolute left-0 right-0 top-[13.3%] flex flex-col items-center gap-10 px-6">
-        <StepProgress current={1} total={3} />
+      <div className="absolute left-0 right-0 top-[13.3%] flex flex-col items-center px-6">
         <div className="space-y-2 text-center">
           <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
             {sent ? "Check your inbox" : "Hi, Welcome Back!"}
