@@ -1,6 +1,5 @@
 import { Check } from "lucide-react";
 import AuthAtmosphere from "@/components/AuthAtmosphere";
-import StepProgress from "@/components/StepProgress";
 
 export const metadata = { title: "Check your email · Dojo" };
 
@@ -12,7 +11,6 @@ export default function CheckEmailPage() {
       <div className="relative z-10 mx-auto h-dvh w-full max-w-[402px]">
         {/* HEADER — top 13.3% (matches Figma) */}
         <div className="absolute left-0 right-0 top-[13.3%] flex flex-col items-center gap-10 px-6">
-          <StepProgress current={1} total={3} />
           <div className="space-y-2 text-center">
             <h1 className="text-[24px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
               Check your inbox
