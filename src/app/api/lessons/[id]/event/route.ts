@@ -108,6 +108,10 @@ export async function POST(
     return NextResponse.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[event] err="${msg}" user=${session.user.id} clientId=${session.user.clientId} lessonId=${id} type=${parsed.data.type}`,
+      err,
+    );
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

@@ -22,6 +22,10 @@ export async function POST(
     return NextResponse.json({ ok: true, upvoted });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[upvote] err="${msg}" user=${session.user.id} clientId=${session.user.clientId} lessonId=${id}`,
+      err,
+    );
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

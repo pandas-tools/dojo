@@ -9,6 +9,8 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/toaster";
 import {
   Bookmark,
   ChevronLeft,
@@ -339,7 +341,14 @@ export default function ReelsFeed({
         const res = await fetch(`/api/lessons/${lessonId}/upvote`, {
           method: "POST",
         });
-        if (!res.ok) throw new Error(`upvote failed: ${res.status}`);
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          throw new Error(
+            body?.error ?? `upvote failed: ${res.status}`,
+          );
+        }
         const body = (await res.json()) as { upvoted: boolean };
         setUpvoted((prev) => {
           const next = new Set(prev);
@@ -347,13 +356,16 @@ export default function ReelsFeed({
           else next.delete(lessonId);
           return next;
         });
-      } catch {
+      } catch (err) {
         setUpvoted((prev) => {
           const next = new Set(prev);
           if (wasUpvoted) next.add(lessonId);
           else next.delete(lessonId);
           return next;
         });
+        toast.error(
+          `Upvote failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       } finally {
         upvotePendingRef.current.delete(lessonId);
       }
@@ -384,13 +396,16 @@ export default function ReelsFeed({
           else next.delete(lessonId);
           return next;
         });
-      } catch {
+      } catch (err) {
         setBookmarked((prev) => {
           const next = new Set(prev);
           if (wasBookmarked) next.add(lessonId);
           else next.delete(lessonId);
           return next;
         });
+        toast.error(
+          `Bookmark failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       } finally {
         bookmarkPendingRef.current.delete(lessonId);
       }
@@ -1195,6 +1210,7 @@ export default function ReelsFeed({
       )}
 
       <style>{`main > div::-webkit-scrollbar { display: none; }`}</style>
+      <Toaster />
     </main>
   );
 }
