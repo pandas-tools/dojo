@@ -1065,7 +1065,7 @@ export default function ReelsFeed({
               card and X button call stopPropagation to opt out. */}
           <div
             aria-hidden
-            className="absolute inset-0 bg-near-black/60 backdrop-blur-2xl"
+            className="absolute inset-0 bg-near-black/60 backdrop-blur-md"
           />
           <ConfettiBurst
             intensity={celebration.kind === "tier" ? "tier" : "lesson"}
