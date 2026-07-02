@@ -17,7 +17,7 @@ export default async function SuccessTierPreviewPage({
       <SimulatedLessonBg />
       <div
         aria-hidden
-        className="absolute inset-0 bg-near-black/60 backdrop-blur-md"
+        className="absolute inset-0 bg-near-black/80 backdrop-blur-md"
       />
       <ConfettiBurst intensity="tier" />
       <div className="relative z-10 flex w-full max-w-md items-center justify-center">
