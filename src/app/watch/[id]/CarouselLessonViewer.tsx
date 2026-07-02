@@ -7,7 +7,7 @@ import {
 } from "@/lib/useLessonTracking";
 import { cn } from "@/lib/cn";
 
-type Slide = { url: string; alt: string; caption?: string };
+type Slide = { url: string; alt: string };
 
 /**
  * CarouselLessonViewer — full-bleed horizontal photo carousel (TikTok-style).
@@ -141,13 +141,6 @@ export default function CarouselLessonViewer({
               className="absolute inset-0 h-full w-full object-cover"
               draggable={false}
             />
-            {slide.caption && (
-              <div className="pointer-events-none absolute inset-x-4 bottom-4 z-10">
-                <p className="rounded-lg bg-black/55 px-3 py-2 text-[10px] text-white backdrop-blur-sm">
-                  {slide.caption}
-                </p>
-              </div>
-            )}
           </div>
         ))}
       </div>
