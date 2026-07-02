@@ -39,6 +39,7 @@ import type { CarouselSlide } from "@/lib/db/schema";
 import VideoLessonViewer from "./VideoLessonViewer";
 import ImageLessonViewer from "./ImageLessonViewer";
 import CarouselLessonViewer from "./CarouselLessonViewer";
+import ReelsProbe from "./ReelsProbe";
 
 // bad/meh/good/amazing → 1..5. Skips 3 so meh sits closer to bad and good
 // closer to amazing — matches the felt semantic gap between "meh" and "good".
@@ -680,6 +681,7 @@ export default function ReelsFeed({
                 else sectionRefs.current.delete(it.id);
               }}
               data-lesson-id={it.id}
+              data-active={active ? "1" : "0"}
               className="relative snap-start bg-black"
               style={{ height: "100dvh", width: "100%" }}
             >
@@ -1259,6 +1261,7 @@ export default function ReelsFeed({
       )}
 
       <style>{`main > div::-webkit-scrollbar { display: none; }`}</style>
+      <ReelsProbe />
     </main>
   );
 }
