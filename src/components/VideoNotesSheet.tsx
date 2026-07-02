@@ -46,6 +46,17 @@ export default function VideoNotesSheet({
   notesMarkdown: string | null;
   lessonTitle?: string;
 }) {
+  // The drawer Content is full-height and vaul translates it so only the
+  // active snap fraction shows. If the scroll body just fills that full
+  // height, short-of-90dvh notes never overflow the box — they hide below
+  // the visible fold with nothing to scroll. Size an inner wrapper to the
+  // visible fraction instead so the body (flex-1 inside it) gets a real
+  // bounded height and overflows into a scroll at every snap.
+  const visibleFraction =
+    typeof snap === "number"
+      ? snap
+      : NOTES_SNAP_POINTS[NOTES_SNAP_POINTS.length - 1];
+
   return (
     <Drawer.Root
       open={open}
@@ -70,40 +81,49 @@ export default function VideoNotesSheet({
               "linear-gradient(180deg, rgba(68,81,88,0.4) 0%, rgba(14,14,14,0.95) 100%), linear-gradient(90deg, rgba(14,14,14,0.95) 0%, rgba(14,14,14,0.95) 100%)",
           }}
         >
-          {/* Fixed header — drag handle + title. Sits ABOVE the scroll
-              container, NOT inside it, so it's always a draggable surface
-              regardless of the notes body's scroll position. Vaul routes
-              whole-drawer drag through non-scrollable areas; if the header
-              lived inside the scroll container (as it did before), then at
-              the top snap point with any scroll-down state the user had no
-              reliable way to drag the drawer back down — the handle's tiny
-              44×44 hitarea was the only escape. */}
-          <div className="flex-shrink-0">
-            <Drawer.Handle
-              preventCycle
-              className="!mx-auto !mt-3 !mb-4 !h-1 !w-10 !rounded-full !bg-white/25"
-            />
-            <div className="px-10 pb-6">
-              <Drawer.Title className="text-[32px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
-                Notes
-              </Drawer.Title>
-              {lessonTitle && (
-                <p className="mt-1 text-[12px] uppercase tracking-wider text-[#f9fdff]/55">
-                  {lessonTitle}
-                </p>
+          {/* Visible-area wrapper — sized to the active snap fraction so it
+              matches exactly what shows above the fold. Everything inside
+              lays out within the visible height, so the notes body actually
+              overflows (and scrolls) instead of extending off-screen. */}
+          <div
+            className="flex min-h-0 flex-col transition-[height] duration-500 ease-out"
+            style={{ height: `${(visibleFraction * 100).toFixed(2)}dvh` }}
+          >
+            {/* Fixed header — drag handle + title. Sits ABOVE the scroll
+                container, NOT inside it, so it's always a draggable surface
+                regardless of the notes body's scroll position. Vaul routes
+                whole-drawer drag through non-scrollable areas; if the header
+                lived inside the scroll container (as it did before), then at
+                the top snap point with any scroll-down state the user had no
+                reliable way to drag the drawer back down — the handle's tiny
+                44×44 hitarea was the only escape. */}
+            <div className="flex-shrink-0">
+              <Drawer.Handle
+                preventCycle
+                className="!mx-auto !mt-3 !mb-4 !h-1 !w-10 !rounded-full !bg-white/25"
+              />
+              <div className="px-10 pb-6">
+                <Drawer.Title className="text-[32px] font-medium leading-[1.2] tracking-tight text-[#f9fdff]">
+                  Notes
+                </Drawer.Title>
+                {lessonTitle && (
+                  <p className="mt-1 text-[12px] uppercase tracking-wider text-[#f9fdff]/55">
+                    {lessonTitle}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Scrollable notes body. `min-h-0 flex-1` fills the remaining
+                space inside the visible-area wrapper and scrolls independently
+                when the notes are taller than what the current snap shows. */}
+            <div className="dojo-notes-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-10 pb-12">
+              {notesMarkdown && notesMarkdown.trim().length > 0 ? (
+                <NotesMarkdown>{notesMarkdown}</NotesMarkdown>
+              ) : (
+                <EmptyNotes />
               )}
             </div>
-          </div>
-
-          {/* Scrollable notes body. `min-h-0 flex-1` lets it fill the
-              remaining flex space and scroll independently; the drawer's
-              own snap-point transform controls how much of it is visible. */}
-          <div className="dojo-notes-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-10 pb-12">
-            {notesMarkdown && notesMarkdown.trim().length > 0 ? (
-              <NotesMarkdown>{notesMarkdown}</NotesMarkdown>
-            ) : (
-              <EmptyNotes />
-            )}
           </div>
 
           <Drawer.Close
