@@ -79,8 +79,9 @@ export default async function WatchPage({
   if (items.length === 0) return <NotReadyBanner />;
 
   const initialId = items.some((i) => i.id === id) ? id : items[0]!.id;
-  const [upvotedIds, completedIds] = await Promise.all([
+  const [upvotedIds, bookmarkedIds, completedIds] = await Promise.all([
     sdb.upvotes.forUser(),
+    sdb.bookmarks.forUser(),
     sdb.events.completedLessonIds(),
   ]);
 
@@ -91,6 +92,7 @@ export default async function WatchPage({
       backHref="/browse"
       urlPrefix="/watch/"
       initialUpvoted={upvotedIds}
+      initialBookmarked={bookmarkedIds}
       initialCompleted={completedIds}
     />
   );

@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Bookmark,
   ChevronLeft,
   ChevronUp,
   ChevronDown,
@@ -18,6 +19,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
+import { toggleBookmark as toggleBookmarkAction } from "@/app/(shell)/browse/actions";
 import VideoNotesSheet, {
   NOTES_INITIAL_SNAP,
 } from "@/components/VideoNotesSheet";
@@ -93,6 +95,7 @@ export default function ReelsFeed({
   urlPrefix,
   disableTracking = false,
   initialUpvoted,
+  initialBookmarked,
   initialCompleted,
 }: {
   items: FeedItem[];
@@ -106,6 +109,9 @@ export default function ReelsFeed({
   /** Set of lesson ids the user has already upvoted. Drives the filled-ThumbsUp
    *  state for the matching lesson in the feed; empty/omitted in preview. */
   initialUpvoted?: Set<string>;
+  /** Set of lesson ids the user has already bookmarked. Drives the filled-
+   *  Bookmark state for the matching lesson; empty/omitted in preview. */
+  initialBookmarked?: Set<string>;
   /** Set of lesson ids the user has already completed. Used to auto-advance
    *  to the next unwatched lesson after a group-completion celebration
    *  burst drains; empty/omitted in preview. */
@@ -268,6 +274,10 @@ export default function ReelsFeed({
     () => new Set(initialUpvoted ?? []),
   );
   const upvotePendingRef = useRef<Set<string>>(new Set());
+  const [bookmarked, setBookmarked] = useState<Set<string>>(
+    () => new Set(initialBookmarked ?? []),
+  );
+  const bookmarkPendingRef = useRef<Set<string>>(new Set());
   // Per-lesson burst: when the user upvotes a lesson (false → true), we show
   // the UpvoteBurst overlay for ~700ms then unmount it.
   const [burstLessonId, setBurstLessonId] = useState<string | null>(null);
@@ -321,6 +331,43 @@ export default function ReelsFeed({
       }
     },
     [disableTracking, upvoted],
+  );
+
+  const toggleBookmark = useCallback(
+    async (lessonId: string) => {
+      if (disableTracking) return;
+      if (bookmarkPendingRef.current.has(lessonId)) return;
+      bookmarkPendingRef.current.add(lessonId);
+
+      const wasBookmarked = bookmarked.has(lessonId);
+      setBookmarked((prev) => {
+        const next = new Set(prev);
+        if (wasBookmarked) next.delete(lessonId);
+        else next.add(lessonId);
+        return next;
+      });
+
+      try {
+        const res = await toggleBookmarkAction(lessonId);
+        if ("error" in res) throw new Error(res.error);
+        setBookmarked((prev) => {
+          const next = new Set(prev);
+          if (res.bookmarked) next.add(lessonId);
+          else next.delete(lessonId);
+          return next;
+        });
+      } catch {
+        setBookmarked((prev) => {
+          const next = new Set(prev);
+          if (wasBookmarked) next.add(lessonId);
+          else next.delete(lessonId);
+          return next;
+        });
+      } finally {
+        bookmarkPendingRef.current.delete(lessonId);
+      }
+    },
+    [disableTracking, bookmarked],
   );
 
   // Scroll to the initial lesson on mount.
@@ -509,6 +556,7 @@ export default function ReelsFeed({
         {items.map((it, i) => {
           const active = i === activeIndex;
           const isUpvoted = upvoted.has(it.id);
+          const isBookmarked = bookmarked.has(it.id);
           const hasNotes = !!(
             it.notesMarkdown && it.notesMarkdown.trim().length > 0
           );
@@ -683,7 +731,7 @@ export default function ReelsFeed({
                         className="flex flex-1 flex-col gap-1.5 text-[#f9fdff]"
                         style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
                       >
-                        <p className="text-[24px] font-semibold leading-[1.2] text-[#f9fdff] lg:text-[15px] lg:font-medium lg:leading-[1.3]">
+                        <p className="text-[18px] font-semibold leading-[1.2] text-[#f9fdff] lg:text-[15px] lg:font-medium lg:leading-[1.3]">
                           {it.title}
                         </p>
                         {it.description && (
@@ -696,7 +744,7 @@ export default function ReelsFeed({
                             disabled={!hasNotes}
                             className="pointer-events-auto self-start text-left text-[14px] font-normal leading-[1.35] text-[#f9fdff]/85 transition-colors hover:text-[#f9fdff] disabled:cursor-default lg:hidden"
                           >
-                            <span className="line-clamp-2">
+                            <span className="line-clamp-1">
                               {it.description}
                               {hasNotes && (
                                 <span className="text-[#b2b2b2]"> …</span>
@@ -706,9 +754,32 @@ export default function ReelsFeed({
                         )}
                       </div>
 
-                      {/* Bottom-overlay upvote — mobile only. Desktop's
+                      {/* Bottom-overlay actions — mobile only, stacked with
+                          bookmark on top and upvote below. Desktop's
                           upvote/mute live in the outside side rail. */}
-                      <div className="pointer-events-auto flex items-center gap-2 pl-2 lg:hidden">
+                      <div className="pointer-events-auto flex flex-col items-center gap-2 pl-2 lg:hidden">
+                        <button
+                          type="button"
+                          aria-label={
+                            isBookmarked ? "Remove bookmark" : "Save lesson"
+                          }
+                          aria-pressed={isBookmarked}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void toggleBookmark(it.id);
+                          }}
+                          className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                        >
+                          <Bookmark
+                            className={cn(
+                              "h-5 w-5 transition-colors",
+                              isBookmarked
+                                ? "fill-arctic-haze text-arctic-haze"
+                                : "",
+                            )}
+                            strokeWidth={2}
+                          />
+                        </button>
                         <button
                           type="button"
                           aria-label={isUpvoted ? "Remove upvote" : "Upvote"}
@@ -826,6 +897,28 @@ export default function ReelsFeed({
                 <div className="pointer-events-auto hidden lg:flex flex-col gap-2">
                   <button
                     type="button"
+                    aria-label={
+                      isBookmarked ? "Remove bookmark" : "Save lesson"
+                    }
+                    aria-pressed={isBookmarked}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void toggleBookmark(it.id);
+                    }}
+                    className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                  >
+                    <Bookmark
+                      className={cn(
+                        "h-5 w-5 transition-colors",
+                        isBookmarked
+                          ? "fill-arctic-haze text-arctic-haze"
+                          : "",
+                      )}
+                      strokeWidth={2}
+                    />
+                  </button>
+                  <button
+                    type="button"
                     aria-label={isUpvoted ? "Remove upvote" : "Upvote"}
                     aria-pressed={isUpvoted}
                     onClick={(e) => {
@@ -896,7 +989,7 @@ export default function ReelsFeed({
             href={backHref}
             aria-label="Back to lessons"
             onClick={(e) => e.stopPropagation()}
-            className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+            className="pointer-events-auto flex h-12 w-12 items-center justify-center text-[#f9fdff] transition-opacity hover:opacity-70"
           >
             <ChevronLeft className="h-5 w-5" strokeWidth={2} />
           </Link>
