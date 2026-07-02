@@ -164,6 +164,16 @@ export default function ReelsFeed({
     [],
   );
 
+  // Auto-dismiss tier/firstThree celebrations after 5s. Group is excluded
+  // because it collects a rating — killing it on a timer would silently drop
+  // that input; users dismiss group via Submit or the backdrop.
+  useEffect(() => {
+    if (!celebration) return;
+    if (celebration.kind === "group") return;
+    const timer = window.setTimeout(popCelebration, 5000);
+    return () => window.clearTimeout(timer);
+  }, [celebration, popCelebration]);
+
   // Completed lesson ids — hydrated from the server on mount, then augmented
   // client-side each time handleLessonCompleted fires. Drives the "next
   // unwatched" walk after a celebration burst drains.
@@ -1023,8 +1033,11 @@ export default function ReelsFeed({
           onPointerDown={(e) => e.stopPropagation()}
           onPointerMove={(e) => e.stopPropagation()}
           onPointerUp={(e) => e.stopPropagation()}
+          onClick={popCelebration}
         >
-          {/* Backdrop — dims the reel behind and swallows shell gestures. */}
+          {/* Backdrop — dims the reel behind and swallows shell gestures.
+              Clicks anywhere outside the card bubble up and dismiss; the
+              card and X button call stopPropagation to opt out. */}
           <div
             aria-hidden
             className="absolute inset-0 bg-near-black/75 backdrop-blur-md"
@@ -1036,13 +1049,19 @@ export default function ReelsFeed({
           <button
             type="button"
             aria-label="Dismiss"
-            onClick={popCelebration}
+            onClick={(e) => {
+              e.stopPropagation();
+              popCelebration();
+            }}
             className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
             style={{ top: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
           >
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
-          <div className="relative z-10 flex w-full max-w-md items-center justify-center">
+          <div
+            className="relative z-10 flex w-full max-w-md items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
             {celebration.kind === "group" && (
               <SuccessGroupCard onSubmit={submitGroupRating} />
             )}
