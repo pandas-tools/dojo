@@ -136,12 +136,9 @@ export default function OnboardingWizard({
 
       {/* CTA — bottom 14% (top-752 of 874) */}
       <div className="absolute left-0 right-0 top-[86%] flex items-center gap-2 px-6">
-        <BackButton
-          onClick={() =>
-            step === "language" ? setStep("store") : undefined
-          }
-          disabled={pending || step === "store"}
-        />
+        {step === "language" && (
+          <BackButton onClick={() => setStep("store")} disabled={pending} />
+        )}
         <button
           type="button"
           onClick={() =>
@@ -175,7 +172,7 @@ function BackButton({
       onClick={onClick}
       disabled={disabled}
       aria-label="Back"
-      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#445158] bg-[rgba(68,81,88,0.1)] text-[#fefefe] backdrop-blur-md transition-all duration-200 hover:bg-[rgba(68,81,88,0.2)] disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex h-12 w-12 shrink-0 items-center justify-center text-[#fefefe] transition-opacity duration-200 hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-40"
     >
       <svg
         viewBox="0 0 24 24"

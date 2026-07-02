@@ -12,7 +12,7 @@ type StoreRow = {
   address?: string | null;
 };
 
-const HQ_LABEL = "I'm not assigned to a store (HQ / other)";
+const HQ_LABEL = "I'm not assigned to a store";
 const PLACEHOLDER = "Select your store";
 
 /**
@@ -255,7 +255,7 @@ function OptionRow({
           : "border-transparent hover:bg-[rgba(68,81,88,0.25)]",
       )}
     >
-      <span className="block truncate text-[16px] leading-[1.3] text-[#fefefe]">
+      <span className="block truncate text-[15px] leading-[1.3] text-[#fefefe]">
         {label}
       </span>
       {detail && (
