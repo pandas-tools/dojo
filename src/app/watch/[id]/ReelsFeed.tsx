@@ -25,7 +25,6 @@ import VideoNotesSheet, {
 } from "@/components/VideoNotesSheet";
 import NotesMarkdown from "@/components/NotesMarkdown";
 import UpvoteBurst from "@/components/UpvoteBurst";
-import SuccessAtmosphere from "@/components/SuccessAtmosphere";
 import ConfettiBurst from "@/components/ConfettiBurst";
 import SuccessCard from "@/components/SuccessCard";
 import AnimatedEmoji from "@/components/AnimatedEmoji";
@@ -766,8 +765,14 @@ export default function ReelsFeed({
 
                       {/* Bottom-overlay actions — mobile only, stacked with
                           bookmark on top and upvote below. Desktop's
-                          upvote/mute live in the outside side rail. */}
-                      <div className="pointer-events-auto flex flex-col items-center gap-2 pl-2 lg:hidden">
+                          upvote/mute live in the outside side rail.
+                          -14px marginRight offsets the 48px hit target's
+                          internal centering so the 20px glyphs sit flush
+                          against the title's px-6 right edge. */}
+                      <div
+                        className="pointer-events-auto flex flex-col items-center gap-2 pl-2 lg:hidden"
+                        style={{ marginRight: "-14px" }}
+                      >
                         <button
                           type="button"
                           aria-label={
@@ -1015,11 +1020,15 @@ export default function ReelsFeed({
           aria-hidden
         />
         <div className="relative flex px-6 pt-4">
+          {/* -22px marginLeft = -14 (button internal centering: (48-20)/2)
+              - 8 (Lucide chevron's stroke-inset from icon box). Puts the
+              chevron tip flush with the title's px-6 left edge. */}
           <Link
             href={backHref}
             aria-label="Back to lessons"
             onClick={(e) => e.stopPropagation()}
             className="pointer-events-auto flex h-12 w-12 items-center justify-center text-[#f9fdff] transition-opacity hover:opacity-70"
+            style={{ marginLeft: "-22px" }}
           >
             <ChevronLeft className="h-5 w-5" strokeWidth={2} />
           </Link>
@@ -1056,9 +1065,8 @@ export default function ReelsFeed({
               card and X button call stopPropagation to opt out. */}
           <div
             aria-hidden
-            className="absolute inset-0 bg-near-black/75 backdrop-blur-md"
+            className="absolute inset-0 bg-near-black/60 backdrop-blur-2xl"
           />
-          <SuccessAtmosphere />
           <ConfettiBurst
             intensity={celebration.kind === "tier" ? "tier" : "lesson"}
           />
