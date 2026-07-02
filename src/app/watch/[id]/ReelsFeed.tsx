@@ -32,6 +32,7 @@ import SuccessGroupCard, {
   type GroupRating,
 } from "@/components/SuccessGroupCard";
 import { nextUnwatchedIndex } from "./nextUnwatched";
+import { reconcileObservation } from "./observationGuard";
 import { cn } from "@/lib/cn";
 import type { LessonCompletedResponse } from "@/lib/useLessonTracking";
 import type { CarouselSlide } from "@/lib/db/schema";
@@ -126,6 +127,11 @@ export default function ReelsFeed({
     return i >= 0 ? i : 0;
   }, [items, initialId]);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
+  // Guards the observer against the mobile-Safari mount-scroll race — see
+  // observationGuard.ts. Starts false so a stray "top of container" reading
+  // can't steal activeIndex off the deep-link target before the scroll to it
+  // settles; flips true once the observer reconciles with the target.
+  const reconciledRef = useRef(false);
   const [notesOpen, setNotesOpen] = useState(false);
   // Snap state is lifted here so the shrunk video card behind the drawer
   // can track the drawer height in real time — the card's scale is a
@@ -408,6 +414,13 @@ export default function ReelsFeed({
         if (!id) return;
         const idx = items.findIndex((it) => it.id === id);
         if (idx < 0) return;
+        const { accept, reconciled } = reconcileObservation({
+          observedIndex: idx,
+          initialIndex,
+          reconciled: reconciledRef.current,
+        });
+        reconciledRef.current = reconciled;
+        if (!accept) return;
         setActiveIndex(idx);
       },
       {
@@ -416,8 +429,26 @@ export default function ReelsFeed({
       },
     );
     sectionRefs.current.forEach((el) => obs.observe(el));
-    return () => obs.disconnect();
-  }, [items]);
+
+    // Safety valve: if the programmatic mount scroll never lands on the target
+    // (e.g. layout not ready), the guard above would otherwise pin activeIndex
+    // to the target forever. The first real user interaction hands the observer
+    // control unconditionally, so scrolling can never wedge.
+    const releaseGuard = () => {
+      reconciledRef.current = true;
+    };
+    const guardOpts = { once: true, passive: true } as const;
+    container.addEventListener("pointerdown", releaseGuard, guardOpts);
+    container.addEventListener("touchstart", releaseGuard, guardOpts);
+    container.addEventListener("wheel", releaseGuard, guardOpts);
+
+    return () => {
+      obs.disconnect();
+      container.removeEventListener("pointerdown", releaseGuard);
+      container.removeEventListener("touchstart", releaseGuard);
+      container.removeEventListener("wheel", releaseGuard);
+    };
+  }, [items, initialIndex]);
 
   // Sync URL with active lesson.
   useEffect(() => {
