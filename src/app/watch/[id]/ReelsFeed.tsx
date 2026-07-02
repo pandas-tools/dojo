@@ -132,6 +132,13 @@ export default function ReelsFeed({
   // can't steal activeIndex off the deep-link target before the scroll to it
   // settles; flips true once the observer reconciles with the target.
   const reconciledRef = useRef(false);
+  // True only after a genuine user scroll gesture (touch/pointer/wheel). Gates
+  // the infinite-scroll tail-sentinel teleport so it can NEVER fire from
+  // programmatic scrolling — the mount deep-link scroll, a dvh/URL-bar reflow,
+  // or auto-advance. Without this, deep-linking to the last lesson (whose
+  // section abuts the sentinel) teleports to section 0 during the mobile-Safari
+  // mount transient: black video + items[0] title.
+  const userEngagedRef = useRef(false);
   const [notesOpen, setNotesOpen] = useState(false);
   // Snap state is lifted here so the shrunk video card behind the drawer
   // can track the drawer height in real time — the card's scale is a
@@ -404,15 +411,37 @@ export default function ReelsFeed({
     [disableTracking, bookmarked],
   );
 
-  // Scroll to the initial lesson on mount.
+  // Land on the deep-link target — and STAY there through the mobile-Safari
+  // mount transient. A single scrollIntoView is unreliable on iOS Safari: the
+  // dvh-based section heights aren't settled at hydration, scroll restoration
+  // can reset the container, and a URL-bar reflow shifts the position. So we
+  // hard-assign scrollTop to the target every frame until the observer confirms
+  // arrival (reconciledRef) or the user takes over — then stop. Bounded so it
+  // can never busy-loop if the target somehow never centers.
   useEffect(() => {
-    const el = sectionRefs.current.get(items[initialIndex]?.id ?? "");
-    if (el) el.scrollIntoView({ behavior: "auto", block: "start" });
+    const container = containerRef.current;
+    const targetId = items[initialIndex]?.id;
+    if (!container || !targetId) return;
+    let raf = 0;
+    const start = performance.now();
+    const pin = () => {
+      if (reconciledRef.current || performance.now() - start > 2500) return;
+      const el = sectionRefs.current.get(targetId);
+      if (el && Math.abs(container.scrollTop - el.offsetTop) > 1) {
+        container.scrollTop = el.offsetTop;
+      }
+      raf = requestAnimationFrame(pin);
+    };
+    raf = requestAnimationFrame(pin);
+    return () => cancelAnimationFrame(raf);
+  }, [items, initialIndex]);
+
+  // Clear pending gesture timers on unmount.
+  useEffect(() => {
     return () => {
       if (burstTimerRef.current !== null) window.clearTimeout(burstTimerRef.current);
       if (pressTimerRef.current !== null) window.clearTimeout(pressTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Track which section is in view.
@@ -424,17 +453,20 @@ export default function ReelsFeed({
         // Infinite-feed wrap: if the tail sentinel is (almost) fully in
         // view, snap-scroll has landed there — teleport scrollTop back to
         // items[0]'s section so the user re-enters the loop seamlessly.
-        // The sentinel shows items[0]'s poster, so the teleport is visually
-        // near-continuous.
-        for (const e of entries) {
-          const t = e.target as HTMLElement;
-          if (t.dataset.sentinel !== "tail") continue;
-          if (e.intersectionRatio < 0.9) continue;
-          const firstId = items[0]?.id;
-          if (!firstId) return;
-          const firstReal = sectionRefs.current.get(firstId);
-          if (firstReal) container.scrollTop = firstReal.offsetTop;
-          return;
+        // Gated on userEngagedRef so it fires ONLY from a real user scroll,
+        // never from the mount deep-link scroll or a dvh reflow (which would
+        // otherwise bounce a deep link to the last lesson back to section 0).
+        if (userEngagedRef.current) {
+          for (const e of entries) {
+            const t = e.target as HTMLElement;
+            if (t.dataset.sentinel !== "tail") continue;
+            if (e.intersectionRatio < 0.9) continue;
+            const firstId = items[0]?.id;
+            if (!firstId) return;
+            const firstReal = sectionRefs.current.get(firstId);
+            if (firstReal) container.scrollTop = firstReal.offsetTop;
+            return;
+          }
         }
 
         let best: IntersectionObserverEntry | null = null;
@@ -472,6 +504,7 @@ export default function ReelsFeed({
     // control unconditionally, so scrolling can never wedge.
     const releaseGuard = () => {
       reconciledRef.current = true;
+      userEngagedRef.current = true;
     };
     const guardOpts = { once: true, passive: true } as const;
     container.addEventListener("pointerdown", releaseGuard, guardOpts);

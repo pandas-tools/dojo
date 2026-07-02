@@ -32,14 +32,35 @@ symptoms at once, which is why they were correlated:
 the target — no flip. Desktop/swipe never repro'd: no remount race, lenient
 autoplay policy, stable viewport.
 
-**Fix.** `observationGuard.ts` — the observer suppresses every observation of a
-NON-target section until it has seen the deep-link target itself settle. From
-that point it drives `activeIndex` freely. One guard on the single writer kills
-all three symptoms because they share one cause. A first-user-gesture safety
-valve (`pointerdown`/`touchstart`/`wheel`) hands the observer control
-unconditionally so the guard can never wedge if the mount scroll fails to land.
+**Fix.** The deep-link target must stay locked until it has *actually landed*,
+against every force that can move the scroll during the mount transient. There
+are three, and guarding only the first is not enough:
 
-**Lesson.** When a scroll-position observer is the source of truth for state
-that a deep link *also* seeds, the two race on mount. Gate the observer until
-the programmatic initial scroll has demonstrably reached its target — don't let
-a transient "top of container" reading clobber the seeded state.
+1. **The IntersectionObserver** (`observationGuard.ts`) — suppresses every
+   observation of a NON-target section until it has seen the target settle; from
+   there it drives `activeIndex` freely.
+2. **The tail-sentinel teleport** (infinite-scroll wrap) — `container.scrollTop
+   = items[0].offsetTop` whenever the tail sentinel is ≥0.9 in view. Deep-linking
+   to the LAST lesson lands right next to the sentinel, and on mobile Safari the
+   mount/`dvh` transient can flash it ≥0.9 and teleport to section 0 (black +
+   items[0] title) *before the user has scrolled at all*. Gated behind
+   `userEngagedRef` — a flag set ONLY by a real touch/pointer/wheel gesture — so
+   the wrap can never fire from programmatic scrolling (mount, dvh reflow,
+   auto-advance).
+3. **The mount scroll itself** — a one-shot `scrollIntoView` is unreliable on
+   iOS Safari (unsettled `dvh` heights at hydration, scroll restoration, URL-bar
+   reflow). Replaced with a bounded `requestAnimationFrame` loop that re-asserts
+   `scrollTop = target.offsetTop` every frame until the observer confirms arrival
+   or the user takes over.
+
+A first-user-gesture safety valve (`pointerdown`/`touchstart`/`wheel`) flips both
+`reconciledRef` and `userEngagedRef`, so nothing can wedge.
+
+**Lesson.** When a deep link seeds scroll-derived state, EVERY actor that writes
+scroll position or that state races the mount. Enumerate them all (observer,
+any teleport/wrap, the initial scroll) and lock each to the target until it has
+demonstrably landed — a guard on just one actor leaves the others to clobber it.
+The first fix guarded only the observer; the sentinel and the flaky scroll still
+bounced the deep link to section 0. Also: a headless Chromium probe could NOT
+reproduce this (it lands correctly every time) — the failure is specific to iOS
+Safari's mount timing, so it needs on-device confirmation.
