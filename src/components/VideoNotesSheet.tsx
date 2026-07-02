@@ -98,7 +98,7 @@ export default function VideoNotesSheet({
           {/* Scrollable notes body. `min-h-0 flex-1` lets it fill the
               remaining flex space and scroll independently; the drawer's
               own snap-point transform controls how much of it is visible. */}
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-10 pb-12">
+          <div className="dojo-notes-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-10 pb-12">
             {notesMarkdown && notesMarkdown.trim().length > 0 ? (
               <NotesMarkdown>{notesMarkdown}</NotesMarkdown>
             ) : (

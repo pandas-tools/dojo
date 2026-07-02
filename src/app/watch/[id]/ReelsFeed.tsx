@@ -894,7 +894,7 @@ export default function ReelsFeed({
                         Notes
                       </p>
                     </div>
-                    <div className="flex-1 overflow-y-auto px-6 py-5">
+                    <div className="dojo-notes-scroll flex-1 overflow-y-auto px-6 py-5">
                       {it.notesMarkdown && (
                         <NotesMarkdown>{it.notesMarkdown}</NotesMarkdown>
                       )}
