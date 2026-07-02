@@ -173,6 +173,18 @@ select:focus-visible,
   will-change: background-position;
 }
 
+/* Upvote button — icon pop when the user upvotes. Slight back-ease for
+ * spring feel; sits on top of the burst overlay and the color transition. */
+@keyframes upvote-bump {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.4); }
+  60%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+.upvote-bump {
+  animation: upvote-bump 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 /* Shell route crossfade — CSS animation (not motion.div) so the browser
  * applies opacity: 0 before the first paint. A JS-driven initial={{opacity:0}}
  * gets set AFTER React's DOM commit, so the new page briefly renders at
