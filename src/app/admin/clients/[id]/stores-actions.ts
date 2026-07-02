@@ -25,6 +25,7 @@ async function requireAdminClient(clientId: string) {
 export async function addStore(input: {
   clientId: string;
   name: string;
+  address?: string;
   city?: string;
   countryCode?: string;
   externalId?: string;
@@ -42,6 +43,7 @@ export async function addStore(input: {
     .values({
       clientId: input.clientId,
       name,
+      address: input.address?.trim() || null,
       city: input.city?.trim() || null,
       countryCode: input.countryCode?.trim().toUpperCase() || null,
       externalId: input.externalId?.trim() || null,
@@ -62,6 +64,7 @@ export async function updateStore(input: {
   storeId: string;
   clientId: string;
   name?: string;
+  address?: string | null;
   city?: string | null;
   countryCode?: string | null;
   externalId?: string | null;
@@ -88,6 +91,8 @@ export async function updateStore(input: {
     if (!name) return { error: "Name cannot be empty" };
     patch.name = name;
   }
+  if (input.address !== undefined)
+    patch.address = input.address?.trim() || null;
   if (input.city !== undefined)
     patch.city = input.city?.trim() || null;
   if (input.countryCode !== undefined)
@@ -142,11 +147,12 @@ export async function deleteStore(input: { storeId: string; clientId: string }) 
  *  - CRLF or LF line endings
  *  - Trailing newlines and blank lines
  *
- * Returns array of { name, city?, countryCode?, externalId? } records.
+ * Returns array of { name, address?, city?, countryCode?, externalId? } records.
  */
 function parseCsv(input: string): {
   rows: {
     name: string;
+    address?: string;
     city?: string;
     countryCode?: string;
     externalId?: string;
@@ -159,14 +165,23 @@ function parseCsv(input: string): {
 
   // Auto-detect header
   const headerCandidates = lines[0].map((c) => c.toLowerCase().trim());
-  const expectedHeaders = ["name", "city", "country_code", "external_id"];
+  const expectedHeaders = [
+    "name",
+    "address",
+    "city",
+    "country_code",
+    "external_id",
+  ];
   const hasHeader = headerCandidates.some((h) => expectedHeaders.includes(h));
 
+  // Positional order for headerless CSVs. `address` is appended last so
+  // existing 4-column (name,city,country,external) files keep mapping correctly.
   let columnOrder: (keyof Record<string, string> | null)[] = [
     "name",
     "city",
     "countryCode",
     "externalId",
+    "address",
   ];
 
   let dataLines = lines;
@@ -175,6 +190,9 @@ function parseCsv(input: string): {
       switch (h) {
         case "name":
           return "name";
+        case "address":
+        case "street":
+          return "address";
         case "city":
           return "city";
         case "country_code":
@@ -213,6 +231,7 @@ function parseCsv(input: string): {
     }
     rows.push({
       name: record.name,
+      address: record.address || undefined,
       city: record.city || undefined,
       countryCode: record.countryCode || undefined,
       externalId: record.externalId || undefined,
@@ -302,6 +321,7 @@ export async function importStoresCsv(input: {
     toInsert.push({
       clientId: input.clientId,
       name: row.name,
+      address: row.address ?? null,
       city: row.city ?? null,
       countryCode: row.countryCode?.toUpperCase() ?? null,
       externalId: row.externalId ?? null,

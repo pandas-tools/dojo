@@ -11,6 +11,7 @@ import {
 type StoreRow = {
   id: string;
   name: string;
+  address: string | null;
   city: string | null;
   countryCode: string | null;
   externalId: string | null;
@@ -32,6 +33,7 @@ export default function StoresManager({
 
   // Manual add form
   const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
   const [externalId, setExternalId] = useState("");
@@ -47,6 +49,7 @@ export default function StoresManager({
       const res = await addStore({
         clientId,
         name,
+        address: address || undefined,
         city: city || undefined,
         countryCode: country || undefined,
         externalId: externalId || undefined,
@@ -56,6 +59,7 @@ export default function StoresManager({
         return;
       }
       setName("");
+      setAddress("");
       setCity("");
       setCountry("");
       setExternalId("");
@@ -129,7 +133,7 @@ export default function StoresManager({
       </div>
 
       {tab === "manual" ? (
-        <form onSubmit={onAdd} className="grid gap-3 sm:grid-cols-5 rounded-md border border-zinc-200 bg-white p-4">
+        <form onSubmit={onAdd} className="grid gap-3 sm:grid-cols-6 rounded-md border border-zinc-200 bg-white p-4">
           <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-zinc-600 mb-1">
               Name *
@@ -142,7 +146,18 @@ export default function StoresManager({
               className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
           </div>
-          <div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-medium text-zinc-600 mb-1">
+              Address
+            </label>
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Meir 78"
+              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+          </div>
+          <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-zinc-600 mb-1">City</label>
             <input
               value={city}
@@ -163,7 +178,7 @@ export default function StoresManager({
               className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm uppercase focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
           </div>
-          <div>
+          <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-zinc-600 mb-1">
               External ID
             </label>
@@ -174,7 +189,7 @@ export default function StoresManager({
               className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
           </div>
-          <div className="sm:col-span-5 flex justify-end">
+          <div className="sm:col-span-6 flex justify-end">
             <button
               type="submit"
               disabled={pending || !name}
@@ -193,6 +208,7 @@ export default function StoresManager({
             <p className="text-xs text-zinc-500 mb-2">
               Header row is optional. Recognized columns:{" "}
               <code className="font-mono">name</code> (required),{" "}
+              <code className="font-mono">address</code>,{" "}
               <code className="font-mono">city</code>,{" "}
               <code className="font-mono">country_code</code>,{" "}
               <code className="font-mono">external_id</code>. Rows with an{" "}
@@ -204,7 +220,7 @@ export default function StoresManager({
               value={csv}
               onChange={(e) => setCsv(e.target.value)}
               rows={8}
-              placeholder={`name,city,country_code,external_id\nOrange Antwerp Central,Antwerp,BE,A001\nOrange Brussels Midi,Brussels,BE,A002`}
+              placeholder={`name,address,city,country_code,external_id\nOrange Antwerp Central,Meir 78,Antwerp,BE,A001\nOrange Brussels Midi,Rue du Midi 12,Brussels,BE,A002`}
               className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-mono focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
           </div>
@@ -239,6 +255,7 @@ export default function StoresManager({
             <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500">
               <tr>
                 <th className="px-3 py-2">Name</th>
+                <th className="px-3 py-2">Address</th>
                 <th className="px-3 py-2">City</th>
                 <th className="px-3 py-2">Country</th>
                 <th className="px-3 py-2">External ID</th>
@@ -250,6 +267,7 @@ export default function StoresManager({
               {stores.map((s) => (
                 <tr key={s.id} className="border-t border-zinc-200">
                   <td className="px-3 py-2 font-medium">{s.name}</td>
+                  <td className="px-3 py-2 text-zinc-600">{s.address ?? "—"}</td>
                   <td className="px-3 py-2 text-zinc-600">{s.city ?? "—"}</td>
                   <td className="px-3 py-2 text-zinc-600 font-mono text-xs">
                     {s.countryCode ?? "—"}

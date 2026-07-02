@@ -112,6 +112,7 @@ export const stores = pgTable(
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    address: text("address"),
     city: text("city"),
     countryCode: text("country_code"),
     externalId: text("external_id"),

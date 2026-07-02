@@ -265,6 +265,7 @@ export default async function ClientDetailPage({
             stores={clientStores.map((s) => ({
               id: s.id,
               name: s.name,
+              address: s.address,
               city: s.city,
               countryCode: s.countryCode,
               externalId: s.externalId,
