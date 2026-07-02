@@ -3,7 +3,7 @@ import LoginIntro, {
   INTRO_SKIP_ATTR,
   INTRO_STORAGE_KEY,
 } from "@/components/LoginIntro";
-import PreLoginWizard from "./PreLoginWizard";
+import LoginForm from "./LoginForm";
 
 export const metadata = { title: "Sign in · Dojo" };
 
@@ -29,7 +29,7 @@ export default function LoginPage() {
         fetchPriority="high"
       />
       <AuthAtmosphere />
-      <PreLoginWizard />
+      <LoginForm />
       <LoginIntro />
     </main>
   );
