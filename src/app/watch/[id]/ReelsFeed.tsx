@@ -444,16 +444,16 @@ export default function ReelsFeed({
     if (celebrations.length !== 0) return;
     if (!advancePendingRef.current) return;
     advancePendingRef.current = false;
-    const nextIdx = nextUnwatchedIndex(items, activeIndexRef.current, completed);
-    if (nextIdx < 0) {
-      router.push("/browse");
-      return;
-    }
-    const target = items[nextIdx];
+    const cur = activeIndexRef.current;
+    const nextIdx = nextUnwatchedIndex(items, cur, completed);
+    // No unwatched left → cycle to the next lesson in scroll order (watched
+    // or not) rather than eject the user to /browse. Keeps them in the feed.
+    const targetIdx = nextIdx >= 0 ? nextIdx : (cur + 1) % items.length;
+    const target = items[targetIdx];
     if (!target) return;
     const el = sectionRefs.current.get(target.id);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [celebrations.length, completed, items, router, disableTracking]);
+  }, [celebrations.length, completed, items, disableTracking]);
 
   const gotoIndex = useCallback(
     (next: number) => {

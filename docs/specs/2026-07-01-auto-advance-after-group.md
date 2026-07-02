@@ -51,7 +51,7 @@ Result: the "you just finished a group" moment ends in a dead-end, and the "you 
 
 - Walk `items` starting at `activeIndex + 1`, wrapping to `0` on the way, stopping at `activeIndex` again. The first item whose id is NOT in the `completed` set wins.
 - Call `gotoIndex(nextIndex)` (existing helper — smooth scroll to that section).
-- If **none** are unwatched: navigate to `/browse`. This mirrors the exhausted state already handled in `(shell)/layout.tsx` (where `firstIncomplete` falls back to `lessons[0]` for onboarding, but exhausted-mid-session belongs on `/browse` as the "you're done for now" surface).
+- If **none** are unwatched: cycle to `(activeIndex + 1) % items.length` — the next lesson in scroll order, watched or not. Keeps the user inside the Reels tab rather than ejecting to `/browse`; the training-complete tier modal (below) still fires beforehand, so the "you're done" signal is preserved without ripping them out of the feed. **Reversed from the original 2026-07-01 decision** (which routed to `/browse`) — see 2026-07-02 note below.
 
 ### Stacked-celebration behavior
 
@@ -79,13 +79,13 @@ The training-complete case is a natural fit for the exhausted branch of auto-adv
 1. User completes final lesson → server emits `groupCompleted` + `tierUnlocked{trainingComplete: true}`.
 2. Celebration queue: tier modal first (with new subtitle), then group modal (rating).
 3. `advancePendingRef` is set to `true` by the fresh `groupCompleted`.
-4. User dismisses both → burst drains → advance fires → walks feed → nothing unwatched → routes to `/browse`.
+4. User dismisses both → burst drains → advance fires → walks feed → nothing unwatched → cycles to the next lesson in scroll order (already watched).
 
 The two features compose cleanly with no special-case branching for "last lesson."
 
 ## Edge cases
 
-- **Feed of length 1**: after celebration drain, there IS no other item. Route to `/browse`.
+- **Feed of length 1**: after celebration drain, `(0 + 1) % 1 === 0` — the cycle target IS the current section, so the smooth-scroll is a no-op. User stays put. Correct.
 - **User scrolls to a different lesson mid-celebration**: the celebration modal blocks scroll gestures currently, so this shouldn't happen. If it does, we still advance from the (new) `activeIndex` at the moment the burst ends — that's the correct anchor.
 - **User completes the same group twice by re-watching**: `groupCompleted.alreadyRated` short-circuits the celebration ([ReelsFeed.tsx:157](../../src/app/watch/[id]/ReelsFeed.tsx#L157)). No celebration → no burst → no advance. Correct.
 - **A tier / first-three fires with no group**: no advance. See "Stacked-celebration behavior" above.
@@ -104,7 +104,7 @@ The two features compose cleanly with no special-case branching for "last lesson
 - **Unit**: a small `nextUnwatchedIndex(items, activeIndex, completedSet)` pure function is easy to test — cover: forward hit, wraparound hit, all-completed → -1, active is only uncompleted → -1.
 - **Integration** (Vitest, existing pattern): mount `ReelsFeed` with a test items array and simulate `handleLessonCompleted` fires with a `groupCompleted` payload. Assert that after `submitGroupRating` resolves, `scrollIntoView` is called on the expected next-unwatched section (mock via `sectionRefs`). Also assert the negative case: a `tierUnlocked`-only payload does NOT trigger `scrollIntoView` after dismissal.
 - **Server unit** (extend [`success-detectors.test.ts`](../../src/tests/success-detectors.test.ts)): a scenario where completion #N crosses into the top tier AND brings the user to 100%. Assert the returned `tierUnlocked.trainingComplete === true`. Also assert `false` for a mid-tier crossing that doesn't hit 100%.
-- **Manual**: preview URL, use test tenant with a fixture user 3 lessons deep in a 4-lesson group. Complete lesson 4 → rate → observe scroll to next-unwatched lesson in a different group. Then complete the very last lesson → observe the Expert modal with the new "That's every lesson done" subtitle → dismiss → observe route to `/browse`.
+- **Manual**: preview URL, use test tenant with a fixture user 3 lessons deep in a 4-lesson group. Complete lesson 4 → rate → observe scroll to next-unwatched lesson in a different group. Then complete the very last lesson → observe the Expert modal with the new "That's every lesson done" subtitle → dismiss → observe smooth-scroll to the next lesson in scroll order (already watched) — user stays in the Reels feed.
 
 ## Rollout
 
@@ -115,3 +115,7 @@ Single PR bundling both changes. No feature flag — the auto-advance is additiv
 - Existing `completedIds` pattern: [`(shell)/layout.tsx`](../../src/app/(shell)/layout.tsx), [`page.tsx`](../../src/app/page.tsx), [`browse.ts`](../../src/lib/browse.ts).
 - Celebration queue logic: [`ReelsFeed.tsx:143-175`](../../src/app/watch/[id]/ReelsFeed.tsx#L143-L175).
 - Feed order: [`scoped.ts:135`](../../src/lib/db/scoped.ts#L135) (`sortOrder ASC`).
+
+## Revision — 2026-07-02
+
+The **exhausted-feed branch** of auto-advance was changed from "route to `/browse`" to "cycle to `(activeIndex + 1) % items.length`" (see "Next unwatched" resolution above). Rationale from Dimi: the Watch tab shouldn't dead-end. Group-completion celebration still fires exactly as before — after dismissal, the user simply stays in the Reels feed instead of being ejected. The training-complete tier modal still carries the "That's every lesson done" signal, so nothing is lost semantically.
