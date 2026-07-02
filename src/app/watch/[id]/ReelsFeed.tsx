@@ -780,7 +780,7 @@ export default function ReelsFeed({
                             e.stopPropagation();
                             void toggleBookmark(it.id);
                           }}
-                          className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                          className="flex h-12 w-12 items-center justify-center text-[#f9fdff]"
                         >
                           <Bookmark
                             className={cn(
@@ -800,7 +800,7 @@ export default function ReelsFeed({
                             e.stopPropagation();
                             void toggleUpvote(it.id);
                           }}
-                          className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                          className="flex h-12 w-12 items-center justify-center text-[#f9fdff]"
                         >
                           <ThumbsUp
                             className={cn(
@@ -904,10 +904,10 @@ export default function ReelsFeed({
 
                 {/* SIDE RAIL — desktop only, vertical stack immediately to
                     the right of the card (or the notes panel, when present).
-                    All buttons share the same 48px circular-stroke treatment.
-                    Upvote on top; nav arrows below with a small gap. Mute
-                    lives on top of the video, no stroke, top-right of the
-                    card. */}
+                    Bookmark and upvote are strokeless icon buttons; nav
+                    arrows below keep the 48px circular-stroke treatment.
+                    Mute lives on top of the video, no stroke, top-right of
+                    the card. */}
                 <div className="pointer-events-auto hidden lg:flex flex-col gap-2">
                   <button
                     type="button"
@@ -919,7 +919,7 @@ export default function ReelsFeed({
                       e.stopPropagation();
                       void toggleBookmark(it.id);
                     }}
-                    className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                    className="flex h-12 w-12 items-center justify-center text-[#f9fdff]"
                   >
                     <Bookmark
                       className={cn(
@@ -939,7 +939,7 @@ export default function ReelsFeed({
                       e.stopPropagation();
                       void toggleUpvote(it.id);
                     }}
-                    className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+                    className="flex h-12 w-12 items-center justify-center text-[#f9fdff]"
                   >
                     <ThumbsUp
                       className={cn(
