@@ -14,7 +14,7 @@ export default function SuccessGroupPreviewPage() {
       />
       <ConfettiBurst intensity="lesson" />
       <div className="relative z-10 flex w-full max-w-md items-center justify-center">
-        <SuccessGroupCard />
+        <SuccessGroupCard onSkip={() => {}} />
       </div>
     </main>
   );

@@ -1070,24 +1070,29 @@ export default function ReelsFeed({
           <ConfettiBurst
             intensity={celebration.kind === "tier" ? "tier" : "lesson"}
           />
-          <button
-            type="button"
-            aria-label="Dismiss"
-            onClick={(e) => {
-              e.stopPropagation();
-              popCelebration();
-            }}
-            className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
-            style={{ top: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
-          >
-            <X className="h-4 w-4" strokeWidth={2} />
-          </button>
+          {celebration.kind !== "group" && (
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={(e) => {
+                e.stopPropagation();
+                popCelebration();
+              }}
+              className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+              style={{ top: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
+            >
+              <X className="h-4 w-4" strokeWidth={2} />
+            </button>
+          )}
           <div
             className="relative z-10 flex w-full max-w-md items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
             {celebration.kind === "group" && (
-              <SuccessGroupCard onSubmit={submitGroupRating} />
+              <SuccessGroupCard
+                onSubmit={submitGroupRating}
+                onSkip={popCelebration}
+              />
             )}
             {celebration.kind === "firstThree" && (
               <SuccessCard
