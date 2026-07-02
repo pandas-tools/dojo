@@ -6,6 +6,7 @@ import {
   addStore,
   deleteStore,
   importStoresCsv,
+  updateStore,
 } from "./stores-actions";
 
 type StoreRow = {
@@ -17,6 +18,9 @@ type StoreRow = {
   externalId: string | null;
   isActive: boolean;
 };
+
+const CELL_INPUT =
+  "w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500";
 
 export default function StoresManager({
   clientId,
@@ -40,6 +44,17 @@ export default function StoresManager({
 
   // CSV form
   const [csv, setCsv] = useState("");
+
+  // Inline edit
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [edit, setEdit] = useState({
+    name: "",
+    address: "",
+    city: "",
+    countryCode: "",
+    externalId: "",
+    isActive: true,
+  });
 
   function onAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -90,6 +105,48 @@ export default function StoresManager({
         setCsv("");
         router.refresh();
       }
+    });
+  }
+
+  function startEdit(s: StoreRow) {
+    setError(null);
+    setSuccess(null);
+    setEditingId(s.id);
+    setEdit({
+      name: s.name,
+      address: s.address ?? "",
+      city: s.city ?? "",
+      countryCode: s.countryCode ?? "",
+      externalId: s.externalId ?? "",
+      isActive: s.isActive,
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  function onSaveEdit(storeId: string) {
+    setError(null);
+    setSuccess(null);
+    startTransition(async () => {
+      const res = await updateStore({
+        storeId,
+        clientId,
+        name: edit.name,
+        address: edit.address,
+        city: edit.city,
+        countryCode: edit.countryCode,
+        externalId: edit.externalId,
+        isActive: edit.isActive,
+      });
+      if (res?.error) {
+        setError(res.error);
+        return;
+      }
+      setEditingId(null);
+      setSuccess("Store updated.");
+      router.refresh();
     });
   }
 
@@ -264,30 +321,123 @@ export default function StoresManager({
               </tr>
             </thead>
             <tbody>
-              {stores.map((s) => (
-                <tr key={s.id} className="border-t border-zinc-200">
-                  <td className="px-3 py-2 font-medium">{s.name}</td>
-                  <td className="px-3 py-2 text-zinc-600">{s.address ?? "—"}</td>
-                  <td className="px-3 py-2 text-zinc-600">{s.city ?? "—"}</td>
-                  <td className="px-3 py-2 text-zinc-600 font-mono text-xs">
-                    {s.countryCode ?? "—"}
-                  </td>
-                  <td className="px-3 py-2 text-zinc-600 font-mono text-xs">
-                    {s.externalId ?? "—"}
-                  </td>
-                  <td className="px-3 py-2">{s.isActive ? "✓" : "—"}</td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => onDelete(s.id, s.name)}
-                      disabled={pending}
-                      className="text-xs text-red-700 hover:underline disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {stores.map((s) =>
+                editingId === s.id ? (
+                  <tr key={s.id} className="border-t border-zinc-200 bg-zinc-50/60">
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        value={edit.name}
+                        onChange={(e) =>
+                          setEdit((v) => ({ ...v, name: e.target.value }))
+                        }
+                        placeholder="Name"
+                        className={CELL_INPUT}
+                      />
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        value={edit.address}
+                        onChange={(e) =>
+                          setEdit((v) => ({ ...v, address: e.target.value }))
+                        }
+                        placeholder="Address"
+                        className={CELL_INPUT}
+                      />
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        value={edit.city}
+                        onChange={(e) =>
+                          setEdit((v) => ({ ...v, city: e.target.value }))
+                        }
+                        placeholder="City"
+                        className={CELL_INPUT}
+                      />
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        value={edit.countryCode}
+                        onChange={(e) =>
+                          setEdit((v) => ({ ...v, countryCode: e.target.value }))
+                        }
+                        placeholder="BE"
+                        maxLength={2}
+                        className={`${CELL_INPUT} uppercase`}
+                      />
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        value={edit.externalId}
+                        onChange={(e) =>
+                          setEdit((v) => ({ ...v, externalId: e.target.value }))
+                        }
+                        placeholder="A001"
+                        className={CELL_INPUT}
+                      />
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        type="checkbox"
+                        checked={edit.isActive}
+                        onChange={(e) =>
+                          setEdit((v) => ({ ...v, isActive: e.target.checked }))
+                        }
+                        aria-label="Active"
+                        className="h-4 w-4 accent-zinc-900"
+                      />
+                    </td>
+                    <td className="px-3 py-2 align-top text-right whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => onSaveEdit(s.id)}
+                        disabled={pending || !edit.name.trim()}
+                        className="text-xs font-medium text-zinc-900 hover:underline disabled:opacity-50"
+                      >
+                        {pending ? "Saving…" : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        disabled={pending}
+                        className="ml-3 text-xs text-zinc-500 hover:underline disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={s.id} className="border-t border-zinc-200">
+                    <td className="px-3 py-2 font-medium">{s.name}</td>
+                    <td className="px-3 py-2 text-zinc-600">{s.address ?? "—"}</td>
+                    <td className="px-3 py-2 text-zinc-600">{s.city ?? "—"}</td>
+                    <td className="px-3 py-2 text-zinc-600 font-mono text-xs">
+                      {s.countryCode ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-zinc-600 font-mono text-xs">
+                      {s.externalId ?? "—"}
+                    </td>
+                    <td className="px-3 py-2">{s.isActive ? "✓" : "—"}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(s)}
+                        disabled={pending}
+                        className="text-xs text-zinc-700 hover:underline disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(s.id, s.name)}
+                        disabled={pending}
+                        className="ml-3 text-xs text-red-700 hover:underline disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ),
+              )}
             </tbody>
           </table>
         )}
