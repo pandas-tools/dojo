@@ -49,11 +49,16 @@ export default function ReelsProbe() {
     };
 
     const post = (partial: boolean) =>
-      fetch("/api/_rt", {
+      fetch("/api/rtrace", {
         method: "POST",
         headers: { "content-type": "application/json" },
         keepalive: true,
-        body: JSON.stringify({ ua: navigator.userAgent, partial, trace: [...trace] }),
+        body: JSON.stringify({
+          ua: navigator.userAgent,
+          partial,
+          trace: [...trace],
+          events: (window as unknown as { __rt?: unknown[] }).__rt ?? [],
+        }),
       }).catch(() => {});
 
     let n = 0;

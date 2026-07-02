@@ -91,6 +91,16 @@ function glowSourceUrl(item: FeedItem): string | null {
   return null;
 }
 
+// TEMPORARY (reels reload investigation): no-op unless the URL contains
+// `reeldebug`. Pushes labelled events to window.__rt; ReelsProbe ships them to
+// /api/_rt so a real-Safari trace is readable server-side. REMOVE after fix.
+function dbg(label: string, extra?: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
+  if (!window.location.search.includes("reeldebug")) return;
+  const w = window as unknown as { __rt?: Record<string, unknown>[] };
+  (w.__rt ||= []).push({ t: Math.round(performance.now()), label, ...extra });
+}
+
 export default function ReelsFeed({
   items,
   initialId,
@@ -423,14 +433,19 @@ export default function ReelsFeed({
     const container = containerRef.current;
     const targetId = items[initialIndex]?.id;
     if (!container || !targetId) return;
+    dbg("mount", { initialIndex, st: Math.round(container.scrollTop) });
     let raf = 0;
+    let frames = 0;
     const start = performance.now();
     const pin = () => {
-      if (reconciledRef.current || performance.now() - start > 2500) return;
+      if (reconciledRef.current) { dbg("pin:stop", { reason: "reconciled", frames }); return; }
+      if (performance.now() - start > 2500) { dbg("pin:stop", { reason: "deadline", frames }); return; }
       const el = sectionRefs.current.get(targetId);
       if (el && Math.abs(container.scrollTop - el.offsetTop) > 1) {
+        dbg("pin:set", { to: Math.round(el.offsetTop), was: Math.round(container.scrollTop) });
         container.scrollTop = el.offsetTop;
       }
+      frames++;
       raf = requestAnimationFrame(pin);
     };
     raf = requestAnimationFrame(pin);
@@ -465,7 +480,10 @@ export default function ReelsFeed({
             const firstId = items[0]?.id;
             if (!firstId) return;
             const firstReal = sectionRefs.current.get(firstId);
-            if (firstReal) container.scrollTop = firstReal.offsetTop;
+            if (firstReal) {
+              dbg("sentinel:teleport", { st: Math.round(container.scrollTop) });
+              container.scrollTop = firstReal.offsetTop;
+            }
             return;
           }
         }
@@ -487,6 +505,7 @@ export default function ReelsFeed({
           initialIndex,
           reconciled: reconciledRef.current,
         });
+        dbg("obs", { idx, accept, wasRec: reconciledRef.current, eng: userEngagedRef.current, st: Math.round(container.scrollTop) });
         reconciledRef.current = reconciled;
         if (!accept) return;
         setActiveIndex(idx);
@@ -503,7 +522,8 @@ export default function ReelsFeed({
     // (e.g. layout not ready), the guard above would otherwise pin activeIndex
     // to the target forever. The first real user interaction hands the observer
     // control unconditionally, so scrolling can never wedge.
-    const releaseGuard = () => {
+    const releaseGuard = (e: Event) => {
+      dbg("release", { via: e.type, st: Math.round(container.scrollTop) });
       reconciledRef.current = true;
       userEngagedRef.current = true;
     };
