@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import AuthAtmosphere from "@/components/AuthAtmosphere";
 import SuccessAtmosphere from "@/components/SuccessAtmosphere";
@@ -10,24 +10,14 @@ import LanguageStep from "./steps/LanguageStep";
 import StoreStep from "./steps/StoreStep";
 import AllSetStep from "./steps/AllSetStep";
 
-const PRELOGIN_KEY = "dojo:pending-onboarding";
-const PRELOGIN_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h — matches magic link
-
-type PendingOnboarding = {
-  email?: string;
-  storeId: string | null;
-  language: string;
-  ts: number;
-};
-
 type StoreRow = { id: string; name: string; city: string | null };
-type Step = "language" | "store" | "done";
+type Step = "store" | "language" | "done";
 
 const TRANSITION = { duration: 0.4, ease: [0.25, 1, 0.5, 1] } as const;
 
 const STEP_TITLE: Record<Exclude<Step, "done">, string> = {
-  language: "Select your Language",
   store: "Select your Store",
+  language: "Select your Language",
 };
 
 export default function OnboardingWizard({
@@ -43,11 +33,9 @@ export default function OnboardingWizard({
   initialStoreId: string | null;
   mode: "first" | "reconfirm";
 }) {
-  const [step, setStep] = useState<Step>("language");
+  const [step, setStep] = useState<Step>("store");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  // Guard so the auto-apply effect only fires once per mount.
-  const autoAppliedRef = useRef(false);
 
   const defaultLanguage = languages.includes(initialLanguage)
     ? initialLanguage
@@ -60,7 +48,7 @@ export default function OnboardingWizard({
     initialStoreId ?? stores[0]?.id ?? "",
   );
 
-  const currentSegment = step === "language" ? 2 : 3;
+  const currentSegment = step === "store" ? 2 : 3;
   const submitLabel = mode === "reconfirm" ? "Confirm" : "Finish";
 
   function handleSubmit() {
@@ -77,74 +65,6 @@ export default function OnboardingWizard({
       setStep("done");
     });
   }
-
-  // Auto-apply data the user picked in the pre-login wizard. If the
-  // localStorage payload is present + fresh, complete onboarding silently
-  // and skip the in-page wizard entirely.
-  useEffect(() => {
-    if (autoAppliedRef.current) return;
-    if (typeof window === "undefined") return;
-    let raw: string | null;
-    try {
-      raw = window.localStorage.getItem(PRELOGIN_KEY);
-    } catch {
-      return;
-    }
-    if (!raw) return;
-    let pending: PendingOnboarding | null;
-    try {
-      pending = JSON.parse(raw) as PendingOnboarding;
-    } catch {
-      try {
-        window.localStorage.removeItem(PRELOGIN_KEY);
-      } catch {
-        // ignore
-      }
-      return;
-    }
-    if (!pending || Date.now() - pending.ts > PRELOGIN_MAX_AGE_MS) {
-      try {
-        window.localStorage.removeItem(PRELOGIN_KEY);
-      } catch {
-        // ignore
-      }
-      return;
-    }
-    autoAppliedRef.current = true;
-    const langValid = languages.includes(pending.language);
-    const storeValid =
-      pending.storeId === null ||
-      stores.some((s) => s.id === pending.storeId);
-    if (!langValid || !storeValid) {
-      // Stale payload — don't apply, fall through to manual wizard.
-      try {
-        window.localStorage.removeItem(PRELOGIN_KEY);
-      } catch {
-        // ignore
-      }
-      return;
-    }
-    // Apply silently — completeOnboarding action runs, success → done step
-    // (which shows AllSet then auto-routes to /).
-    startTransition(async () => {
-      const res = await completeOnboarding({
-        language: pending.language,
-        storeId: pending.storeId,
-      });
-      try {
-        window.localStorage.removeItem(PRELOGIN_KEY);
-      } catch {
-        // ignore
-      }
-      if (!res?.error) {
-        setLanguage(pending.language);
-        if (pending.storeId === null) setHq(true);
-        else setStoreId(pending.storeId);
-        setStep("done");
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   if (step === "done") {
     return (
@@ -174,22 +94,6 @@ export default function OnboardingWizard({
       {/* CONTENT — vertically centered, 327px wide */}
       <div className="absolute left-1/2 top-1/2 w-[327px] -translate-x-1/2 -translate-y-1/2">
         <AnimatePresence mode="wait" initial={false}>
-          {step === "language" && (
-            <motion.div
-              key="language"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={TRANSITION}
-            >
-              <LanguageStep
-                languages={languages}
-                value={language}
-                onChange={setLanguage}
-              />
-            </motion.div>
-          )}
-
           {step === "store" && (
             <motion.div
               key="store"
@@ -208,6 +112,22 @@ export default function OnboardingWizard({
               />
             </motion.div>
           )}
+
+          {step === "language" && (
+            <motion.div
+              key="language"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={TRANSITION}
+            >
+              <LanguageStep
+                languages={languages}
+                value={language}
+                onChange={setLanguage}
+              />
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -215,23 +135,23 @@ export default function OnboardingWizard({
       <div className="absolute left-0 right-0 top-[86%] flex items-center gap-2 px-6">
         <BackButton
           onClick={() =>
-            step === "store" ? setStep("language") : undefined
+            step === "language" ? setStep("store") : undefined
           }
-          disabled={pending || step === "language"}
+          disabled={pending || step === "store"}
         />
         <button
           type="button"
           onClick={() =>
-            step === "language" ? setStep("store") : handleSubmit()
+            step === "store" ? setStep("language") : handleSubmit()
           }
           disabled={
             pending ||
-            (step === "language" && !language) ||
-            (step === "store" && !hq && !storeId)
+            (step === "store" && !hq && !storeId) ||
+            (step === "language" && !language)
           }
           className="flex h-[56px] flex-1 items-center justify-center rounded-[40px] bg-[#0e0e0e] px-8 text-[16px] font-normal leading-[1.3] text-[#fefefe] transition-colors duration-200 hover:bg-[#1a1a1a] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {pending ? "Saving…" : step === "language" ? "Continue" : submitLabel}
+          {pending ? "Saving…" : step === "store" ? "Continue" : submitLabel}
         </button>
       </div>
       </div>
