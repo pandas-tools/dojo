@@ -13,6 +13,7 @@ import {
   type TierConfig,
 } from "@/lib/tiers";
 import { cn } from "@/lib/cn";
+import AnimatedEmoji from "@/components/AnimatedEmoji";
 
 type GroupProgress = { name: string; completed: number; total: number };
 
@@ -195,8 +196,12 @@ function TierModal({
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/30 text-xl">
-                    {tier.emoji}
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/30">
+                    <AnimatedEmoji
+                      emoji={tier.emoji}
+                      play
+                      className="h-6 w-6"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

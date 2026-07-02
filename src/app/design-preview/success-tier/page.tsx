@@ -1,6 +1,7 @@
 import SuccessAtmosphere from "@/components/SuccessAtmosphere";
 import SuccessCard from "@/components/SuccessCard";
 import ConfettiBurst from "@/components/ConfettiBurst";
+import AnimatedEmoji from "@/components/AnimatedEmoji";
 
 export const metadata = { title: "New tier · Preview" };
 
@@ -17,7 +18,7 @@ export default async function SuccessTierPreviewPage({
       <ConfettiBurst intensity="tier" />
       <div className="relative z-10 flex w-full max-w-md items-center justify-center">
         <SuccessCard
-          icon={<span className="text-4xl leading-none">🏆</span>}
+          icon={<AnimatedEmoji emoji="🏆" play className="h-10 w-10" />}
           title={<>Congrats! You&apos;ve just unlocked a new tier.</>}
           subtitle={
             trainingComplete

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
-import TierEmoji from "./TierEmoji";
+import AnimatedEmoji from "./AnimatedEmoji";
 
 /**
  * TierProgressPopup — modal showing the user's tier ladder + a progress bar
@@ -27,7 +27,7 @@ export type TierStanding = {
   name: string;
   /** Display order in the tier ladder (0-indexed). */
   sortOrder: number;
-  /** Emoji glyph from tier config — resolved to Noto Lottie in <TierEmoji>. */
+  /** Emoji glyph from tier config — resolved to Noto Lottie in <AnimatedEmoji>. */
   emoji: string;
 };
 
@@ -249,7 +249,7 @@ function TierCircle({
               }
         }
       >
-        <TierEmoji
+        <AnimatedEmoji
           emoji={emoji}
           play
           className={iconSize}

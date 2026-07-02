@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
+import AnimatedEmoji from "@/components/AnimatedEmoji";
 import ReorderButtons from "./ReorderButtons";
 import EditTierDialog from "./EditTierDialog";
 import { deleteTier } from "./actions";
@@ -69,9 +70,11 @@ function Row({ row }: { row: TierRow }) {
       />
 
       <div className="flex items-center gap-3 min-w-0">
-        <span className="text-xl leading-none" aria-hidden>
-          {row.emoji}
-        </span>
+        <AnimatedEmoji
+          emoji={row.emoji}
+          play
+          className="h-5 w-5 shrink-0"
+        />
         <span className="font-medium text-zinc-900 truncate">{row.name}</span>
       </div>
 

@@ -28,6 +28,7 @@ import UpvoteBurst from "@/components/UpvoteBurst";
 import SuccessAtmosphere from "@/components/SuccessAtmosphere";
 import ConfettiBurst from "@/components/ConfettiBurst";
 import SuccessCard from "@/components/SuccessCard";
+import AnimatedEmoji from "@/components/AnimatedEmoji";
 import SuccessGroupCard, {
   type GroupRating,
 } from "@/components/SuccessGroupCard";
@@ -1047,7 +1048,7 @@ export default function ReelsFeed({
             )}
             {celebration.kind === "firstThree" && (
               <SuccessCard
-                icon={<span className="text-4xl leading-none">🎉</span>}
+                icon={<AnimatedEmoji emoji="🎉" play className="h-10 w-10" />}
                 title={
                   <>Congrats! You&apos;ve just completed your first three lessons.</>
                 }
@@ -1057,9 +1058,11 @@ export default function ReelsFeed({
             {celebration.kind === "tier" && (
               <SuccessCard
                 icon={
-                  <span className="text-4xl leading-none">
-                    {celebration.tierEmoji}
-                  </span>
+                  <AnimatedEmoji
+                    emoji={celebration.tierEmoji}
+                    play
+                    className="h-10 w-10"
+                  />
                 }
                 title={
                   <>

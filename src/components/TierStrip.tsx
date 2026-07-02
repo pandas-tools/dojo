@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import TierProgressPopup, { type TierStanding } from "./TierProgressPopup";
-import TierEmoji from "./TierEmoji";
+import AnimatedEmoji from "./AnimatedEmoji";
 
 /**
  * TierStrip — compact tier-progress pill at the top of Library / Bookmark.
@@ -49,7 +49,7 @@ export default function TierStrip({
         }}
       >
         <div className="flex flex-1 items-center gap-2">
-          <TierEmoji
+          <AnimatedEmoji
             emoji={currentTier.emoji}
             play
             className="h-4 w-4 shrink-0"

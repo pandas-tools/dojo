@@ -5,21 +5,21 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 
 /**
- * TierEmoji — renders the Noto animated emoji for a tier badge. Maps
- * `emoji` → codepoint → self-hosted Lottie JSON in /public/emoji/. Plays
- * on loop when `play` is true; frozen at frame 0 otherwise (still visible,
- * just static). Respects prefers-reduced-motion. Falls back to the raw
- * text glyph if the JSON is missing so we never blank.
+ * AnimatedEmoji — renders a Noto animated emoji (Google's noto-emoji-animation
+ * set). Maps `emoji` → codepoint → self-hosted Lottie JSON in /public/emoji/.
+ * Plays on loop when `play` is true; frozen at frame 0 otherwise (still visible,
+ * just static). Respects prefers-reduced-motion. Falls back to the raw text
+ * glyph if the JSON is missing so we never blank.
  */
 
-// Module-level cache so the popup + pill don't refetch the same tier's JSON.
+// Module-level cache so multiple sites don't refetch the same emoji's JSON.
 const CACHE = new Map<string, object | "missing">();
 
 function codepointOf(emoji: string): string {
   return emoji.codePointAt(0)?.toString(16) ?? "";
 }
 
-export default function TierEmoji({
+export default function AnimatedEmoji({
   emoji,
   play = false,
   className,

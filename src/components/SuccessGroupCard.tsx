@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
+import AnimatedEmoji from "./AnimatedEmoji";
 
 /**
  * SuccessGroupCard — group-completion success popup with emoji rating +
@@ -25,7 +26,7 @@ const RATINGS: { id: GroupRating; emoji: string; label: string }[] = [
 ];
 
 export default function SuccessGroupCard({
-  icon = <span className="text-4xl leading-none">🎉</span>,
+  icon = <AnimatedEmoji emoji="🎉" play className="h-10 w-10" />,
   title = "Congrats! You've just completed this group.",
   onSubmit,
 }: {
@@ -77,13 +78,17 @@ export default function SuccessGroupCard({
               >
                 <span
                   className={cn(
-                    "text-[40px] leading-none transition-[filter,opacity] duration-200",
+                    "block h-10 w-10 transition-[filter,opacity] duration-200",
                     selected
                       ? "opacity-100 [filter:drop-shadow(0_0_12px_rgba(193,232,251,0.65))]"
                       : "opacity-55",
                   )}
                 >
-                  {r.emoji}
+                  <AnimatedEmoji
+                    emoji={r.emoji}
+                    play={selected}
+                    className="h-full w-full"
+                  />
                 </span>
                 <span
                   className={cn(
