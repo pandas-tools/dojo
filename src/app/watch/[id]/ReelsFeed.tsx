@@ -887,14 +887,14 @@ export default function ReelsFeed({
                 {hasNotes && (
                   <aside
                     data-no-shell-gesture
-                    className="pointer-events-auto hidden lg:flex lg:flex-col h-[min(90vh,880px)] w-[360px] overflow-hidden rounded-2xl border border-white/10 bg-[rgba(14,14,14,0.85)] text-[#f9fdff] backdrop-blur-md shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)]"
+                    className="pointer-events-auto hidden lg:flex lg:flex-col max-h-[min(90vh,880px)] w-[360px] overflow-hidden rounded-2xl border border-white/10 bg-[rgba(14,14,14,0.85)] text-[#f9fdff] backdrop-blur-md shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)]"
                   >
-                    <div className="border-b border-white/8 px-6 pt-6 pb-4">
+                    <div className="shrink-0 border-b border-white/8 px-6 pt-6 pb-4">
                       <p className="text-[11px] uppercase tracking-[0.14em] text-[#f9fdff]/55">
                         Notes
                       </p>
                     </div>
-                    <div className="dojo-notes-scroll flex-1 overflow-y-auto px-6 py-5">
+                    <div className="dojo-notes-scroll min-h-0 flex-1 overflow-y-auto px-6 py-5">
                       {it.notesMarkdown && (
                         <NotesMarkdown>{it.notesMarkdown}</NotesMarkdown>
                       )}
