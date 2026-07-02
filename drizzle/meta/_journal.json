@@ -92,6 +92,13 @@
       "when": 1783300000000,
       "tag": "0012_backfill_lesson_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1783400000000,
+      "tag": "0013_formatted_placeholder_notes",
+      "breakpoints": true
     }
   ]
 }

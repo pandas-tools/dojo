@@ -23,6 +23,7 @@ import { toggleBookmark as toggleBookmarkAction } from "@/app/(shell)/browse/act
 import VideoNotesSheet, {
   NOTES_INITIAL_SNAP,
 } from "@/components/VideoNotesSheet";
+import NotesMarkdown from "@/components/NotesMarkdown";
 import UpvoteBurst from "@/components/UpvoteBurst";
 import SuccessAtmosphere from "@/components/SuccessAtmosphere";
 import ConfettiBurst from "@/components/ConfettiBurst";
@@ -882,8 +883,10 @@ export default function ReelsFeed({
                         Notes
                       </p>
                     </div>
-                    <div className="flex-1 overflow-y-auto whitespace-pre-wrap px-6 py-5 text-[13px] leading-[20px] text-[#f9fdff]/85">
-                      {it.notesMarkdown}
+                    <div className="flex-1 overflow-y-auto px-6 py-5">
+                      {it.notesMarkdown && (
+                        <NotesMarkdown>{it.notesMarkdown}</NotesMarkdown>
+                      )}
                     </div>
                   </aside>
                 )}

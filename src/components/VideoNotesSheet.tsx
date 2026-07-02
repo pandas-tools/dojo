@@ -1,6 +1,7 @@
 "use client";
 
 import { Drawer } from "vaul";
+import NotesMarkdown from "@/components/NotesMarkdown";
 
 /**
  * VideoNotesSheet — bottom sheet that surfaces the lesson's notes content.
@@ -99,9 +100,7 @@ export default function VideoNotesSheet({
               own snap-point transform controls how much of it is visible. */}
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-10 pb-12">
             {notesMarkdown && notesMarkdown.trim().length > 0 ? (
-              <div className="space-y-4 whitespace-pre-wrap text-[14px] leading-[22px] text-[#f9fdff]/85">
-                {notesMarkdown}
-              </div>
+              <NotesMarkdown>{notesMarkdown}</NotesMarkdown>
             ) : (
               <EmptyNotes />
             )}

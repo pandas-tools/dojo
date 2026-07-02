@@ -301,7 +301,27 @@ async function main() {
         console.log(`    = lesson exists: ${spec.title}`);
       }
 
-      const fixtureNotes = `# ${spec.title}\n\nFixture notes for /browse design review. Replace with real content when the lesson is authored.\n\n- Key point one\n- Key point two\n- Key point three`;
+      const fixtureNotes = [
+        `**About this lesson**`,
+        ``,
+        `This is placeholder content so you can see how the notes panel reads. Replace it with the real summary from the lesson admin view.`,
+        ``,
+        `---`,
+        ``,
+        `**What you'll learn**`,
+        ``,
+        `- The key idea, in a single line`,
+        `- A step that comes up with customers`,
+        `- A common mistake to avoid`,
+        ``,
+        `---`,
+        ``,
+        `**Good to remember**`,
+        ``,
+        `_Keep notes short — employees skim these between customers._`,
+        ``,
+        `Questions? Ask your store lead.`,
+      ].join("\n");
 
       // Translation — copy the recycled media verbatim. ON CONFLICT (lesson,
       // lang) DO NOTHING so a re-run never clobbers hand-edits.
