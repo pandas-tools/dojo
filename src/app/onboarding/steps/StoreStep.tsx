@@ -170,7 +170,10 @@ export default function StoreStep({
           <div
             role="listbox"
             aria-label="Stores"
-            className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 flex max-h-[340px] flex-col gap-2 overflow-hidden rounded-[24px] border border-[#445158] bg-near-black/90 p-2 backdrop-blur-xl"
+            // Panel top sits at ~50dvh + 34px (centered trigger + gap); the
+            // CTA row starts at 86dvh. Cap height to the space between them
+            // so the open panel never covers the Continue button.
+            className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 flex max-h-[min(340px,calc(36dvh-48px))] flex-col gap-2 overflow-hidden rounded-[24px] border border-[#445158] bg-near-black/90 p-2 backdrop-blur-xl"
           >
             <label htmlFor="store-search" className="sr-only">
               Search stores
