@@ -44,8 +44,11 @@ export default function OnboardingWizard({
 
   const initialIsHq = mode === "reconfirm" && initialStoreId === null;
   const [hq, setHq] = useState(initialIsHq);
+  // No silent preselection on first login — the dropdown trigger shows a
+  // placeholder until the user actively picks. Reconfirm preselects the
+  // current assignment so unchanged users can tap straight through.
   const [storeId, setStoreId] = useState<string>(
-    initialStoreId ?? stores[0]?.id ?? "",
+    mode === "reconfirm" ? (initialStoreId ?? "") : "",
   );
 
   const currentSegment = step === "store" ? 1 : 2;
