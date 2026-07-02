@@ -193,6 +193,23 @@ export default function ReelsFeed({
   // Latest activeIndex mirror — the advance effect reads this without
   // re-subscribing on every scroll.
   const activeIndexRef = useRef<number>(initialIndex);
+  // Down-wrap sentinel — a hidden duplicate section rendered after the last
+  // real lesson. When the user swipe-lands on it, the intersection observer
+  // teleports scrollTop back to items[0], producing a TikTok-style infinite
+  // feed on native mobile scroll. Rendered only when there's more than one
+  // lesson (single-lesson feeds have nothing to wrap).
+  const tailSentinelRef = useRef<HTMLElement | null>(null);
+  const firstItemPosterUrl = useMemo(() => {
+    const first = items[0];
+    if (!first) return null;
+    if (first.content.type === "video") {
+      return `https://image.mux.com/${first.content.playbackId}/thumbnail.jpg?time=0&width=1080`;
+    }
+    if (first.content.type === "image") return first.content.imageUrl;
+    if (first.content.type === "carousel")
+      return first.content.slides[0]?.url ?? null;
+    return null;
+  }, [items]);
 
   const handleLessonCompleted = useCallback(
     (res: LessonCompletedResponse, lessonId: string) => {
@@ -404,8 +421,26 @@ export default function ReelsFeed({
     if (!container) return;
     const obs = new IntersectionObserver(
       (entries) => {
+        // Infinite-feed wrap: if the tail sentinel is (almost) fully in
+        // view, snap-scroll has landed there — teleport scrollTop back to
+        // items[0]'s section so the user re-enters the loop seamlessly.
+        // The sentinel shows items[0]'s poster, so the teleport is visually
+        // near-continuous.
+        for (const e of entries) {
+          const t = e.target as HTMLElement;
+          if (t.dataset.sentinel !== "tail") continue;
+          if (e.intersectionRatio < 0.9) continue;
+          const firstId = items[0]?.id;
+          if (!firstId) return;
+          const firstReal = sectionRefs.current.get(firstId);
+          if (firstReal) container.scrollTop = firstReal.offsetTop;
+          return;
+        }
+
         let best: IntersectionObserverEntry | null = null;
         for (const e of entries) {
+          const t = e.target as HTMLElement;
+          if (t.dataset.sentinel) continue;
           if (e.intersectionRatio < 0.6) continue;
           if (!best || e.intersectionRatio > best.intersectionRatio) best = e;
         }
@@ -429,6 +464,7 @@ export default function ReelsFeed({
       },
     );
     sectionRefs.current.forEach((el) => obs.observe(el));
+    if (tailSentinelRef.current) obs.observe(tailSentinelRef.current);
 
     // Safety valve: if the programmatic mount scroll never lands on the target
     // (e.g. layout not ready), the guard above would otherwise pin activeIndex
@@ -475,16 +511,16 @@ export default function ReelsFeed({
     if (celebrations.length !== 0) return;
     if (!advancePendingRef.current) return;
     advancePendingRef.current = false;
-    const nextIdx = nextUnwatchedIndex(items, activeIndexRef.current, completed);
-    if (nextIdx < 0) {
-      router.push("/browse");
-      return;
-    }
-    const target = items[nextIdx];
+    const cur = activeIndexRef.current;
+    const nextIdx = nextUnwatchedIndex(items, cur, completed);
+    // No unwatched left → cycle to the next lesson in scroll order (watched
+    // or not) rather than eject the user to /browse. Keeps them in the feed.
+    const targetIdx = nextIdx >= 0 ? nextIdx : (cur + 1) % items.length;
+    const target = items[targetIdx];
     if (!target) return;
     const el = sectionRefs.current.get(target.id);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [celebrations.length, completed, items, router, disableTracking]);
+  }, [celebrations.length, completed, items, disableTracking]);
 
   const gotoIndex = useCallback(
     (next: number) => {
@@ -1032,6 +1068,36 @@ export default function ReelsFeed({
             </section>
           );
         })}
+        {/* Down-wrap sentinel — a hidden extra snap section AFTER the last
+            real lesson. It shows items[0]'s poster so when the user
+            swipe-lands on it, the intersection observer teleports scrollTop
+            back to items[0]. Result: infinite feed. Skipped when there's
+            only one lesson (nothing to wrap into). */}
+        {items.length > 1 && (
+          <section
+            ref={(el) => {
+              tailSentinelRef.current = el;
+            }}
+            data-sentinel="tail"
+            aria-hidden
+            className="relative snap-start bg-black"
+            style={{ height: "100dvh", width: "100%" }}
+          >
+            <div className="relative h-full w-full lg:flex lg:items-center lg:justify-center">
+              <div className="relative h-full w-full bg-black lg:h-[min(90vh,880px)] lg:w-auto lg:aspect-[9/16] lg:max-w-[80vw] lg:overflow-hidden lg:rounded-2xl">
+                {firstItemPosterUrl && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={firstItemPosterUrl}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                    draggable={false}
+                  />
+                )}
+              </div>
+            </div>
+          </section>
+        )}
       </div>
 
       {/* Persistent back button — 48px circular, never fades */}
@@ -1096,29 +1162,34 @@ export default function ReelsFeed({
               card and X button call stopPropagation to opt out. */}
           <div
             aria-hidden
-            className="absolute inset-0 bg-near-black/60 backdrop-blur-2xl"
+            className="absolute inset-0 bg-near-black/80 backdrop-blur-md"
           />
           <ConfettiBurst
             intensity={celebration.kind === "tier" ? "tier" : "lesson"}
           />
-          <button
-            type="button"
-            aria-label="Dismiss"
-            onClick={(e) => {
-              e.stopPropagation();
-              popCelebration();
-            }}
-            className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
-            style={{ top: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
-          >
-            <X className="h-4 w-4" strokeWidth={2} />
-          </button>
+          {celebration.kind !== "group" && (
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={(e) => {
+                e.stopPropagation();
+                popCelebration();
+              }}
+              className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[rgba(14,14,14,0.55)] text-[#f9fdff] backdrop-blur-md transition-colors hover:bg-[rgba(14,14,14,0.7)]"
+              style={{ top: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
+            >
+              <X className="h-4 w-4" strokeWidth={2} />
+            </button>
+          )}
           <div
             className="relative z-10 flex w-full max-w-md items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
             {celebration.kind === "group" && (
-              <SuccessGroupCard onSubmit={submitGroupRating} />
+              <SuccessGroupCard
+                onSubmit={submitGroupRating}
+                onSkip={popCelebration}
+              />
             )}
             {celebration.kind === "firstThree" && (
               <SuccessCard

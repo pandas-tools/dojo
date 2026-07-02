@@ -29,10 +29,12 @@ export default function SuccessGroupCard({
   icon = <AnimatedEmoji emoji="🎉" play className="h-10 w-10" />,
   title = "Congrats! You've just completed this group.",
   onSubmit,
+  onSkip,
 }: {
   icon?: React.ReactNode;
   title?: React.ReactNode;
   onSubmit?: (input: { rating: GroupRating | null; comment: string }) => void;
+  onSkip?: () => void;
 }) {
   const [rating, setRating] = useState<GroupRating | null>(null);
   const [comment, setComment] = useState("");
@@ -139,6 +141,16 @@ export default function SuccessGroupCard({
           className="flex h-[44px] w-full items-center justify-center rounded-full bg-arctic-haze px-4 text-[14px] font-medium text-near-black transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Submit
+        </button>
+      )}
+
+      {onSkip && (
+        <button
+          type="button"
+          onClick={onSkip}
+          className="self-center text-[12px] leading-4 text-[#f9fdff]/60 underline underline-offset-2 transition-colors hover:text-arctic-haze"
+        >
+          Skip
         </button>
       )}
     </motion.div>
