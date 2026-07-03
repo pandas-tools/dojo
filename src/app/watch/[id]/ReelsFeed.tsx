@@ -550,6 +550,12 @@ export default function ReelsFeed({
     }
   }, [activeIndex, items, urlPrefix]);
 
+  // TEMPORARY (reeldebug): log every activeIndex change to correlate the
+  // React-state timeline against the scroll timeline in the beacon.
+  useEffect(() => {
+    dbg("activeIndex", { v: activeIndex });
+  }, [activeIndex]);
+
   // Keep activeIndexRef mirrored so the auto-advance effect below reads the
   // latest scroll position without re-subscribing on every change.
   useEffect(() => {

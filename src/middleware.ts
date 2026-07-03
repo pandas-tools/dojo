@@ -22,6 +22,7 @@ export default auth((req) => {
     path.startsWith("/api/auth") ||
     path.startsWith("/api/webhooks") ||
     path.startsWith("/api/health") ||
+    path.startsWith("/api/rtrace") ||
     path.startsWith("/api/media") ||
     path.startsWith("/preview/") ||
     path.startsWith("/design-preview") ||
